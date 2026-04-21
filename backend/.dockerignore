@@ -1,0 +1,12 @@
+# IGNORE HEAVY DATA (They are mounted via Volumes anyway)
+model_cache/
+media/
+
+# IGNORE CACHES
+__pycache__/
+*.pyc
+env/
+venv/
+.venv/
+.git/
+.env

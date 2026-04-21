@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-multipart
+sqlalchemy
+psycopg2-binary
+pgvector
+requests
+pydantic
+python-dotenv
+tenacity
+fastembed==0.5.1
+Pillow
+httpx

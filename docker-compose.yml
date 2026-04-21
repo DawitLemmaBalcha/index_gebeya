@@ -1,0 +1,63 @@
+services:
+  # 1. Database
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: suq_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5433:5432"
+    volumes:
+      - suq_postgres_data:/var/lib/postgresql/data
+
+  # 2. API
+  api:
+    build: ./backend
+    container_name: suq_api
+    restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      PYTHONUNBUFFERED: 1
+      GEMINI_API_KEY: ${GOOGLE_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      TELEGRAM_BOT_TOKEN: "REDACTED_TELEGRAM_BOT_TOKEN"
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+      - suq_media_data:/app/media
+
+  # 3. Listener
+  listener:
+    build: ./listener
+    container_name: suq_listener
+    restart: always
+    environment:
+      TELEGRAM_BOT_TOKEN: "REDACTED_TELEGRAM_BOT_TOKEN"
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      - api
+    volumes:
+      - suq_media_data:/app/media
+
+  # 4. Frontend (NEW!)
+  frontend:
+    build: ./frontend
+    container_name: suq_frontend
+    restart: always
+    ports:
+      - "3001:5173" # We map VPS port 3000 to Container port 5173
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevents host node_modules from overriding container
+
+volumes:
+  suq_postgres_data:
+  suq_media_data:

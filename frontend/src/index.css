@@ -1,0 +1,43 @@
+/* 1. The v4 Import (Replaces @tailwind base/components/utilities) */
+@import "tailwindcss";
+
+/* 2. The Configuration (Replaces tailwind.config.js) */
+@theme {
+  /* Define the Font */
+  --font-sans: "Outfit", sans-serif;
+
+  /* Define the "Fade In Up" Animation */
+  --animate-fade-in-up: fadeInUp 0.5s ease-out forwards;
+
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(15px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Define the Soft Shadow */
+  --shadow-soft: 0 10px 40px -10px rgba(0,0,0,0.08);
+}
+
+/* 3. Global Styles */
+:root {
+  font-family: var(--font-sans);
+  background-color: #F8FAFC; 
+  color: #0F172A;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide Scrollbar Utilities */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
