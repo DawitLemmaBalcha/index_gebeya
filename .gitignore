@@ -59,3 +59,5 @@ desktop.ini
 # === Logs and Databases ===
 *.log
 *.sqlite3
+.opencode
+/AGENTS.md
