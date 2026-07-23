@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import engine, Base
+from sqlalchemy import text
+from database import engine, Base, ensure_db_extensions
 from ai_engine.vector_client import initialize_taxonomy_index
 
 # 👇 IMPORT ROUTERS 👇
@@ -27,9 +28,6 @@ class EndpointFilter(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 # -------------------------
 
-# Initialize DB
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="Index Gebeya API", version="0.6.0")
 
 # Mount Media
@@ -47,6 +45,71 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
+    # ===================================================================
+    # Phase 1 — Enable PostgreSQL extensions (vector, pg_trgm)
+    # ===================================================================
+    try:
+        ensure_db_extensions(engine)
+    except Exception as e:
+        logger.warning(f"⚠️ Extension setup failed: {e}")
+
+    # ===================================================================
+    # Phase 2 — Create tables (idempotent: CREATE TABLE IF NOT EXISTS)
+    # ===================================================================
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables verified/created")
+    except Exception as e:
+        logger.warning(f"⚠️ Table creation failed: {e}")
+
+    # ===================================================================
+    # Phase 3 — Create indexes (SINGLE SOURCE OF TRUTH)
+    # ===================================================================
+    try:
+        with engine.begin() as conn:
+            def _index_exists(conn, name: str) -> bool:
+                """Check if an index already exists on the items table."""
+                row = conn.execute(
+                    text(
+                        "SELECT 1 FROM pg_indexes "
+                        "WHERE indexname = :name AND tablename = 'items'"
+                    ),
+                    {"name": name},
+                ).fetchone()
+                return row is not None
+
+            index_definitions = [
+                {
+                    "name": "ix_items_image_vector_hnsw",
+                    "ddl": (
+                        "CREATE INDEX IF NOT EXISTS ix_items_image_vector_hnsw "
+                        "ON items USING hnsw (image_vector vector_cosine_ops)"
+                    ),
+                },
+                {
+                    "name": "ix_items_text_search",
+                    "ddl": (
+                        "CREATE INDEX IF NOT EXISTS ix_items_text_search "
+                        "ON items USING gin ((coalesce(title, '') || ' ' || coalesce(description, '')) gin_trgm_ops)"
+                    ),
+                },
+            ]
+
+            for idx_def in index_definitions:
+                try:
+                    if _index_exists(conn, idx_def["name"]):
+                        logger.info(f"Index already exists: {idx_def['name']}")
+                    else:
+                        conn.execute(text(idx_def["ddl"]))
+                        logger.info(f"Created index: {idx_def['name']}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Index creation failed for {idx_def['name']}: {e}")
+    except Exception as e:
+        logger.warning(f"⚠️ Index setup connection failed: {e}")
+
+    # ===================================================================
+    # Phase 4 — Initialize taxonomy index (existing behavior, preserved)
+    # ===================================================================
     try:
         initialize_taxonomy_index()
         logger.info("✅ Visual Taxonomy Index Initialized")
