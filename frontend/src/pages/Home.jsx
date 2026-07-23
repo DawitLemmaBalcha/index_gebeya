@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShop } from '../hooks/useShop';
 import NavBar from '../components/home/NavBar';
+import SearchFilters from '../components/SearchFilters';
 import CategoryBar from '../components/home/CategoryBar';
 import ProductGrid from '../components/home/ProductGrid';
 
@@ -30,6 +31,18 @@ const Home = () => {
         setActiveCategory={shop.setActiveCategory}
       />
       
+      {shop.searchQuery && !shop.visualResults && (
+        <SearchFilters
+          searchQuery={shop.searchQuery}
+          minPrice={shop.minPrice}
+          setMinPrice={shop.setMinPrice}
+          maxPrice={shop.maxPrice}
+          setMaxPrice={shop.setMaxPrice}
+          filterCategory={shop.filterCategory}
+          setFilterCategory={shop.setFilterCategory}
+        />
+      )}
+
       {!shop.visualResults && !shop.searchResults && !shop.searchQuery && !isMobileMenuOpen && (
         <CategoryBar 
           activeCategory={shop.activeCategory}

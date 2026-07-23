@@ -320,3 +320,150 @@ When the LLM Judge is unavailable (missing API key, network error, timeout, malf
 - If the LLM Judge is configured but temporarily unavailable (timeout, rate limit), fail open and continue.
 - If the LLM Judge is permanently misconfigured (missing API key, invalid key), log a critical error and consider whether to fail open or reject all (operator decision).
 - At minimum, the distinction is logged clearly so operators can diagnose.
+
+---
+
+## NB-21: Post Deduplication via Vector Matching
+
+**Priority:** HIGH
+**Affected Features:** Ingestion
+**File(s):** `backend/api/routes/ingestion.py`, `backend/services/alerting.py`
+
+**The Gap:**
+When a seller reposts the exact same product (same images, same channel), the system blindly creates a duplicate item. Over time, sellers who repost daily will generate hundreds of duplicate entries, polluting the catalog and wasting ingestion resources.
+
+**User Acceptance Criteria:**
+- Before creating a new item, the system compares the new post's visual fingerprint against all items from the same channel posted in the last 30 days using cosine similarity.
+- If similarity is ≥ 0.98, the existing item's price, description, and extracted fields are updated with the new data. The timestamp is refreshed. No duplicate is created.
+- **When a repost replaces an existing item, the Alert Matching Engine is triggered for the updated item as if it were newly ingested.** This ensures price drops and other changes generate notifications.
+- The platform must communicate to sellers that reusing the exact same image replaces the previous listing. Unique images per unique product are expected.
+- Sellers with genuinely different products using different images are never affected.
+
+---
+
+## NB-22: Channel and User Profile Photos
+
+**Priority:** MEDIUM
+**Affected Features:** Channels, Reviews, Frontend
+**File(s):** `backend/models.py`, `backend/api/routes/ingestion.py`, `frontend/src/pages/ProductPage.jsx`, `frontend/src/components/ReviewModal.jsx`
+
+**The Gap:**
+Product detail pages and review cards currently show letter-avatar placeholders instead of actual photos. Channels have Telegram profile photos that are not fetched or displayed. Users submitting reviews have Telegram profile photos that are not captured from the Mini App's `initData`.
+
+**User Acceptance Criteria:**
+- **Channel photos:** On first ingestion of a channel, the system fetches and stores the channel's Telegram `file_id`. A background task re-checks active channels once per day for a changed `file_id`. Photos are served via the bot's `getFile()` method and displayed on product detail pages.
+- **User photos on reviews:** At review submission time, the frontend captures `photo_url` from the Telegram Mini App `initData`. If the user has a public photo, it is displayed alongside their review. If not, the existing letter-avatar fallback is used.
+- User photos auto-update because they are served directly from Telegram's CDN via the stored URL. Channel photos auto-update within 24 hours of the channel changing them.
+- Both photo types gracefully degrade to the letter-avatar placeholder when unavailable.
+
+---
+
+## NB-23: Search Returns No Results (Empty Catalog + Missing Extension) [IMPLEMENTED]
+
+**Priority:** HIGH
+**Affected Features:** Search
+**File(s):** `backend/services/search.py`, database
+
+**The Gap:**
+The search bar in the frontend appears to not work. There are two potential causes:
+
+1. **Empty catalog:** The database has zero ingested items. Searches technically execute but return empty arrays. From the buyer's perspective, search is "broken" because it never shows results regardless of query.
+2. **Missing pg_trgm extension:** The hybrid search SQL uses `similarity()` from PostgreSQL's `pg_trgm` extension. If this extension was not enabled on the database (unlike `vector` which was explicitly enabled during setup), the search query will fail with a SQL error rather than returning results.
+
+**User Acceptance Criteria:**
+- The `pg_trgm` extension is enabled on the database alongside the `vector` extension during initial database setup.
+- Search returns actual results when items exist in the catalog.
+- Until items are ingested, the search endpoint returns a clean empty array (no SQL errors) and the frontend displays a "No items found" message rather than appearing broken.
+- Add a startup check or migration that verifies `pg_trgm` is enabled and logs a clear error if it is not.
+
+---
+
+## NB-24: Infinite Scroll with Waterfall Recommendation Mix [IMPLEMENTED]
+
+**Priority:** HIGH
+**Affected Features:** Recommendation Feed, Frontend
+**File(s):** `backend/services/recommendation.py`, `backend/api/routes/feed.py`, `frontend/src/hooks/useShop.js`, `frontend/src/components/home/ProductGrid.jsx`
+
+**The Gap:**
+The "For You" feed returns a fixed batch of 50 items and stops. Buyers cannot browse deeper into the catalog. The recommendation mix (40% session / 40% discovery / 20% trending for Regular buyers) stays static regardless of scroll depth, never introducing serendipity or exploration.
+
+**User Acceptance Criteria:**
+
+**Infinite Scroll Behavior:**
+- The frontend initially loads 20 items from `/feed/foryou`.
+- When the buyer scrolls to the bottom of the grid, a loading indicator appears and the next 20 items are fetched by passing an `offset` parameter equal to the number of items already displayed.
+- New items are appended to the existing grid without replacing or reordering items already shown.
+- Server-side deduplication prevents any item from appearing twice across scroll pages.
+- When the backend returns fewer than 20 items (or zero), a "You've seen everything" message is displayed and no further requests are made.
+
+**Waterfall Mix by Scroll Depth (Regular buyers only, >10 interactions):**
+
+| Scroll Depth | Session | Discovery | Trending | Wildcard |
+|---|---|---|---|---|
+| Page 1 (0–20) | 40% | 40% | 20% | — |
+| Page 2 (21–40) | 25% | 45% | 30% | — |
+| Page 3 (41–60) | 10% | 50% | 40% | — |
+| Page 4+ (61+) | — | 40% | 40% | 20% |
+
+**Wildcard Definition (Page 4+):**
+- The wildcard pulls trending items from the buyer's **second-tier categories** — categories they have interacted with but that are not in their top 3. This introduces subtle, non-aggressive serendipity.
+- If the buyer has zero second-tier interests (narrow browsing profile or cold start), wildcard falls back to general trending.
+- Explorer (<10 interactions) and Cold Start (<3 interactions) states do not receive wildcards — they are still forming their profile.
+
+**Backend Changes:**
+- The feed endpoint must accept an `offset` parameter and return items starting from that position.
+- The waterfall mix logic must be parameterized by scroll depth (offset / 20 = page number).
+- Session context naturally exhausts as scroll depth increases because there are limited items visually similar to the last 5 viewed. Discovery and trending fill the gap.
+
+---
+
+## NB-25: Search Filters on Frontend (Price Range + Category)
+
+**Priority:** HIGH
+**Affected Features:** Search, Frontend
+**File(s):** `frontend/src/hooks/useShop.js`, `frontend/src/components/home/NavBar.jsx`
+
+**The Gap:**
+The backend `SearchQuery` schema already supports `min_price`, `max_price`, and `category` as optional filters. The hybrid search service applies these as post-SQL filters. However, the frontend sends a hardcoded payload of `{ query, limit: 50 }` with no filter fields, and there is no UI for the buyer to specify price ranges or categories during search.
+
+**User Acceptance Criteria:**
+- After a buyer types a search query and results appear, a filter bar is displayed below the search input containing:
+  - **Min Price** and **Max Price** number inputs (in ETB)
+  - **Category** dropdown populated from the taxonomy, defaulting to "All"
+- Filters are applied immediately when the buyer changes a value — no "Apply" button needed.
+- Clear visual feedback when filters are active (e.g., count of active filters, highlighted chips).
+- The `handleTextSearch` function passes `min_price`, `max_price`, and `category` to the backend alongside the query text.
+- Sort by price or date is explicitly excluded from this ticket (see UF-7).
+
+---
+
+## NB-26: Missing Database Indexes — Vector (HNSW) and Text (GIN) [IMPLEMENTED]
+
+**Priority:** CRITICAL
+**Affected Features:** Search, Recommendation Feed
+**File(s):** `backend/models.py`, `backend/services/search.py`, `backend/services/recommendation.py`
+
+**The Gap:**
+The hybrid search and recommendation engine both rely on vector similarity and text similarity. Neither has a database index. This means every search performs a full table scan — PostgreSQL loads every row's 512-dimensional vector and computes cosine distance sequentially. Text similarity via `pg_trgm` also scans the entire `items` table.
+
+**Performance degradation by item count:**
+
+| Items | Current (no index) | With indexes |
+|---|---|---|
+| 1,000 | ~0.05s | ~0.001s |
+| 10,000 | ~0.5s | ~0.003s |
+| 40,000 | ~2s | ~0.005s |
+| 100,000+ | ~5s (unusable) | ~0.01s |
+
+**The Fixes Required:**
+
+1. **Vector Index (HNSW):** Add an HNSW index on `image_vector` using `vector_cosine_ops`. HNSW is the best default — O(log n) queries with ~99% recall, sub-millisecond even at millions of vectors. The column definition in SQLAlchemy must include the index directive, and the database migration must create it.
+
+2. **Text Index (GIN):** Add a GIN index on the concatenated title + description columns using `gin_trgm_ops`. This accelerates the `similarity()` calls in the search WHERE clause and the lexical scoring computation. Without it, the text similarity scans every row every time.
+
+**User Acceptance Criteria:**
+- Searching with 10,000+ items in the catalog returns results in under 100ms.
+- The recommendation feed (which also uses vector distance queries) returns in under 100ms.
+- The pgvector extension (already enabled) and pg_trgm extension (see NB-23) are prerequisites — both indexes require their respective extensions.
+- The HNSW index build is a one-time cost at migration time. Subsequent inserts are indexed incrementally.
+- Both indexes are defined in the SQLAlchemy model so they are created automatically during `Base.metadata.create_all()` or documented for manual creation.

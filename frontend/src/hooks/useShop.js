@@ -19,6 +19,11 @@ export const useShop = () => {
   const [isSearchingText, setIsSearchingText] = useState(false);
   const [isSearchingVisual, setIsSearchingVisual] = useState(false);
 
+  // Filter state
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [filterCategory, setFilterCategory] = useState("All");
+
   // Infinite scroll state
   const LIMIT = 20;
   const [offset, setOffset] = useState(0);
@@ -36,13 +41,16 @@ export const useShop = () => {
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (searchQuery.trim().length > 0) {
-        handleTextSearch(searchQuery);
+        handleTextSearch(searchQuery, { minPrice, maxPrice, filterCategory });
       } else {
+        setMinPrice("");
+        setMaxPrice("");
+        setFilterCategory("All");
         setSearchResults(null);
       }
     }, 600); 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  }, [searchQuery, minPrice, maxPrice, filterCategory]);
 
   const fetchItems = useCallback(async (pageOffset = 0) => {
     // Build URL with limit, offset, and exclude params
@@ -108,9 +116,20 @@ export const useShop = () => {
     }
   }, [hasMore, isFetchingMore, offset, fetchItems]);
 
-  const handleTextSearch = async (query) => {
+  const handleTextSearch = async (query, filters = {}) => {
     setIsSearchingText(true); setVisualResults(null); setActiveCategory("All"); 
     
+    const body = { query, limit: 50 };
+    if (filters.minPrice && filters.minPrice !== "") {
+      body.min_price = Number(filters.minPrice);
+    }
+    if (filters.maxPrice && filters.maxPrice !== "") {
+      body.max_price = Number(filters.maxPrice);
+    }
+    if (filters.filterCategory && filters.filterCategory !== "All") {
+      body.category = filters.filterCategory;
+    }
+
     const analyticsHeaders = getAnalyticsHeaders();
 
     try {
@@ -120,7 +139,7 @@ export const useShop = () => {
                 "Content-Type": "application/json",
                 ...analyticsHeaders 
             },
-            body: JSON.stringify({ query: query, limit: 50 })
+            body: JSON.stringify(body)
         });
         if (response.ok) {
             const data = await response.json();
@@ -184,6 +203,7 @@ export const useShop = () => {
     visualResults, searchResults,
     handleImageSearch, clearVisualSearch,
     displayItems, isSearchingText, isSearchingVisual,
-    hasMore, isFetchingMore, fetchMore, LIMIT
+    hasMore, isFetchingMore, fetchMore, LIMIT,
+    minPrice, setMinPrice, maxPrice, setMaxPrice, filterCategory, setFilterCategory
   };
 };
