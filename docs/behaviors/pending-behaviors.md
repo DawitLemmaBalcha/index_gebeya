@@ -417,7 +417,7 @@ The "For You" feed returns a fixed batch of 50 items and stops. Buyers cannot br
 
 ---
 
-## NB-25: Search Filters on Frontend (Price Range + Category)
+## NB-25: Search Filters on Frontend (Price Range + Category) [IMPLEMENTED]
 
 **Priority:** HIGH
 **Affected Features:** Search, Frontend
