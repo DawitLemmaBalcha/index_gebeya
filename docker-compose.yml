@@ -27,36 +27,46 @@ services:
       PYTHONUNBUFFERED: 1
       GEMINI_API_KEY: ${GOOGLE_API_KEY}
       GROQ_API_KEY: ${GROQ_API_KEY}
-      TELEGRAM_BOT_TOKEN: "REDACTED_TELEGRAM_BOT_TOKEN"
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
     depends_on:
       - db
     volumes:
       - ./backend:/app
       - suq_media_data:/app/media
+    networks:
+      - default
+      - proxy-network
 
   # 3. Listener
   listener:
     build: ./listener
     container_name: suq_listener
     restart: always
+    env_file:
+      - .env
     environment:
-      TELEGRAM_BOT_TOKEN: "REDACTED_TELEGRAM_BOT_TOKEN"
       PYTHONUNBUFFERED: 1
     depends_on:
       - api
     volumes:
       - suq_media_data:/app/media
 
-  # 4. Frontend (NEW!)
+  # 4. Frontend
   frontend:
     build: ./frontend
     container_name: suq_frontend
     restart: always
     ports:
-      - "3001:5173" # We map VPS port 3000 to Container port 5173
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules # Prevents host node_modules from overriding container
+      - "3001:5173"
+    networks:
+      - default
+      - proxy-network
+
+networks:
+  default:
+    driver: bridge
+  proxy-network:
+    external: true
 
 volumes:
   suq_postgres_data:

@@ -19,7 +19,7 @@ API_URL = f"{API_BASE}/parse-telegram-post" # Legacy Variable for Worker
 ALERTS_API_URL = f"{API_BASE}/alerts/"      # New Variable for Alerts
 
 # EXTERNAL LINKS
-WEB_APP_URL = "https://teleshop-et.ddns.net"
+WEB_APP_URL = "https://indexgebeya.cfd"
 
 MEDIA_DIR = "/app/media"
 

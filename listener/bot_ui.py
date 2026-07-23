@@ -7,7 +7,7 @@ from config import logger
 # ------------------------------------------------------------------
 
 # YOUR SECURE DOMAIN
-WEB_APP_URL = "https://teleshop-et.ddns.net"
+WEB_APP_URL = "https://indexgebeya.cfd"
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """

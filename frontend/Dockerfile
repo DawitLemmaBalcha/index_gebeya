@@ -2,17 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Only copy package.json initially (since lockfile doesn't exist yet)
+# Install dependencies first (cached layer)
 COPY package.json .
-
-# Install dependencies (this generates the lockfile inside the container)
 RUN npm install --legacy-peer-deps
 
-# Copy the rest of the code
+# Copy source and build production bundle
 COPY . .
+RUN npm run build
 
-# Expose port 5173 (Vite's default)
+# Serve the optimized production build
 EXPOSE 5173
-
-# Run dev server restricted to 0.0.0.0 so we can access it from outside
-CMD ["npm", "run", "dev", "--", "--host"]
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]
