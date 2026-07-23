@@ -12,7 +12,7 @@ from ai_engine.matcher import evaluate_match, MatchTier
 from ai_engine.vector_client import vectorize_text
 from ai_engine.llm_client import verify_match_with_llm 
 
-logger = logging.getLogger("suq_alerts")
+logger = logging.getLogger("index_alerts")
 
 def _normalize(s: str) -> str:
     """

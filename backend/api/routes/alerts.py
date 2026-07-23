@@ -28,8 +28,8 @@ def get_current_user(
         username = "unknown"
         
         # --- INTERNAL BYPASS ---
-        # If the request comes from the suq-listener (bot), we allow plain integer IDs.
-        is_internal = (x_internal_service == "suq-listener")
+        # If the request comes from the index-listener (bot), we allow plain integer IDs.
+        is_internal = (x_internal_service == "index-listener")
 
         if is_internal and init_data.isdigit():
             tg_id = int(init_data)

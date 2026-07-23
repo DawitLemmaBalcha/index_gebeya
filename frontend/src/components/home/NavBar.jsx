@@ -20,7 +20,7 @@ const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, isMobileM
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={onReset}>
             <div className="bg-blue-600 p-2 rounded-lg"><ShoppingBag className="text-white" size={20} /></div>
-            <span className="text-xl font-bold text-gray-900 tracking-tight">Suq<span className="text-blue-600">.et</span></span>
+            <span className="text-xl font-bold text-gray-900 tracking-tight">Index<span className="text-blue-600"> Gebeya</span></span>
           </div>
           
           <div className="hidden md:flex flex-1 max-w-md mx-4 relative">

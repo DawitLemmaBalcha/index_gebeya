@@ -14,7 +14,7 @@ from ai_engine.vector_client import vectorize_image, get_visual_hints
 from services.alerting import process_new_item # IMPORT ORCHESTRATOR
 
 router = APIRouter()
-logger = logging.getLogger("suq_ingestion")
+logger = logging.getLogger("index_ingestion")
 
 @router.post("/parse-telegram-post", response_model=IngestionResponse)
 async def parse_telegram_post(

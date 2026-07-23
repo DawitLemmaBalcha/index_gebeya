@@ -1,4 +1,4 @@
-# Teleshop (Suq.et) — Documentation
+# Index Gebeya — Documentation
 
 ## Structure
 

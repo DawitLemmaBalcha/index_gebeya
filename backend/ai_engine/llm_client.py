@@ -3,7 +3,7 @@ import json
 import logging
 import httpx 
 
-logger = logging.getLogger("suq_llm")
+logger = logging.getLogger("index_llm")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"

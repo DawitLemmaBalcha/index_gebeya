@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../config';
 
-const SESSION_KEY = 'suq_session_id';
-const USER_ID_KEY = 'suq_user_id';
+const SESSION_KEY = 'index_session_id';
+const USER_ID_KEY = 'index_user_id';
 
 // Simple UUID generator since we can't install packages easily
 const generateUUID = () => {

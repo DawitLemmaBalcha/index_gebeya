@@ -2,7 +2,7 @@ import httpx
 from config import API_URL, ALERTS_API_URL, API_BASE, logger
 
 # NEW: Internal Secret Header
-INTERNAL_HEADERS = {"X-Internal-Service": "suq-listener"}
+INTERNAL_HEADERS = {"X-Internal-Service": "index-listener"}
 
 async def send_to_api(payload: dict) -> bool:
     """Sends payload to Backend API (Ingestion)."""

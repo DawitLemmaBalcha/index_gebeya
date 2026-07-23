@@ -10,7 +10,7 @@ from models import Item, UserInteraction
 from database import engine
 
 # --- LOGGER SETUP ---
-logger = logging.getLogger("suq_api")
+logger = logging.getLogger("index_api")
 # --------------------
 
 # Configuration

@@ -21,7 +21,7 @@ if __name__ == '__main__':
         logger.critical("❌ ERROR: TELEGRAM_BOT_TOKEN missing in .env")
         sys.exit(1)
 
-    logger.info("--- 👂 Suq Listener (Hybrid: Ingestion + MiniApp) Online ---")
+    logger.info("--- Index Gebeya Listener (Hybrid: Ingestion + MiniApp) Online ---")
 
     # 1. Initialize Application
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()

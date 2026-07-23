@@ -12,7 +12,7 @@ from api.routes import ingestion, search, items, reviews, alerts, notifications,
 
 # Initialize Logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("suq_api")
+logger = logging.getLogger("index_api")
 
 # --- CUSTOM LOG FILTER ---
 class EndpointFilter(logging.Filter):
@@ -30,7 +30,7 @@ logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 # Initialize DB
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Teleshop API", version="0.6.0")
+app = FastAPI(title="Index Gebeya API", version="0.6.0")
 
 # Mount Media
 os.makedirs("/app/media/temp", exist_ok=True)
@@ -55,7 +55,7 @@ def startup_event():
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "service": "Teleshop Engine Alpha 0.6.0"}
+    return {"status": "online", "service": "Index Gebeya Alpha 0.6.0"}
 
 # INCLUDE ROUTERS
 app.include_router(ingestion.router)
