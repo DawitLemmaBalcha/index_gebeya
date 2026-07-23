@@ -50,6 +50,9 @@ const Home = () => {
         onClearVisual={shop.clearVisualSearch}
         activeCategory={shop.activeCategory}
         activeSubCategory={shop.activeSubCategory}
+        hasMore={shop.hasMore}
+        isFetchingMore={shop.isFetchingMore}
+        onLoadMore={shop.fetchMore}
       />
     </div>
   );

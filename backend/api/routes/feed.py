@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -12,6 +12,8 @@ router = APIRouter()
 def get_personalized_feed(
     request: Request,
     limit: int = 20,
+    offset: int = 0,
+    exclude: Optional[str] = Query(None, description="Comma-separated item IDs to exclude from results"),
     x_user_id: Optional[int] = Header(None),
     x_session_id: Optional[str] = Header(None),
     db: Session = Depends(get_db)
@@ -19,6 +21,7 @@ def get_personalized_feed(
     """
     Generates a personalized 'For You' feed based on the user's
     interaction history (Session or Long-Term).
+    Supports infinite-scroll pagination via offset and exclude parameters.
     """
     
     # Priority: Authenticated User > Anonymous Session > Trending Fallback
@@ -28,7 +31,9 @@ def get_personalized_feed(
         db=db, 
         user_id=x_user_id, 
         session_id=x_session_id, 
-        limit=limit
+        limit=limit,
+        offset=offset,
+        exclude_ids_str=exclude
     )
     
     return items

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 import { TAXONOMY } from '../constants/taxonomy';
 import { getAnalyticsHeaders } from '../utils/analytics'; 
@@ -19,8 +19,15 @@ export const useShop = () => {
   const [isSearchingText, setIsSearchingText] = useState(false);
   const [isSearchingVisual, setIsSearchingVisual] = useState(false);
 
+  // Infinite scroll state
+  const LIMIT = 20;
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [seenItemIds, setSeenItemIds] = useState(new Set());
+
   // Initial Fetch
-  useEffect(() => { fetchItems(); }, []);
+  useEffect(() => { fetchItems(0); }, []);
 
   // Reset Subcat on Cat change
   useEffect(() => { setActiveSubCategory("All"); }, [activeCategory]);
@@ -37,32 +44,69 @@ export const useShop = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async (pageOffset = 0) => {
+    // Build URL with limit, offset, and exclude params
+    let url = `${API_BASE_URL}/feed/foryou?limit=${LIMIT}&offset=${pageOffset}`;
+    if (seenItemIds.size > 0) {
+      url += `&exclude=${[...seenItemIds].join(',')}`;
+    }
+
     try {
-      setLoading(true); setError(null);
+      if (pageOffset === 0) {
+        setLoading(true);
+      }
+      setError(null);
       
-      // --- CHANGED: USE 'FOR YOU' FEED WITH ANALYTICS HEADERS ---
       const analyticsHeaders = getAnalyticsHeaders();
       
-      // We request 50 items to ensure client-side filtering (by category) 
-      // still has enough data to display.
-      const response = await fetch(`${API_BASE_URL}/feed/foryou?limit=50`, {
+      const response = await fetch(url, {
           headers: {
               ...analyticsHeaders
           }
       });
-      // ----------------------------------------------------------
 
       if (!response.ok) throw new Error(`Server Error: ${response.status}`);
       const data = await response.json();
-      setItems(data);
+      
+      if (pageOffset === 0) {
+        setItems(data);
+        setOffset(0);
+      } else {
+        setItems(prev => [...prev, ...data]);
+      }
+      
+      if (data.length < LIMIT) {
+        setHasMore(false);
+      }
+      if (data.length === 0) {
+        setHasMore(false);
+      }
+      
+      // Track seen IDs
+      setSeenItemIds(prev => {
+        const next = new Set(prev);
+        data.forEach(item => next.add(item.id));
+        return next;
+      });
     } catch (error) {
       console.error("Error fetching items:", error);
       setError(error.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [LIMIT, seenItemIds]);
+
+  const fetchMore = useCallback(async () => {
+    if (!hasMore || isFetchingMore) return;
+    const newOffset = offset + LIMIT;
+    setIsFetchingMore(true);
+    try {
+      await fetchItems(newOffset);
+      setOffset(newOffset);
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [hasMore, isFetchingMore, offset, fetchItems]);
 
   const handleTextSearch = async (query) => {
     setIsSearchingText(true); setVisualResults(null); setActiveCategory("All"); 
@@ -139,6 +183,7 @@ export const useShop = () => {
     searchQuery, setSearchQuery,
     visualResults, searchResults,
     handleImageSearch, clearVisualSearch,
-    displayItems, isSearchingText, isSearchingVisual
+    displayItems, isSearchingText, isSearchingVisual,
+    hasMore, isFetchingMore, fetchMore, LIMIT
   };
 };

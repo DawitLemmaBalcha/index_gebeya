@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import ItemCard from '../ItemCard';
 import { WifiOff, Camera, Search } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
 
-const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults, searchResults, onClearVisual, activeCategory, activeSubCategory }) => {
+const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults, searchResults, onClearVisual, activeCategory, activeSubCategory, hasMore, isFetchingMore, onLoadMore }) => {
   
   // Status Line
   const StatusLine = () => (
@@ -22,6 +22,27 @@ const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults
        )}
     </div>
   );
+
+  // IntersectionObserver sentinel for infinite scroll
+  const sentinelRef = useRef(null);
+  useEffect(() => {
+    if (!hasMore) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isFetchingMore) {
+          onLoadMore();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+    
+    return () => observer.disconnect();
+  }, [hasMore, isFetchingMore, onLoadMore]);
 
   if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
   
@@ -45,6 +66,15 @@ const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults
         </div>
       ) : (
         <div className="text-center text-gray-500 py-10">No items found.</div>
+      )}
+      <div ref={sentinelRef} className="h-1" />
+      {isFetchingMore && (
+        <div className="flex justify-center items-center py-6">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      )}
+      {!hasMore && items.length > 0 && (
+        <p className="text-center text-gray-400 py-6 text-sm">You've seen everything!</p>
       )}
     </main>
   );
