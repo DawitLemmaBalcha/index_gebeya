@@ -467,3 +467,24 @@ The hybrid search and recommendation engine both rely on vector similarity and t
 - The pgvector extension (already enabled) and pg_trgm extension (see NB-23) are prerequisites — both indexes require their respective extensions.
 - The HNSW index build is a one-time cost at migration time. Subsequent inserts are indexed incrementally.
 - Both indexes are defined in the SQLAlchemy model so they are created automatically during `Base.metadata.create_all()` or documented for manual creation.
+
+---
+
+## NB-27: Channel & Group Bot Onboarding
+
+**Priority:** HIGH
+**Affected Features:** Listener, Channels
+**File(s):** `listener/main.py`, `backend/models.py`, new handler module
+
+**The Gap:**
+There is no onboarding flow for channel/group owners. The bot silently discovers channels during ingestion. Owners have no way to know the bot is working, no instructions for how to add it, and no feedback when the bot's status changes. Channels auto-discovered during ingestion have no ownership metadata.
+
+**User Acceptance Criteria:**
+- `/addchannel` command returns clear step-by-step instructions for adding the bot as admin to a channel or group.
+- When the bot is added as admin to a public channel/group, the owner receives a confirmation DM and the channel is registered with `registered_by` set to their Telegram ID.
+- Private channels/groups (no @username) are rejected with a clear DM explaining the requirement.
+- When added as a regular member (not admin), the owner receives a DM instructing them to re-add as admin.
+- When the bot is demoted from admin to member, the owner receives a DM warning that ingestion is paused.
+- When the bot is removed entirely, the owner receives a DM confirming their listings are no longer being updated.
+- Re-adding the bot as admin immediately resumes ingestion with no manual resync.
+- Every status transition is idempotent — no stale state, no manual commands needed.
