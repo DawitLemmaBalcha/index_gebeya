@@ -470,7 +470,7 @@ The hybrid search and recommendation engine both rely on vector similarity and t
 
 ---
 
-## NB-27: Channel & Group Bot Onboarding
+## NB-27: Channel & Group Bot Onboarding [IMPLEMENTED]
 
 **Priority:** HIGH
 **Affected Features:** Listener, Channels
