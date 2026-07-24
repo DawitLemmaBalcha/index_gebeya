@@ -19,6 +19,14 @@ class ChannelResponse(ChannelBase):
     class Config:
         from_attributes = True
 
+
+class ChannelUpsert(BaseModel):
+    username: str
+    title: Optional[str] = None
+    registered_by: Optional[int] = None
+    telegram_id: Optional[int] = None
+
+
 # ----------------------------------------------------------------------
 # REVIEW SCHEMAS
 # ----------------------------------------------------------------------

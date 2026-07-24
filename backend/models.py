@@ -118,6 +118,7 @@ class Channel(Base):
     review_count = Column(Integer, default=0)
     is_verified = Column(Boolean, default=False)
     photo_file_id = Column(String, nullable=True)  # Telegram big_file_id for channel profile photo
+    registered_by = Column(BigInteger, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

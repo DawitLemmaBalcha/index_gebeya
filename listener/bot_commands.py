@@ -57,3 +57,20 @@ async def handle_alert_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 await query.message.reply_text("✅ Alert deleted.")
         else:
             await query.answer("❌ Failed to stop alert. Try again.", show_alert=True)
+
+
+async def handle_addchannel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Instructs a channel/group owner on how to add the bot as admin.
+    """
+    bot_username = context.bot.username
+    instruction_text = (
+        "To list your products on Index Gebeya, add me to your channel or group as an **admin**:\n\n"
+        "1. Open your channel or group → **Info** → **Administrators**\n"
+        f"2. Tap **Add Admin** and search for `@{bot_username}`\n"
+        "3. ⚠️ **Turn OFF all permissions.** I don't need to delete messages, ban users, or post. "
+        "Admin is only needed so I can verify you own this channel/group.\n"
+        "4. Confirm.\n\n"
+        "Once added, post a product — it'll appear in the marketplace within a minute or two."
+    )
+    await update.message.reply_text(instruction_text, parse_mode="Markdown")

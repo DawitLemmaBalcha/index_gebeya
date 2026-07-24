@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Channel
-from schemas import ChannelResponse
+from schemas import ChannelResponse, ChannelUpsert
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 router = APIRouter()
@@ -45,6 +45,37 @@ def update_channel(channel_id: int, update: ChannelUpdate, db: Session = Depends
     db.commit()
     db.refresh(channel)
     return channel
+
+
+@router.post("/", response_model=ChannelResponse)
+def upsert_channel(body: ChannelUpsert, db: Session = Depends(get_db)):
+    """Upsert a channel from the listener bot (owner onboarding)."""
+    channel = db.query(Channel).filter(Channel.username == body.username).first()
+
+    if channel:
+        # Update existing channel
+        if body.registered_by is not None:
+            channel.registered_by = body.registered_by
+        if body.title is not None:
+            channel.title = body.title
+        if body.telegram_id is not None:
+            channel.telegram_id = body.telegram_id
+        db.commit()
+        db.refresh(channel)
+        return channel
+    else:
+        # Create new channel with default trust_score
+        channel = Channel(
+            username=body.username,
+            title=body.title or body.username,
+            registered_by=body.registered_by,
+            telegram_id=body.telegram_id,
+            trust_score=2.5,
+        )
+        db.add(channel)
+        db.commit()
+        db.refresh(channel)
+        return channel
 
 
 @router.get("/{channel_id}/photo")

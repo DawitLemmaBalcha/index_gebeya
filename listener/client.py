@@ -101,3 +101,26 @@ async def ack_notification(notification_id: int) -> bool:
         except Exception as e:
             logger.error(f"⚠️ Failed to ACK notification {notification_id}: {e}")
             return False
+
+
+async def upsert_channel_api(username: str, title: str, registered_by: int, telegram_id: int) -> bool:
+    """Registers or updates a channel with the backend (owner onboarding)."""
+    url = f"{API_BASE}/channels/"
+    payload = {
+        "username": username,
+        "title": title,
+        "registered_by": registered_by,
+        "telegram_id": telegram_id,
+    }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.post(url, json=payload, headers=INTERNAL_HEADERS)
+            if response.status_code == 200:
+                logger.info(f"✅ Channel registered: @{username}")
+                return True
+            else:
+                logger.error(f"❌ Channel registration failed ({response.status_code}): {response.text}")
+                return False
+        except Exception as e:
+            logger.error(f"💥 Channel upsert exception: {e}")
+            return False

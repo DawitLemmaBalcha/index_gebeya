@@ -1,14 +1,15 @@
 import asyncio
 import sys
 import logging
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, CallbackQueryHandler, filters
+from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, CallbackQueryHandler, ChatMemberHandler, filters
 from config import TELEGRAM_TOKEN, logger
 
 # NEW IMPORTS
 from monitor import handle_channel_post
 from bot_ui import handle_start
 from alert_conversation import alert_conv_handler
-from bot_commands import handle_my_alerts, handle_alert_callback # 👈 NEW IMPORTS
+from bot_commands import handle_my_alerts, handle_alert_callback, handle_addchannel # 👈 NEW IMPORTS
+from chat_member_handler import handle_chat_member
 from worker import background_worker
 from notifications import notification_poller
 from photo_refresher import channel_photo_refresher
@@ -36,6 +37,8 @@ if __name__ == '__main__':
     # A. User Commands
     application.add_handler(CommandHandler('start', handle_start))
     application.add_handler(CommandHandler('myalerts', handle_my_alerts)) # 👈 NEW COMMAND
+    application.add_handler(CommandHandler('addchannel', handle_addchannel))
+    application.add_handler(ChatMemberHandler(handle_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
     
     # B. Conversation (Alert Creation)
     application.add_handler(alert_conv_handler)
