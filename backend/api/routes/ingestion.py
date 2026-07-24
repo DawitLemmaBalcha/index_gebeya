@@ -2,15 +2,17 @@ import os
 import time
 import logging
 import numpy as np
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from database import get_db
 from models import Item, Channel, ItemImage
 from schemas import TelegramPost, IngestionResponse
 from ai_engine import extract_product_info
 from ai_engine.vector_client import vectorize_image, get_visual_hints
+from ai_engine.matcher import cosine_similarity
 from services.alerting import process_new_item # IMPORT ORCHESTRATOR
 
 router = APIRouter()
@@ -94,6 +96,101 @@ async def parse_telegram_post(
             channel = Channel(username=clean_username, title=clean_username, trust_score=2.5)
             db.add(channel)
             db.flush()
+
+        # ---------------------------------------------------------
+        # TECH-06: DEDUP BLOCK — Compare visual vector against recent items
+        # in the same channel. If a near-identical match is found
+        # (cosine similarity >= 0.98), update the existing item instead
+        # of creating a duplicate.
+        #
+        # NOTE: Two concurrent workers processing the same channel could
+        # both read the same stale candidate list and both decide "no match",
+        # creating two items. This race is acceptable for now (low probability
+        # given the serial worker architecture). A future improvement: add a
+        # unique constraint on (channel_id, image_vector) with a pgvector
+        # distance operator.
+        # ---------------------------------------------------------
+        if visual_vector is not None:
+            cutoff_date = datetime.utcnow() - timedelta(days=30)
+            stmt_candidates = (
+                select(Item)
+                .where(
+                    Item.channel_id == channel.id,
+                    Item.created_at >= cutoff_date,
+                    Item.image_vector != None
+                )
+            )
+            candidates = db.scalars(stmt_candidates).all()
+            logger.debug(f"Dedup: comparing against {len(candidates)} candidates in channel {channel.id}")
+
+            best_match = None
+            best_sim = 0.0
+
+            for candidate in candidates:
+                try:
+                    if hasattr(candidate.image_vector, "tolist"):
+                        candidate_vec = candidate.image_vector.tolist()
+                    else:
+                        candidate_vec = list(candidate.image_vector)
+                    sim = cosine_similarity(visual_vector, candidate_vec)
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_match = candidate
+                except Exception as e:
+                    logger.warning(
+                        f"Dedup: skipping candidate #{candidate.id} (malformed vector): {e}"
+                    )
+                    continue
+
+            if best_match is not None and best_sim >= 0.98:
+                logger.info(f"Dedup: matched item #{best_match.id} (sim={best_sim:.4f})")
+
+                # Update fields on the existing item
+                best_match.title = getattr(ext, 'title', getattr(ext, 'item_name', 'Unknown Item'))
+                best_match.description = getattr(ext, 'description', 'No description')
+                best_match.price = getattr(ext, 'price', 0)
+                best_match.currency = getattr(ext, 'currency', 'ETB')
+                best_match.phone_number = getattr(ext, 'contact_phone', None) or getattr(ext, 'phone_number', None)
+                best_match.category = getattr(ext, 'category', 'Uncategorized')
+                best_match.subcategory = getattr(ext, 'subcategory', 'General')
+                best_match.specs = str(getattr(ext, 'item_metadata', {}))
+                best_match.image_path = post.image_path
+                best_match.image_vector = visual_vector
+                best_match.original_caption = post.text
+                best_match.created_at = datetime.utcnow()
+
+                # Refresh gallery images
+                db.execute(
+                    delete(ItemImage).where(ItemImage.item_id == best_match.id)
+                )
+                if post.album_paths:
+                    for path in post.album_paths:
+                        db.add(ItemImage(item_id=best_match.id, image_path=path))
+                elif post.image_path:
+                    db.add(ItemImage(item_id=best_match.id, image_path=post.image_path))
+
+                db.commit()
+                db.refresh(best_match)
+
+                # Re-run alert matching on the updated item
+                process_new_item(db, best_match.id)
+
+                return IngestionResponse(
+                    status="success",
+                    item_id=best_match.id,
+                    extracted_data=extraction_data if isinstance(extraction_data, dict) else extraction_data.dict(),
+                    error=None
+                )
+
+            else:
+                if len(candidates) == 0:
+                    logger.info(
+                        f"Dedup: no candidates found for channel {channel.id}, creating new item."
+                    )
+                else:
+                    logger.info(
+                        f"Dedup: new item (best sim={best_sim:.4f})"
+                    )
 
         # ---------------------------------------------------------
         # 3. Create Item
