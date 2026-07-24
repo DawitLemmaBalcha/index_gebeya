@@ -323,7 +323,7 @@ When the LLM Judge is unavailable (missing API key, network error, timeout, malf
 
 ---
 
-## NB-21: Post Deduplication via Vector Matching
+## NB-21: Post Deduplication via Vector Matching [IMPLEMENTED]
 
 **Priority:** HIGH
 **Affected Features:** Ingestion
@@ -341,7 +341,7 @@ When a seller reposts the exact same product (same images, same channel), the sy
 
 ---
 
-## NB-22: Channel and User Profile Photos
+## NB-22: Channel and User Profile Photos [IMPLEMENTED]
 
 **Priority:** MEDIUM
 **Affected Features:** Channels, Reviews, Frontend
