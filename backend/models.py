@@ -32,7 +32,7 @@ class UserInteraction(Base):
     session_id = Column(String, nullable=True)
     
     # MODIFIED: Changed to nullable=True to support generic events (e.g., Search)
-    item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="SET NULL"), nullable=True)
     
     interaction_type = Column(String, default="view")
     
@@ -84,7 +84,7 @@ class Notification(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
     alert_id = Column(Integer, ForeignKey("alerts.id"), nullable=True)
     
     # Payload Data
@@ -195,7 +195,7 @@ class ItemImage(Base):
     __tablename__ = "item_images"
 
     id = Column(Integer, primary_key=True, index=True)
-    item_id = Column(Integer, ForeignKey("items.id"), nullable=False)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
     image_path = Column(String, nullable=False)
     
     # Relationship
