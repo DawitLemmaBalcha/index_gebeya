@@ -2,11 +2,17 @@
 
 # Defined as a Python Dict so we can access it programmatically for Vector Indexing
 TAXONOMY_STRUCTURE = {
-    "Mobile Phones & Tablets": [
-        "Mobile Phones", "Tablets", "Smart Watches", "Accessories for Phones & Tablets", "Headphones"
+    "Mobile Phones": [
+        "Android Phones", "iPhones", "Feature Phones", "Phone Accessories"
+    ],
+    "Laptops & Computers": [
+        "Laptops", "Desktop Computers", "Computer Accessories", "Printers & Scanners", "Networking Products"
+    ],
+    "Tablets": [
+        "Tablets", "E-Readers", "Tablet Accessories"
     ],
     "Electronics": [
-        "Laptops & Computers", "TV & DVD Equipment", "Audio & Music Equipment", "Computer Accessories", "Photo & Video Cameras", "Printers & Scanners", "Security & Surveillance", "Video Game Consoles", "Networking Products"
+        "TV & DVD Equipment", "Audio & Music Equipment", "Photo & Video Cameras", "Security & Surveillance", "Video Game Consoles", "Smart Watches", "Headphones"
     ],
     "Vehicles": [
         "Cars", "Buses & Microbuses", "Motorcycles & Scooters", "Trucks & Trailers", "Heavy Machinery", "Vehicle Parts & Accessories", "Watercraft & Boats"
@@ -17,8 +23,14 @@ TAXONOMY_STRUCTURE = {
     "Home, Appliances & Furniture": [
         "Furniture", "Home Appliances", "Kitchen Appliances", "Kitchenware & Cookware", "Home Accessories", "Garden Supplies", "Cleaning Supplies"
     ],
-    "Fashion": [
-        "Men's Clothing", "Women's Clothing", "Men's Shoes", "Women's Shoes", "Bags", "Watches", "Jewelry", "Clothing Accessories", "Kids' Fashion"
+    "Men's Fashion": [
+        "Men's Clothing", "Men's Shoes", "Watches", "Men's Accessories"
+    ],
+    "Women's Fashion": [
+        "Women's Clothing", "Women's Shoes", "Bags", "Jewelry", "Women's Accessories"
+    ],
+    "Shoes": [
+        "Sneakers", "Formal Shoes", "Boots", "Sandals", "Sports Shoes"
     ],
     "Health & Beauty": [
         "Fragrance", "Makeup", "Hair Beauty", "Skin & Body Care", "Tools & Accessories", "Vitamins & Supplements", "Sexual Wellness"

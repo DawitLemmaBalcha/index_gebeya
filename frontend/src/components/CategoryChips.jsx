@@ -1,36 +1,5 @@
-import { Smartphone, Laptop, Car, Home, Shirt, Grid, Sparkles, SprayCan, Heart, Armchair } from 'lucide-react';
-
-// Define the Strict Taxonomy for the Frontend
-const TAXONOMY = {
-  'Electronics': {
-    icon: Smartphone,
-    subs: ['Mobile Phones', 'Laptops', 'Tablets', 'Audio', 'Accessories', 'Cameras', 'Gaming']
-  },
-  'Fashion': {
-    icon: Shirt,
-    subs: ['Men', 'Women', 'Shoes', 'Jewelry', 'Accessories', 'Bags']
-  },
-  'Beauty': {
-    icon: Sparkles,
-    subs: ['Makeup', 'Fragrance', 'Nail Care']
-  },
-  'Personal Care': {
-    icon: SprayCan, // Or Heart/Droplet
-    subs: ['Skincare', 'Hair Care', 'Treatments', 'Hygiene']
-  },
-  'Vehicles': {
-    icon: Car,
-    subs: ['Cars', 'Motorcycles', 'Parts & Accessories']
-  },
-  'Real Estate': {
-    icon: Home,
-    subs: ['Houses', 'Apartments', 'Land', 'Commercial']
-  },
-  'Home': {
-    icon: Armchair,
-    subs: ['Furniture', 'Appliances', 'Decor', 'Kitchenware']
-  }
-};
+import { Grid } from 'lucide-react';
+import { TAXONOMY } from '../constants/taxonomy';
 
 export default function CategoryChips({ activeCategory, setActiveCategory, activeSubcategory, setActiveSubcategory }) {
   
@@ -46,7 +15,7 @@ export default function CategoryChips({ activeCategory, setActiveCategory, activ
     }
   };
 
-  const currentSubs = TAXONOMY[activeCategory]?.subs || [];
+  const currentSubs = TAXONOMY[activeCategory] || [];
 
   return (
     <div className="flex flex-col gap-2 pb-2">
@@ -67,8 +36,7 @@ export default function CategoryChips({ activeCategory, setActiveCategory, activ
             <span>All</span>
           </button>
 
-          {Object.entries(TAXONOMY).map(([key, data]) => {
-            const Icon = data.icon;
+          {Object.keys(TAXONOMY).map((key) => {
             const isActive = activeCategory === key;
             return (
               <button
@@ -81,7 +49,6 @@ export default function CategoryChips({ activeCategory, setActiveCategory, activ
                     : 'bg-white text-gray-500 border border-gray-100 hover:border-blue-100'}
                 `}
               >
-                <Icon size={14} className={isActive ? 'text-white' : 'text-gray-400'} />
                 <span>{key}</span>
               </button>
             );
