@@ -36,10 +36,10 @@ const Home = () => {
         setSearchQuery={shop.setSearchQuery}
         onImageSearch={shop.handleImageSearch}
         onReset={handleReset}
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
         activeCategory={shop.activeCategory}
         setActiveCategory={shop.setActiveCategory}
+        activeSubCategory={shop.activeSubCategory}
+        setActiveSubCategory={shop.setActiveSubCategory}
       />
       
       {shop.searchQuery && !shop.visualResults && (
