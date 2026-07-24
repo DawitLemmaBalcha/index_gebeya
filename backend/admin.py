@@ -2,6 +2,8 @@ import os
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
+from starlette.responses import Response
+import base64
 
 from database import engine
 from models import User, UserInteraction, Alert, Notification, Channel, Review, Item, ItemImage
@@ -17,7 +19,10 @@ class AdminAuth(AuthenticationBackend):
         password = form.get("password")
         expected_user = os.getenv("ADMIN_USERNAME", "admin")
         expected_pass = os.getenv("ADMIN_PASSWORD", "indexgebeya")
-        return username == expected_user and password == expected_pass
+        if username == expected_user and password == expected_pass:
+            request.session.update({"token": "authenticated"})
+            return True
+        return False
 
     async def logout(self, request: Request) -> bool:
         request.session.clear()
@@ -25,10 +30,7 @@ class AdminAuth(AuthenticationBackend):
 
     async def authenticate(self, request: Request) -> bool:
         token = request.session.get("token")
-        if not token:
-            return False
-        # token is set by SQLAdmin after successful login
-        return True
+        return token == "authenticated"
 
 
 # ---------------------------------------------------------------------------

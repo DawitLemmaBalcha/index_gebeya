@@ -3,7 +3,6 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 
 from sqlalchemy import text
 from database import engine, Base, ensure_db_extensions
@@ -44,9 +43,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Session middleware — required by SQLAdmin auth
-app.add_middleware(SessionMiddleware, secret_key=os.getenv("ADMIN_SECRET_KEY", "change-me-in-production"))
 
 @app.on_event("startup")
 def startup_event():
