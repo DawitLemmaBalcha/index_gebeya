@@ -145,6 +145,7 @@ def setup_admin(app):
         authentication_backend=auth_backend,
         title="Index Gebeya Admin",
         base_url="/admin",
+        templates_dir="/app/templates",
     )
     # Register all model views
     admin.add_view(UserAdmin)
