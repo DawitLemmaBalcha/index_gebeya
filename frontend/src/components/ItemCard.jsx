@@ -100,6 +100,13 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
           {formatPrice(item.price, item.currency)}
         </div>
 
+        {/* TECH-15: Channel username */}
+        {item.channel?.username && (
+          <div className="flex items-center gap-1 mb-1">
+            <span className="text-[10px] text-gray-400 truncate">@{item.channel.username}</span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
           <span className="bg-gray-100 px-2 py-1 rounded truncate max-w-[60%]">{item.category || "General"}</span>
           <span className="line-clamp-1">{item.location || 'Addis Ababa'}</span>

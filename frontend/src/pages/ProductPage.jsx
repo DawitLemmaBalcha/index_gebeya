@@ -249,7 +249,7 @@ const ProductPage = () => {
                                                         />
                                                     ) : null}
                                                     <User size={12} className={`text-gray-400 ${rev.user_photo_url ? 'hidden' : ''}`} />
-                                                    <span className="text-xs font-bold text-gray-700">Verified User</span>
+                                                    <span className="text-xs font-bold text-gray-700">{rev.user_name || rev.user?.first_name || "User"}</span>
                                                 </div>
                                                 <div className="flex gap-0.5">
                                                     {[...Array(5)].map((_, i) => (

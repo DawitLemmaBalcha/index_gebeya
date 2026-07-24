@@ -340,5 +340,38 @@ def test_create_review_with_photo_then_list():
     )
 
 
+# =========================================================================
+# TECH-15: T17 — Review list includes user_name
+# =========================================================================
+
+def test_review_list_includes_user_name():
+    """
+    T17 (TECH-15): Call GET /reviews/{channel_id}.
+    Verify each review in the response includes user_name
+    (either a display name string or null).
+    """
+    channel_id = get_test_channel_id()
+    if channel_id is None:
+        pytest.skip("No channels in database to test reviews against")
+
+    resp = api_get(f"/reviews/{channel_id}")
+    assert resp.status_code == 200, (
+        f"Expected 200 from /reviews/{channel_id}, got {resp.status_code}"
+    )
+
+    reviews = resp.json()
+    assert isinstance(reviews, list), f"Expected list, got {type(reviews)}"
+
+    if reviews:
+        for rev in reviews:
+            assert "user_name" in rev, (
+                f"Review item missing 'user_name'. Keys: {list(rev.keys())}"
+            )
+            name = rev["user_name"]
+            assert name is None or isinstance(name, str), (
+                f"user_name should be string or null, got {type(name)}: {name}"
+            )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

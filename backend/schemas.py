@@ -43,6 +43,7 @@ class ReviewResponse(BaseModel):
     rating: int
     comment: Optional[str]
     user_photo_url: Optional[str] = None
+    user_name: Optional[str] = None
     created_at: datetime
     
     class Config:

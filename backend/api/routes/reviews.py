@@ -5,7 +5,7 @@ import json
 from typing import List
 from urllib.parse import unquote
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from database import get_db
@@ -115,4 +115,7 @@ def create_review(payload: ReviewCreate, db: Session = Depends(get_db)):
 @router.get("/{channel_id}", response_model=List[ReviewResponse])
 def get_reviews(channel_id: int, db: Session = Depends(get_db), limit: int = 10):
     """Fetch recent reviews for a specific channel"""
-    return db.query(Review).filter(Review.channel_id == channel_id).order_by(Review.created_at.desc()).limit(limit).all()
+    reviews = db.query(Review).options(joinedload(Review.user)).filter(Review.channel_id == channel_id).order_by(Review.created_at.desc()).limit(limit).all()
+    for r in reviews:
+        r.user_name = r.user.first_name or r.user.username or "User"
+    return reviews
