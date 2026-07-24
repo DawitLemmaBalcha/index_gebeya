@@ -1,43 +1,76 @@
 /* 1. The v4 Import (Replaces @tailwind base/components/utilities) */
 @import "tailwindcss";
 
-/* 2. The Configuration (Replaces tailwind.config.js) */
 @theme {
-  /* Define the Font */
-  --font-sans: "Outfit", sans-serif;
+  --font-sans: "Inter", "Noto Sans Ethiopic", sans-serif;
+  --font-amharic: "Noto Sans Ethiopic", sans-serif;
 
-  /* Define the "Fade In Up" Animation */
   --animate-fade-in-up: fadeInUp 0.5s ease-out forwards;
+  --animate-fade-in: fadeIn 0.4s ease-out forwards;
 
   @keyframes fadeInUp {
-    0% {
-      opacity: 0;
-      transform: translateY(15px);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    0% { opacity: 0; transform: translateY(15px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
   }
 
-  /* Define the Soft Shadow */
   --shadow-soft: 0 10px 40px -10px rgba(0,0,0,0.08);
+  --shadow-warm: 0 10px 30px -5px rgba(180, 83, 9, 0.08);
+  --shadow-glow: 0 0 25px rgba(217, 119, 6, 0.25);
+
+  --color-brand-50: #FFFBEB;
+  --color-brand-100: #FEF3C7;
+  --color-brand-500: #F59E0B;
+  --color-brand-600: #D97706;
+  --color-brand-700: #B45309;
+  --color-brand-800: #92400E;
+  --color-brand-900: #78350F;
+
+  --color-ethiopia-green: #047857;
+  --color-ethiopia-gold: #D97706;
+  --color-ethiopia-red: #B91C1C;
+  --color-ethiopia-dark: #0F0E11;
+  --color-ethiopia-card: #18171C;
+  --color-ethiopia-paper: #FAF6F0;
+  --color-ethiopia-border: #E5DFD5;
 }
 
-/* 3. Global Styles */
 :root {
   font-family: var(--font-sans);
-  background-color: #F8FAFC; 
+  background-color: #F8FAFC;
   color: #0F172A;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Hide Scrollbar Utilities */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Landing Page Custom Styles ── */
+.bg-mesh {
+  background-image: radial-gradient(at 0% 0%, rgba(217, 119, 6, 0.06) 0px, transparent 50%),
+                    radial-gradient(at 100% 100%, rgba(4, 120, 87, 0.05) 0px, transparent 50%);
 }
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #FAF6F0; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #D97706; border-radius: 9999px; }
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 0.4; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+.animate-pulse-ring { animation: pulse-ring 2s infinite ease-in-out; }
+
+.cursor-blink {
+  display: inline-block; width: 2px; height: 1.2em;
+  background-color: #D97706; vertical-align: middle;
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
