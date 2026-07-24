@@ -11,6 +11,7 @@ from alert_conversation import alert_conv_handler
 from bot_commands import handle_my_alerts, handle_alert_callback # 👈 NEW IMPORTS
 from worker import background_worker
 from notifications import notification_poller
+from photo_refresher import channel_photo_refresher
 
 # --- SILENCE HTTPX LOGS (POLLING NOISE) ---
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -55,6 +56,10 @@ if __name__ == '__main__':
         # B. Notification Poller (The Mailman)
         asyncio.create_task(notification_poller(app.bot))
         logger.info("✅ Notification Poller Injected")
+
+        # C. Channel Photo Refresher
+        asyncio.create_task(channel_photo_refresher(app.bot))
+        logger.info("✅ Channel Photo Refresher Injected")
 
     application.post_init = post_init
 

@@ -14,6 +14,7 @@ class ChannelBase(BaseModel):
 class ChannelResponse(ChannelBase):
     id: int
     review_count: int
+    photo_file_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -33,6 +34,7 @@ class ReviewResponse(BaseModel):
     user_id: int
     rating: int
     comment: Optional[str]
+    user_photo_url: Optional[str] = None
     created_at: datetime
     
     class Config:

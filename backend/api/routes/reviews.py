@@ -59,6 +59,7 @@ def create_review(payload: ReviewCreate, db: Session = Depends(get_db)):
     # 1. Verify Identity (Cryptographic Check)
     tg_user = validate_telegram_data(payload.init_data)
     tg_id = tg_user.get("id")
+    photo_url = tg_user.get("photo_url")  # TECH-07: Capture user profile photo from initData
     
     if not tg_id:
         raise HTTPException(status_code=400, detail="Invalid User Data")
@@ -89,7 +90,8 @@ def create_review(payload: ReviewCreate, db: Session = Depends(get_db)):
         user_id=user.id,
         channel_id=payload.channel_id,
         rating=payload.rating,
-        comment=payload.comment
+        comment=payload.comment,
+        user_photo_url=photo_url
     )
     db.add(new_review)
     db.commit()

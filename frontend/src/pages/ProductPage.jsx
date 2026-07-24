@@ -21,6 +21,9 @@ const ProductPage = () => {
     const [isReviewOpen, setIsReviewOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false); // NEW
 
+    // Channel photo state for graceful fallback
+    const [channelPhotoLoaded, setChannelPhotoLoaded] = useState(true);
+
     useEffect(() => {
         const fetchProductData = async () => {
             try {
@@ -170,9 +173,20 @@ const ProductPage = () => {
                     {/* CHANNEL TRUST CARD */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-xl">
-                                {item.channel?.username?.[0]?.toUpperCase() || "S"}
-                            </div>
+                            {item.channel?.id && channelPhotoLoaded ? (
+                                <img
+                                    src={`${API_BASE_URL}/channels/${item.channel.id}/photo`}
+                                    alt={item.channel?.username || "Channel"}
+                                    className="w-12 h-12 rounded-full object-cover"
+                                    onLoad={() => setChannelPhotoLoaded(true)}
+                                    onError={() => setChannelPhotoLoaded(false)}
+                                />
+                            ) : null}
+                            {!channelPhotoLoaded || !item.channel?.id ? (
+                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-xl">
+                                    {item.channel?.username?.[0]?.toUpperCase() || "S"}
+                                </div>
+                            ) : null}
                             <div>
                                 <h3 className="font-bold text-gray-900">@{item.channel?.username || "Unknown"}</h3>
                                 <div className="flex items-center gap-1 text-sm text-green-600">
@@ -208,7 +222,18 @@ const ProductPage = () => {
                                         <div key={rev.id} className="bg-gray-50 p-3 rounded-lg">
                                             <div className="flex justify-between items-start mb-1">
                                                 <div className="flex items-center gap-1">
-                                                    <User size={12} className="text-gray-400"/>
+                                                    {rev.user_photo_url ? (
+                                                        <img
+                                                            src={rev.user_photo_url}
+                                                            alt="Reviewer"
+                                                            className="w-5 h-5 rounded-full object-cover"
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                e.target.nextSibling.style.display = 'inline';
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                    <User size={12} className={`text-gray-400 ${rev.user_photo_url ? 'hidden' : ''}`} />
                                                     <span className="text-xs font-bold text-gray-700">Verified User</span>
                                                 </div>
                                                 <div className="flex gap-0.5">

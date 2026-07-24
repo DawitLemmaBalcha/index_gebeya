@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import httpx
 import numpy as np
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -96,6 +97,30 @@ async def parse_telegram_post(
             channel = Channel(username=clean_username, title=clean_username, trust_score=2.5)
             db.add(channel)
             db.flush()
+
+        # ---------------------------------------------------------
+        # TECH-07: Fetch channel profile photo on first encounter
+        # ---------------------------------------------------------
+        if channel.photo_file_id is None:
+            BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+            if BOT_TOKEN:
+                try:
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChat?chat_id=@{channel.username}"
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.get(url)
+                        if response.status_code == 200:
+                            data = response.json()
+                            if data.get("ok") and data["result"].get("photo"):
+                                channel.photo_file_id = data["result"]["photo"]["big_file_id"]
+                                logger.info(f"📸 Fetched photo for channel @{channel.username}")
+                            else:
+                                logger.info(f"ℹ️ Channel @{channel.username} has no photo")
+                        else:
+                            logger.warning(f"⚠️ Failed to fetch chat info for @{channel.username}: {response.status_code}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Photo fetch failed for @{channel.username}: {e}")
+            else:
+                logger.warning("⚠️ TELEGRAM_BOT_TOKEN not set, skipping photo fetch")
 
         # ---------------------------------------------------------
         # TECH-06: DEDUP BLOCK — Compare visual vector against recent items

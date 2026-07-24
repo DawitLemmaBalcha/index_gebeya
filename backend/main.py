@@ -9,7 +9,7 @@ from database import engine, Base, ensure_db_extensions
 from ai_engine.vector_client import initialize_taxonomy_index
 
 # 👇 IMPORT ROUTERS 👇
-from api.routes import ingestion, search, items, reviews, alerts, notifications, analytics, feed
+from api.routes import ingestion, search, items, reviews, alerts, notifications, analytics, feed, channels
 
 # Initialize Logging
 logging.basicConfig(level=logging.INFO)
@@ -132,3 +132,4 @@ app.include_router(notifications.router, prefix="/notifications", tags=["Notific
 app.include_router(analytics.router, prefix="/activity", tags=["Analytics"]) 
 
 app.include_router(feed.router, prefix="/feed", tags=["Feed"])
+app.include_router(channels.router, prefix="/channels", tags=["Channels"])

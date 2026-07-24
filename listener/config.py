@@ -31,5 +31,8 @@ MAX_RETRIES_LIMIT = int(os.getenv("LISTENER_MAX_RETRIES", "10"))
 # ALBUM BUFFERING
 ALBUM_BUFFER_DELAY = 2.0 
 
+# CHANNEL PHOTO REFRESH (in seconds — default to 24 hours)
+CHANNEL_PHOTO_REFRESH_INTERVAL = float(os.getenv("PHOTO_REFRESH_INTERVAL", "86400.0"))
+
 # Ensure media directory exists
 os.makedirs(MEDIA_DIR, exist_ok=True)

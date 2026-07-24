@@ -117,6 +117,7 @@ class Channel(Base):
     trust_score = Column(Float, default=0.0)
     review_count = Column(Integer, default=0)
     is_verified = Column(Boolean, default=False)
+    photo_file_id = Column(String, nullable=True)  # Telegram big_file_id for channel profile photo
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -138,6 +139,7 @@ class Review(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     rating = Column(Integer, nullable=False)
     comment = Column(Text, nullable=True)
+    user_photo_url = Column(Text, nullable=True)  # URL to reviewer's Telegram profile photo
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
