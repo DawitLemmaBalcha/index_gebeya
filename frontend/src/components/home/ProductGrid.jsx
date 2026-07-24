@@ -3,7 +3,7 @@ import ItemCard from '../ItemCard';
 import { WifiOff, Camera, Search } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
 
-const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults, searchResults, onClearVisual, activeCategory, activeSubCategory, hasMore, isFetchingMore, onLoadMore }) => {
+const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults, searchResults, onClearVisual, activeCategory, activeSubCategory, hasMore, isFetchingMore, onLoadMore, isSearchingText = false, isSearchingVisual = false }) => {
   
   // Status Line
   const StatusLine = () => (
@@ -43,6 +43,33 @@ const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults
     
     return () => observer.disconnect();
   }, [hasMore, isFetchingMore, onLoadMore]);
+
+  // TECH-11: Search loading skeleton grid
+  if (isSearchingText || isSearchingVisual) {
+    return (
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          {isSearchingText ? (
+            <p className="text-sm text-gray-500">Searching...</p>
+          ) : (
+            <p className="text-sm text-gray-500">Analyzing image...</p>
+          )}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm animate-pulse">
+              <div className="aspect-square bg-gray-200" />
+              <div className="p-3 space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-3/4" />
+                <div className="h-4 bg-gray-200 rounded w-1/2" />
+                <div className="h-4 bg-gray-200 rounded w-1/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
+    );
+  }
 
   if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
   

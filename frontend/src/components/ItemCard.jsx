@@ -101,7 +101,7 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
         </div>
 
         <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-          <span className="bg-gray-100 px-2 py-1 rounded line-clamp-1 max-w-[50%]">{item.category || "General"}</span>
+          <span className="bg-gray-100 px-2 py-1 rounded truncate max-w-[60%]">{item.category || "General"}</span>
           <span className="line-clamp-1">{item.location || 'Addis Ababa'}</span>
         </div>
 

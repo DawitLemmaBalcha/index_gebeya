@@ -3,9 +3,12 @@ import { API_BASE_URL } from '../config';
 import { TAXONOMY } from '../constants/taxonomy';
 import { getAnalyticsHeaders } from '../utils/analytics'; 
 
+// TECH-10: Module-level feed cache for instant back navigation
+let _feedCache = null;
+
 export const useShop = () => {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState(() => _feedCache ? _feedCache.items : []);
+  const [loading, setLoading] = useState(() => !_feedCache);
   const [error, setError] = useState(null);
   
   // Selection
@@ -26,13 +29,35 @@ export const useShop = () => {
 
   // Infinite scroll state
   const LIMIT = 20;
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(() => _feedCache ? _feedCache.offset : 0);
+  const [hasMore, setHasMore] = useState(() => _feedCache ? _feedCache.hasMore : true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [seenItemIds, setSeenItemIds] = useState(new Set());
+  const [seenItemIds, setSeenItemIds] = useState(() => _feedCache ? new Set(_feedCache.seenItemIds) : new Set());
 
-  // Initial Fetch
-  useEffect(() => { fetchItems(0); }, []);
+  // TECH-10: Reset feed cache and force fresh fetch
+  const resetFeed = useCallback(() => {
+    _feedCache = null;
+    setItems([]);
+    setLoading(true);
+    setOffset(0);
+    setHasMore(true);
+    setSeenItemIds(new Set());
+    fetchItems(0);
+  }, []);
+
+  // Initial Fetch (TECH-10: skip if cache exists)
+  useEffect(() => {
+    // Always reset transient search states on mount
+    setSearchResults(null);
+    setVisualResults(null);
+    setSearchQuery("");
+    setMinPrice("");
+    setMaxPrice("");
+    setFilterCategory("All");
+
+    if (_feedCache) return; // Cache hit — skip fetch
+    fetchItems(0);
+  }, []);
 
   // Reset Subcat on Cat change
   useEffect(() => { setActiveSubCategory("All"); }, [activeCategory]);
@@ -90,10 +115,21 @@ export const useShop = () => {
         setHasMore(false);
       }
       
-      // Track seen IDs
+      // Track seen IDs & populate cache on initial load (TECH-10)
       setSeenItemIds(prev => {
         const next = new Set(prev);
         data.forEach(item => next.add(item.id));
+        
+        if (pageOffset === 0) {
+          // Populate module-level cache for instant back navigation
+          _feedCache = {
+            items: data,
+            offset: 0,
+            hasMore: data.length >= LIMIT,
+            seenItemIds: [...next],
+          };
+        }
+        
         return next;
       });
     } catch (error) {
@@ -204,6 +240,7 @@ export const useShop = () => {
     handleImageSearch, clearVisualSearch,
     displayItems, isSearchingText, isSearchingVisual,
     hasMore, isFetchingMore, fetchMore, LIMIT,
-    minPrice, setMinPrice, maxPrice, setMaxPrice, filterCategory, setFilterCategory
+    minPrice, setMinPrice, maxPrice, setMaxPrice, filterCategory, setFilterCategory,
+    resetFeed
   };
 };

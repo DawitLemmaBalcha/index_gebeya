@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Share2, ShieldCheck, MessageCircle, Phone, Sparkles, AlertCircle, Star, User, Bell } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, MessageCircle, Phone, Sparkles, AlertCircle, Star, User, Bell } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import ItemCard from '../components/ItemCard';
 import ReviewModal from '../components/ReviewModal';
-import AlertModal from '../components/AlertModal'; // IMPORTED
+import AlertModal from '../components/AlertModal';
+import NavBar from '../components/home/NavBar';
 
 const ProductPage = () => {
     const { id } = useParams();
@@ -19,7 +20,12 @@ const ProductPage = () => {
 
     // Modal States
     const [isReviewOpen, setIsReviewOpen] = useState(false);
-    const [isAlertOpen, setIsAlertOpen] = useState(false); // NEW
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
+
+    // TECH-13: NavBar state
+    const [searchQuery, setSearchQuery] = useState("");
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [activeCategory, setActiveCategory] = useState("All");
 
     // Channel photo state for graceful fallback
     const [channelPhotoLoaded, setChannelPhotoLoaded] = useState(true);
@@ -96,11 +102,20 @@ const ProductPage = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 font-sans pb-10">
-            {/* Header */}
-            <div className="bg-white border-b sticky top-0 z-20 px-4 py-3 flex items-center justify-between">
-                <button onClick={() => navigate('/')} className="p-2 hover:bg-gray-100 rounded-full"><ArrowLeft size={24} className="text-gray-700" /></button>
-                <div className="flex gap-2"><button className="p-2 hover:bg-gray-100 rounded-full text-gray-600"><Share2 size={20} /></button></div>
-            </div>
+            {/* TECH-13: NavBar replaces old header */}
+            <NavBar
+              variant="product"
+              onBack={() => navigate('/')}
+              onReset={() => navigate('/')}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              onImageSearch={() => navigate('/')}
+              isMobileMenuOpen={isMobileMenuOpen}
+              setIsMobileMenuOpen={setIsMobileMenuOpen}
+              activeCategory={activeCategory}
+              setActiveCategory={(cat) => { setActiveCategory(cat); setIsMobileMenuOpen(false); navigate('/'); }}
+              onSearchSubmit={(query) => navigate(`/?q=${encodeURIComponent(query)}`)}
+            />
 
             <div className="max-w-6xl mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
                 
