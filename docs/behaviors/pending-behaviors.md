@@ -488,3 +488,98 @@ There is no onboarding flow for channel/group owners. The bot silently discovers
 - When the bot is removed entirely, the owner receives a DM confirming their listings are no longer being updated.
 - Re-adding the bot as admin immediately resumes ingestion with no manual resync.
 - Every status transition is idempotent — no stale state, no manual commands needed.
+
+---
+
+## NB-28: Taxonomy Restructuring — Granular Main Categories [IMPLEMENTED]
+
+**Priority:** HIGH
+**Affected Features:** AI Classification, Frontend, Visual Hints
+**File(s):** `backend/ai_engine/prompts.py`, `frontend/src/constants/taxonomy.js`, `frontend/src/components/CategoryChips.jsx`
+
+**The Gap:**
+The current taxonomy uses broad main categories (e.g., "Mobile Phones & Tablets" as one category, "Electronics" covering laptops, "Fashion" covering everything from clothing to shoes). This makes browsing imprecise — a buyer looking for laptops has to dig into "Electronics → Laptops & Computers." A buyer looking for shoes has to navigate "Fashion → Men's Shoes" or "Fashion → Women's Shoes." The taxonomy should have granular, consumer-facing main categories like other e-commerce platforms.
+
+Additionally, the `CategoryChips.jsx` component has an inline copy of the taxonomy instead of importing from the shared constants file — a DRY violation that makes future taxonomy changes error-prone.
+
+**User Acceptance Criteria:**
+- The taxonomy is restructured to the locked structure defined in `docs/behaviors/taxonomy.md`:
+  - "Mobile Phones & Tablets" split into "Mobile Phones" and "Tablets" as separate main categories
+  - "Laptops & Computers" promoted from Electronics subcategory to its own main category
+  - "Fashion" split into "Men's Fashion" and "Women's Fashion" as separate main categories
+  - "Shoes" added as a standalone main category
+  - All existing subcategories reassigned to their appropriate new main categories
+- The frontend taxonomy in `taxonomy.js` matches the backend taxonomy in `prompts.py` exactly.
+- `CategoryChips.jsx` imports from `taxonomy.js` instead of maintaining its own inline copy.
+- The AI prompt dynamically incorporates the new taxonomy — no prompt text needs manual updating.
+- The visual hints index rebuilds from the new taxonomy on API startup.
+- All frontend components (CategoryBar, NavBar, SearchFilters, useShop) work with the new taxonomy without code changes since they read dynamically.
+
+---
+
+## NB-29: Slow Back Navigation — Feed Re-Fetches Unnecessarily [IMPLEMENTED]
+
+**Priority:** HIGH
+**Affected Features:** Frontend
+**File(s):** `frontend/src/hooks/useShop.js`, `frontend/src/pages/Home.jsx`
+
+**The Gap:**
+When a buyer opens a product detail page and then navigates back to the home page, the entire feed is re-fetched from the backend. This causes a 10+ second delay before the product grid reappears. The feed data should be cached in memory so back navigation is instant — the feed only re-fetches when the buyer explicitly refreshes or pulls to refresh.
+
+**User Acceptance Criteria:**
+- Navigating from a product detail page back to the home page restores the feed instantly (no loading spinner, no re-fetch).
+- The feed data persists in React state across route changes — it is not cleared when the buyer navigates away.
+- The feed only re-fetches when the buyer performs an explicit refresh action (pull-to-refresh or a manual refresh button).
+- Search results and visual search results are cleared when navigating back (these are transient query states).
+
+---
+
+## NB-30: No Visual Feedback During Search [IMPLEMENTED]
+
+**Priority:** MEDIUM
+**Affected Features:** Search, Frontend
+**File(s):** `frontend/src/hooks/useShop.js`, `frontend/src/components/home/ProductGrid.jsx`
+
+**The Gap:**
+When a buyer types a search query, there is a 600ms debounce before the search fires, and then additional network latency before results appear. During this entire window, the UI shows no change — the product grid still displays the previous feed items or nothing at all. The buyer has no indication that their search is being processed. The `isSearchingText` state already exists in the hook but is never wired to the UI.
+
+**User Acceptance Criteria:**
+- As soon as the buyer begins typing (before the debounce fires), the product grid shows a skeleton loading state or spinner.
+- The loading state persists through the debounce window and network fetch until results arrive.
+- When results arrive, the loading state is replaced with results (or a "no results" message).
+- The loading state is distinct from the infinite scroll loading spinner — the buyer can tell the difference between "searching" and "loading more feed items."
+
+---
+
+## NB-31: Long Category Names Overflow on Item Cards [IMPLEMENTED]
+
+**Priority:** LOW
+**Affected Features:** Frontend
+**File(s):** `frontend/src/components/ItemCard.jsx`
+
+**The Gap:**
+On product cards, the category label is displayed in a chip with `max-w-[50%]` and `line-clamp-1`. Long category names like "Home, Appliances & Furniture" overflow the chip and bleed into the card background or get clipped mid-word. The text should truncate cleanly with an ellipsis.
+
+**User Acceptance Criteria:**
+- Category names on product cards that exceed the available width are truncated with an ellipsis ("Home, Applianc...").
+- The truncated text does not overflow its container or bleed into adjacent elements.
+- The full category name is visible on the product detail page (already the case — this is only a card-level fix).
+
+---
+
+## NB-32: Share Button Replaced with Mobile Navigation Bar on Product Page [IMPLEMENTED]
+
+**Priority:** MEDIUM
+**Affected Features:** Frontend
+**File(s):** `frontend/src/pages/ProductPage.jsx`
+
+**The Gap:**
+The product detail page has a non-functional share button in the header that does nothing. Buyers who want to share can already navigate to the original Telegram post. Instead of the share button, the product page header should include the same navigation elements as the home page — a search bar and category menu — so buyers can search or browse without returning to the home screen.
+
+**User Acceptance Criteria:**
+- The share button is removed from the product detail page header.
+- The product detail page header includes a search bar (same as the home page NavBar search).
+- The product detail page header includes a hamburger menu or category selector for quick category browsing.
+- The back arrow is preserved and remains functional.
+- The header is sticky at the top of the page during scroll.
+- Search from the product page behaves identically to search from the home page — it navigates to the home page with the search results pre-populated, or shows results in a dropdown/overlay on the product page.
