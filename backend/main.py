@@ -3,10 +3,12 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from sqlalchemy import text
 from database import engine, Base, ensure_db_extensions
 from ai_engine.vector_client import initialize_taxonomy_index
+from admin import setup_admin
 
 # 👇 IMPORT ROUTERS 👇
 from api.routes import ingestion, search, items, reviews, alerts, notifications, analytics, feed, channels
@@ -42,6 +44,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Session middleware — required by SQLAdmin auth
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("ADMIN_SECRET_KEY", "change-me-in-production"))
 
 @app.on_event("startup")
 def startup_event():
@@ -133,3 +138,6 @@ app.include_router(analytics.router, prefix="/activity", tags=["Analytics"])
 
 app.include_router(feed.router, prefix="/feed", tags=["Feed"])
 app.include_router(channels.router, prefix="/channels", tags=["Channels"])
+
+# SQLAdmin — full CRUD dashboard at /admin
+setup_admin(app)
