@@ -43,7 +43,7 @@ const Home = ({ embedded = false, initialSearchQuery = '' }) => {
         setSearchQuery={shop.setSearchQuery}
         onImageSearch={shop.handleImageSearch}
         onReset={handleReset}
-        onLogoClick={() => navigate('/')}
+        onLogoClick={() => navigate('/welcome')}
         activeCategory={shop.activeCategory}
         setActiveCategory={shop.setActiveCategory}
         activeSubCategory={shop.activeSubCategory}

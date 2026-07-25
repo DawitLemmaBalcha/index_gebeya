@@ -70,31 +70,30 @@ const App = () => {
   const handleGetStarted = (params) => {
     try {
       localStorage.setItem('onboarding_seen', 'true');
-    } catch {
-      // localStorage unavailable — silently proceed
-    }
-    if (params?.searchQuery) {
-      setInitialSearchQuery(params.searchQuery);
-    }
+    } catch {}
     setShowOnboarding(false);
+    if (params?.searchQuery) {
+      // Navigate to explore with search query — Home picks up ?q= param
+      window.location.href = `/?q=${encodeURIComponent(params.searchQuery)}`;
+    }
   };
 
-    // Open web: always show landing page (no onboarding concept)
+  // Open web: always show landing page
   if (!isTelegramWebView()) {
     return <LandingPage />;
   }
 
-  // Telegram: onboarding not yet seen → show landing page as onboarding
+  // Telegram: onboarding not yet seen
   if (showOnboarding) {
     return <LandingPage isTelegram={true} onGetStarted={handleGetStarted} />;
   }
 
-  // Telegram: already onboarded → show marketplace with tabs
+  // Telegram: already onboarded
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<LandingPage isTelegram={true} compact={true} />} />
-        <Route path="/*" element={<MainLayout initialSearchQuery={initialSearchQuery} />} />
+        <Route path="/welcome" element={<LandingPage isTelegram={true} compact={true} onGetStarted={handleGetStarted} />} />
+        <Route path="/*" element={<MainLayout />} />
       </Routes>
     </Router>
   );
