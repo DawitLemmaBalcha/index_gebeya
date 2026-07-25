@@ -135,7 +135,7 @@
 
 6. **Add `handle_addchannel` to `listener/bot_commands.py`**:
    - Define an async function `handle_addchannel(update: Update, context: ContextTypes.DEFAULT_TYPE)`.
-   - Send a reply using `update.message.reply_text()` with the exact instruction text from the behavior spec (Rule 1.1 in `docs/behaviors/bot-onboarding.md`), replacing `@SuqListenerDevBot` with the actual bot username (a constant extracted from env or hardcoded). Use `parse_mode="Markdown"`.
+   - Send a reply using `update.message.reply_text()` with the exact instruction text from the behavior spec (Rule 1.1 in `docs/behaviors/bot-onboarding.md`), replacing `@IndexGebeyaBot` with the actual bot username (a constant extracted from env or hardcoded). Use `parse_mode="Markdown"`.
    - The instruction text must include the four numbered steps exactly as specified.
 
 ### Phase 5 — `my_chat_member` Handler (New File)

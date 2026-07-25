@@ -64,7 +64,7 @@ The page is a single scroll. No multi-page navigation. Everything the visitor ne
 **Must include:**
 - Tagline: "The Search Engine for Ethiopia's Telegram Marketplace" or a creative variation that captures the same meaning
 - A one-line explanation: "Thousands of products are posted on Ethiopian Telegram channels every day. We index them so you can search across all of them at once."
-- A clear Call to Action: "Open in Telegram" — links to `https://t.me/SuqListenerDevBot`
+- A clear Call to Action: "Open in Telegram" — links to `https://t.me/IndexGebeyaBot`
 - A secondary link: "Browse on Web" for those who want to peek without Telegram
 
 **Creative opportunities:**

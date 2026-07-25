@@ -9,7 +9,7 @@
 **Index Gebeya** is a Telegram-native e-commerce aggregator for the Ethiopian market. It monitors Telegram channels that post items for sale, enriches those products with AI-powered classification and visual understanding, and presents them to buyers through a Telegram Mini App and a companion Bot.
 
 The system has three primary user-facing surfaces:
-- **The Telegram Bot** (`@SuqListenerDevBot`) — for creating alerts, receiving match notifications, and launching the store.
+- **The Telegram Bot** (`@IndexGebeyaBot`) — for creating alerts, receiving match notifications, and launching the store.
 - **The Mini App (Web Frontend)** — a React app embedded in Telegram for browsing, searching, and reviewing sellers.
 - **The Ingestion Listener** — an invisible background worker that monitors partner channels and feeds products into the catalog.
 

@@ -24,7 +24,7 @@ const faqs = [
   { q: "Why build this for Telegram instead of a separate website?", a: "Because that's where Ethiopian commerce already happens. Over 80% of digital selling in Ethiopia occurs inside Telegram channels. Rather than forcing thousands of sellers to create website accounts, we bring search technology directly to where they post every single day." },
   { q: "Do you sell products directly or process payments?", a: "No. We are strictly a search engine—an index. When you click on a product, Index Gebeya connects you directly to the original seller's post inside Telegram. You talk, negotiate, and inspect the item with the seller directly." },
   { q: "Is Index Gebeya free for buyers?", a: "Yes! It is 100% free for buyers. You can search unlimited products, set price alert notifications, and connect with sellers without paying any fees or subscriptions." },
-  { q: "I own a Telegram channel. How do I get my products listed?", a: "It takes 30 seconds. Simply add our Telegram bot (@SuqListenerDevBot) to your public Telegram channel as an admin. The bot automatically reads your new posts, extracts images and prices, and makes them searchable on Index Gebeya immediately." },
+  { q: "I own a Telegram channel. How do I get my products listed?", a: "It takes 30 seconds. Simply add our Telegram bot (@IndexGebeyaBot) to your public Telegram channel as an admin. The bot automatically reads your new posts, extracts images and prices, and makes them searchable on Index Gebeya immediately." },
   { q: "Is this service only available in Ethiopia?", a: "Yes. Today, Index Gebeya is specifically built for Ethiopia. Prices are processed in Ethiopian Birr (ETB), search keywords support English and Amharic, and locations cover key hubs across Addis Ababa and major regions." },
 ];
 
@@ -98,7 +98,7 @@ const LandingPage = () => {
               <span>Monitoring <strong className="text-slate-900 font-semibold">850+</strong> Channels</span>
             </div>
             <a href="#sellers" className="hidden sm:inline-flex text-xs font-semibold text-slate-700 hover:text-brand-600 transition-colors px-3 py-2">For Sellers</a>
-            <a href="https://t.me/SuqListenerDevBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-brand-600 text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-brand-500/20 transition-all transform active:scale-95">
+            <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-brand-600 text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-brand-500/20 transition-all transform active:scale-95">
               <svg className="w-4 h-4 fill-current text-sky-400" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-2.01 1.28-5.68 3.76-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.5-.85-.27-1.53-.42-1.47-.89.03-.25.38-.51 1.07-.78 4.2-1.82 7-3.03 8.4-3.61 4-.17 4.83 2.1 4.54 3.22z"/></svg>
               <span>Open in Telegram</span>
             </a>
@@ -181,7 +181,7 @@ const LandingPage = () => {
                   </div>
                   <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex items-center justify-between">
                     <div><span className="text-[10px] text-slate-400 block font-medium uppercase">Price</span><span className="text-base font-black text-slate-900 tracking-tight font-mono">{p.price} <span className="text-xs font-normal text-slate-500">ETB</span></span></div>
-                    <a href="https://t.me/SuqListenerDevBot" target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-slate-900 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1.5">
+                    <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-slate-900 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1.5">
                       <span>Open Post</span>
                       <svg className="w-3.5 h-3.5 fill-current text-sky-400" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-2.01 1.28-5.68 3.76-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.5-.85-.27-1.53-.42-1.47-.89.03-.25.38-.51 1.07-.78 4.2-1.82 7-3.03 8.4-3.61 4-.17 4.83 2.1 4.54 3.22z"/></svg>
                     </a>
@@ -193,7 +193,7 @@ const LandingPage = () => {
 
           {/* Hero CTAs */}
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="https://t.me/SuqListenerDevBot" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-8 py-4 bg-slate-900 hover:bg-brand-600 text-white font-bold text-base rounded-2xl shadow-xl hover:shadow-brand-500/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3">
+            <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-8 py-4 bg-slate-900 hover:bg-brand-600 text-white font-bold text-base rounded-2xl shadow-xl hover:shadow-brand-500/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3">
               <svg className="w-5 h-5 fill-current text-sky-400" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-2.01 1.28-5.68 3.76-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.5-.85-.27-1.53-.42-1.47-.89.03-.25.38-.51 1.07-.78 4.2-1.82 7-3.03 8.4-3.61 4-.17 4.83 2.1 4.54 3.22z"/></svg>
               <span>Open Index Gebeya Bot in Telegram</span>
             </a>
@@ -301,7 +301,7 @@ const LandingPage = () => {
                   <div key={i} className="flex items-start gap-3"><div className="w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">✓</div><p className="text-sm text-slate-200"><strong className="text-white">{t.split(':')[0]}:</strong>{t.split(':').slice(1).join(':')}</p></div>
                 ))}
               </div>
-              <a href="https://t.me/SuqListenerDevBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm sm:text-base rounded-2xl shadow-lg transition-all"><span>+</span><span>Add Your Channel to Index</span></a>
+              <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm sm:text-base rounded-2xl shadow-lg transition-all"><span>+</span><span>Add Your Channel to Index</span></a>
             </div>
             <div className="lg:col-span-5 bg-slate-800/90 border border-slate-700/80 p-6 sm:p-8 rounded-3xl shadow-2xl backdrop-blur-sm">
               <h3 className="text-lg font-bold text-white mb-2">⚡ Estimated Reach Calculator</h3>
@@ -402,7 +402,7 @@ const LandingPage = () => {
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight mb-4">Stop Scrolling 50 Telegram Channels.<br/><span className="text-brand-500">Start Searching Index Gebeya.</span></h2>
           <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto mb-8">Open our Mini App directly inside Telegram and find what you're looking for in seconds.</p>
-          <a href="https://t.me/SuqListenerDevBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-base rounded-2xl shadow-xl transition-all transform hover:-translate-y-0.5"><span>Open @SuqListenerDevBot</span></a>
+          <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-base rounded-2xl shadow-xl transition-all transform hover:-translate-y-0.5"><span>Open @IndexGebeyaBot</span></a>
         </div>
       </section>
 
@@ -414,7 +414,7 @@ const LandingPage = () => {
             <p className="text-slate-500">© 2026 Index Gebeya. Built for the Ethiopian Telegram Community.</p>
           </div>
           <div className="flex items-center gap-6">
-            <a href="https://t.me/SuqListenerDevBot" target="_blank" className="hover:text-white transition-colors">Telegram Bot</a>
+            <a href="https://t.me/IndexGebeyaBot" target="_blank" className="hover:text-white transition-colors">Telegram Bot</a>
             <a href="#sellers" className="hover:text-white transition-colors">For Sellers</a>
             <a href="#how-it-works" className="hover:text-white transition-colors">About Indexing</a>
             <span className="text-slate-600">|</span>

@@ -20,7 +20,7 @@ When any user sends `/addchannel` to the bot, the bot responds with step-by-step
 > "To list your products on Index Gebeya, add me to your channel or group as an **admin**:
 > 
 > 1. Open your channel or group → **Info** → **Administrators**
-> 2. Tap **Add Admin** and search for `@SuqListenerDevBot`
+> 2. Tap **Add Admin** and search for `@IndexGebeyaBot`
 > 3. ⚠️ **Turn OFF all permissions.** I don't need to delete messages, ban users, or post. Admin is only needed so I can verify you own this channel/group.
 > 4. Confirm.
 > 
