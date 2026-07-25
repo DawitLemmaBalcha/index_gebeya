@@ -6,7 +6,7 @@ import SearchFilters from '../components/SearchFilters';
 import CategoryBar from '../components/home/CategoryBar';
 import ProductGrid from '../components/home/ProductGrid';
 
-const Home = ({ embedded = false }) => {
+const Home = ({ embedded = false, initialSearchQuery = '' }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -14,10 +14,13 @@ const Home = ({ embedded = false }) => {
   const shop = useShop();
 
   // TECH-13: Handle ?q= query parameter from ProductPage search
+  // Also handle initialSearchQuery prop from landing page onboarding
   useEffect(() => {
     const q = searchParams.get('q');
     if (q && q.trim().length > 0) {
       shop.setSearchQuery(q);
+    } else if (initialSearchQuery && initialSearchQuery.trim().length > 0) {
+      shop.setSearchQuery(initialSearchQuery);
     }
   }, []); // Run once on mount
 
@@ -40,6 +43,7 @@ const Home = ({ embedded = false }) => {
         setSearchQuery={shop.setSearchQuery}
         onImageSearch={shop.handleImageSearch}
         onReset={handleReset}
+        onLogoClick={() => navigate('/')}
         activeCategory={shop.activeCategory}
         setActiveCategory={shop.setActiveCategory}
         activeSubCategory={shop.activeSubCategory}

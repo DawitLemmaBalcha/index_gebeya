@@ -54,7 +54,7 @@ const CategorySheet = ({
   };
 
   return (
-    <div className="fixed inset-0 z-40 bg-white flex flex-col">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
       {/* Header */}
       <div className="h-14 flex items-center justify-between px-4 border-b border-gray-200 shrink-0">
         <button

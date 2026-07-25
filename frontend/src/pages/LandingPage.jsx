@@ -80,6 +80,13 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
     e.preventDefault();
     const q = searchQuery.trim();
     if (!q) { setSearchResults(null); setActiveFilter(null); setSearchError(null); return; }
+
+    // In Telegram: navigate to webapp with search query instead of showing results locally
+    if (isTelegram && onGetStarted) {
+      onGetStarted({ searchQuery: q });
+      return;
+    }
+
     setIsSearching(true);
     setSearchError(null);
     setActiveFilter(null);
@@ -326,6 +333,18 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
                 <span>Open Index Gebeya Bot in Telegram</span>
               </a>
               <a href="#how-it-works" className="w-full sm:w-auto px-6 py-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-semibold text-base rounded-2xl shadow-sm transition-all text-center">See How Indexing Works</a>
+            </div>
+          )}
+
+          {/* Get Started button — visible in Telegram onboarding, above the fold */}
+          {isTelegram && onGetStarted && (
+            <div className="mt-10 flex justify-center">
+              <button
+                onClick={() => onGetStarted({})}
+                className="w-full sm:w-auto px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-base rounded-2xl shadow-xl hover:shadow-brand-500/20 transition-all transform hover:-translate-y-0.5 active:scale-95"
+              >
+                Get Started
+              </button>
             </div>
           )}
           <p className="text-xs text-slate-500 mt-4">🔒 Free for all buyers. No app installation required. Works directly inside your Telegram app.</p>

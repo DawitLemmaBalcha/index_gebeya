@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, X, Loader2, DollarSign, Filter } from 'lucide-react';
+import { Bell, X, Loader2, DollarSign, Filter, Search } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 const AlertModal = ({ isOpen, onClose, initialQuery, currentPrice }) => {
+  const [searchQuery, setSearchQuery] = useState(initialQuery || "");
   const [targetPrice, setTargetPrice] = useState("");
   const [preferences, setPreferences] = useState({
       strict_brand: false,
@@ -12,11 +13,14 @@ const AlertModal = ({ isOpen, onClose, initialQuery, currentPrice }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (isOpen && currentPrice) {
+    if (isOpen) {
+      setSearchQuery(initialQuery || "");
+      if (currentPrice) {
         // Default target price is current price
         setTargetPrice(currentPrice.toString());
+      }
     }
-  }, [isOpen, currentPrice]);
+  }, [isOpen, initialQuery, currentPrice]);
 
   if (!isOpen) return null;
 
@@ -27,6 +31,13 @@ const AlertModal = ({ isOpen, onClose, initialQuery, currentPrice }) => {
   const handleSubmit = async () => {
     setSubmitting(true);
     setError(null);
+
+    const query = searchQuery.trim();
+    if (!query) {
+      setError("Please enter what you're looking for.");
+      setSubmitting(false);
+      return;
+    }
 
     const initData = window.Telegram?.WebApp?.initData;
     const authData = initData || "user_id_placeholder"; 
@@ -45,7 +56,7 @@ const AlertModal = ({ isOpen, onClose, initialQuery, currentPrice }) => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                query_text: initialQuery,
+                query_text: query,
                 max_price: finalPrice,
                 init_data: authData,
                 preferences: preferences
@@ -79,7 +90,22 @@ const AlertModal = ({ isOpen, onClose, initialQuery, currentPrice }) => {
             <Bell size={24} className="fill-blue-100" />
             <h3 className="text-xl font-bold text-gray-900">Create Alert</h3>
         </div>
-        <p className="text-sm text-gray-500 mb-6">Notify me when <b>"{initialQuery}"</b> appears.</p>
+        <p className="text-sm text-gray-500 mb-6">Get notified when new items matching your search are posted.</p>
+
+        {/* SEARCH QUERY INPUT */}
+        <div className="mb-4">
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">What are you looking for? <span className="text-red-500">*</span></label>
+            <div className="relative">
+                <Search size={16} className="absolute left-3 top-3.5 text-gray-400" />
+                <input 
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., iPhone 13 Pro"
+                />
+            </div>
+        </div>
 
         {/* PRICE INPUT */}
         <div className="mb-4">
@@ -123,7 +149,7 @@ const AlertModal = ({ isOpen, onClose, initialQuery, currentPrice }) => {
 
         <button 
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !searchQuery.trim()}
             className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50 flex justify-center items-center gap-2 shadow-lg shadow-blue-200"
         >
             {submitting && <Loader2 size={18} className="animate-spin" />}

@@ -3,7 +3,7 @@ import { Search, ShoppingBag, Menu, X, Camera, ArrowLeft } from 'lucide-react';
 import { TAXONOMY } from '../../constants/taxonomy';
 import CategorySheet from '../CategorySheet';
 
-const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, setActiveCategory, activeCategory, activeSubCategory, setActiveSubCategory, variant = "home", onBack, onSearchSubmit }) => {
+const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, setActiveCategory, activeCategory, activeSubCategory, setActiveSubCategory, variant = "home", onBack, onSearchSubmit, onLogoClick }) => {
   const fileInputRef = useRef(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -24,7 +24,7 @@ const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, setActive
               <ArrowLeft size={24} className="text-gray-700" />
             </button>
           ) : (
-            <div className="flex items-center gap-2 cursor-pointer" onClick={onReset}>
+            <div className="flex items-center gap-2 cursor-pointer" onClick={onLogoClick || onReset}>
               <div className="bg-slate-900 p-2 rounded-lg"><ShoppingBag className="text-brand-500" size={20} /></div>
               <span className="font-extrabold text-xl tracking-tight text-slate-900">Index<span className="text-brand-600"> Gebeya</span></span>
             </div>

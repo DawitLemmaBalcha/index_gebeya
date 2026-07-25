@@ -15,7 +15,7 @@ const isTelegramWebView = () => {
   }
 };
 
-function MainLayout() {
+function MainLayout({ initialSearchQuery = '' }) {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('explore');
   const isProductPage = location.pathname.startsWith('/item/');
@@ -26,7 +26,7 @@ function MainLayout() {
       <div className="flex-1">
         {/* Explore Tab — always mounted, shown when active and not on product page */}
         <div style={{ display: (!isProductPage && activeTab === 'explore') ? 'block' : 'none' }}>
-          <Home embedded={true} />
+          <Home embedded={true} initialSearchQuery={initialSearchQuery} />
         </div>
 
         {/* Alerts Tab — always mounted */}
@@ -64,16 +64,22 @@ const App = () => {
     }
   });
 
-  const handleGetStarted = () => {
+  // Initial search query passed from landing page onboarding search
+  const [initialSearchQuery, setInitialSearchQuery] = useState('');
+
+  const handleGetStarted = (params) => {
     try {
       localStorage.setItem('onboarding_seen', 'true');
     } catch {
       // localStorage unavailable — silently proceed
     }
+    if (params?.searchQuery) {
+      setInitialSearchQuery(params.searchQuery);
+    }
     setShowOnboarding(false);
   };
 
-  // Open web: always show landing page (no onboarding concept)
+    // Open web: always show landing page (no onboarding concept)
   if (!isTelegramWebView()) {
     return <LandingPage />;
   }
@@ -87,7 +93,7 @@ const App = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/*" element={<MainLayout />} />
+        <Route path="/*" element={<MainLayout initialSearchQuery={initialSearchQuery} />} />
       </Routes>
     </Router>
   );
