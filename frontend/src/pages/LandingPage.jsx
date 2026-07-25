@@ -41,6 +41,7 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
 
   // Real API state
   const [searchResults, setSearchResults] = useState(null);
+  const [trendingItems, setTrendingItems] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchingImage, setIsSearchingImage] = useState(false);
   const [stats, setStats] = useState(null);
@@ -48,7 +49,7 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
 
   const fileInputRef = useRef(null);
 
-  // Fetch stats on mount
+  // Fetch stats AND trending items on mount
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -60,7 +61,18 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
         setStats({ product_count: null, channel_count: null, category_counts: {} });
       }
     };
+    const fetchTrending = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/feed/foryou?limit=6`);
+        if (!res.ok) throw new Error("Feed fetch failed");
+        const data = await res.json();
+        setTrendingItems(Array.isArray(data) ? data : []);
+      } catch {
+        setTrendingItems([]);
+      }
+    };
     fetchStats();
+    fetchTrending();
   }, []);
 
   // Real API search
@@ -140,7 +152,7 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
 
   const displayedItems = searchResults !== null
     ? searchResults
-    : null;
+    : trendingItems.length > 0 ? trendingItems : null;
 
   // Build category list from TAXONOMY with stats from API
   const categoryEntries = Object.entries(TAXONOMY).map(([catName, subcats]) => {
@@ -271,8 +283,12 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
               <>
                 <div className="flex items-center justify-between mb-4 px-1">
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-md bg-slate-900 text-brand-400 font-mono text-xs font-bold">{displayedItems.length} MATCHES</span>
-                    <span className="text-xs sm:text-sm text-slate-500 font-medium">{activeFilter ? `Filtered by: "${activeFilter}"` : "Showing search results across indexed channels"}</span>
+                    <span className="px-2.5 py-0.5 rounded-md bg-slate-900 text-brand-400 font-mono text-xs font-bold">
+                      {searchResults !== null ? `${displayedItems.length} MATCHES` : "TRENDING"}
+                    </span>
+                    <span className="text-xs sm:text-sm text-slate-500 font-medium">
+                      {activeFilter ? `Filtered by: "${activeFilter}"` : searchResults !== null ? "Showing search results across indexed channels" : "Popular products from indexed channels"}
+                    </span>
                   </div>
                   {activeFilter && <button onClick={handleClear} className="text-xs font-semibold text-brand-600 hover:underline">Show All</button>}
                 </div>
