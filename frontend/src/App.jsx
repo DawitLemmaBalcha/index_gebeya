@@ -93,6 +93,7 @@ const App = () => {
   return (
     <Router>
       <Routes>
+        <Route path="/" element={<LandingPage isTelegram={true} compact={true} />} />
         <Route path="/*" element={<MainLayout initialSearchQuery={initialSearchQuery} />} />
       </Routes>
     </Router>

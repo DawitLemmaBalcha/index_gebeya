@@ -15,6 +15,7 @@ const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, setActive
   };
 
   return (
+    <>
     <nav className="bg-ethiopia-paper/90 backdrop-blur-md border-b border-ethiopia-border sticky top-0 z-30">
         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
         
@@ -53,17 +54,16 @@ const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, setActive
                 {!searchQuery && <button onClick={() => fileInputRef.current?.click()} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-600"><Camera size={18} /></button>}
             </div>
         </div>
-
-        <CategorySheet
-          isOpen={isSheetOpen}
-          onClose={() => setIsSheetOpen(false)}
-          activeCategory={activeCategory}
-          setActiveCategory={setActiveCategory}
-          activeSubCategory={activeSubCategory}
-          setActiveSubCategory={setActiveSubCategory}
-          TAXONOMY={TAXONOMY}
-        />
     </nav>
-  );
+    <CategorySheet
+      isOpen={isSheetOpen}
+      onClose={() => setIsSheetOpen(false)}
+      activeCategory={activeCategory}
+      setActiveCategory={setActiveCategory}
+      activeSubCategory={activeSubCategory}
+      setActiveSubCategory={setActiveSubCategory}
+      TAXONOMY={TAXONOMY}
+    />
+  </>);
 };
 export default NavBar;
