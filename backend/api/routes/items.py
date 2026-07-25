@@ -1,15 +1,35 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from database import get_db
-from models import Item
+from models import Item, Channel
 from schemas import ItemResponse
 from services import search as search_service
 from services.analytics import AnalyticsService
 
 router = APIRouter()
+
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db)):
+    """Return aggregate stats: product count, channel count, and per-category item counts."""
+    product_count = db.execute(select(func.count()).select_from(Item)).scalar()
+    channel_count = db.execute(select(func.count()).select_from(Channel)).scalar()
+
+    # Per-category counts for the category grid
+    category_rows = db.execute(
+        select(Item.category, func.count())
+        .where(Item.category.isnot(None))
+        .group_by(Item.category)
+    ).all()
+    category_counts = {cat: cnt for cat, cnt in category_rows}
+
+    return {
+        "product_count": product_count,
+        "channel_count": channel_count,
+        "category_counts": category_counts,
+    }
 
 @router.get("/recent", response_model=List[ItemResponse])
 def get_recent_items(limit: int = 20, db: Session = Depends(get_db)):

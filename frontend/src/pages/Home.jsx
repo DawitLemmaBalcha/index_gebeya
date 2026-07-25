@@ -30,7 +30,7 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="min-h-screen bg-ethiopia-paper font-sans">
       <NavBar 
         searchQuery={shop.searchQuery}
         setSearchQuery={shop.setSearchQuery}

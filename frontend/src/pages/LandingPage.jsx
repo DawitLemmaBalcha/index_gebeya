@@ -1,24 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
+import ItemCard from '../components/ItemCard';
+import { TAXONOMY } from '../constants/taxonomy';
 
-const sampleProducts = [
-  { id: 1, title: "Toyota Vitz 2019 Compact Car", category: "Vehicles", price: "1,250,000", location: "Bole, Addis Ababa", channel: "@AddisAutoDeals", timeAgo: "12 mins ago", image: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80", verified: true },
-  { id: 2, title: "iPhone 13 Pro 128GB Gold — Clean Condition", category: "Phones", price: "48,500", location: "4 Kilo, Addis Ababa", channel: "@EthioTechHub", timeAgo: "25 mins ago", image: "https://images.unsplash.com/photo-1632661674596-df8be070a5c5?auto=format&fit=crop&w=600&q=80", verified: true },
-  { id: 3, title: "Nike Air Force 1 '07 White (Size 42)", category: "Fashion", price: "3,800", location: "Piassa, Addis Ababa", channel: "@HabeshaKicks", timeAgo: "1 hour ago", image: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=600&q=80", verified: false },
-  { id: 4, title: "Bole Atlas 2-Bedroom Furnished Apartment", category: "Real Estate", price: "45,000 / mo", location: "Bole Atlas, Addis Ababa", channel: "@ZemenRealEstate", timeAgo: "2 hours ago", image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80", verified: true },
-  { id: 5, title: "Apple MacBook Air M1 2020 256GB SSD", category: "Laptops", price: "52,000", location: "CMC, Addis Ababa", channel: "@LaptopsAddis", timeAgo: "3 hours ago", image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?auto=format&fit=crop&w=600&q=80", verified: true },
-  { id: 6, title: "Borena Ox / Fattened Livestock (የቦረና ሰንጋ)", category: "Livestock", price: "68,000", location: "Kera, Addis Ababa", channel: "@EthioAgriMarket", timeAgo: "4 hours ago", image: "https://images.unsplash.com/photo-1545468800-85cc9bc6ecf7?auto=format&fit=crop&w=600&q=80", verified: false },
-];
-
-const categories = [
-  { icon: "📱", name: "Phones & Electronics", desc: "iPhone, Samsung, Xiaomi, Airpods", filter: "Phones" },
-  { icon: "🚗", name: "Vehicles & Cars", desc: "Toyota Vitz, Yaris, Suzuki, Motorbikes", filter: "Vehicles" },
-  { icon: "🏠", name: "Property & Rentals", desc: "Bole, CMC, Kazanchis Apartments", filter: "Real Estate" },
-  { icon: "👟", name: "Shoes & Fashion", desc: "Nike, Jordan, Habesha Clothes, Watches", filter: "Fashion" },
-  { icon: "💻", name: "Laptops & Tech", desc: "MacBook M1/M2, HP, Dell, Monitors", filter: "Laptops" },
-  { icon: "🐂", name: "Livestock & Agri", desc: "Borena Oxen, Goats, Coffee, Teff", filter: "Livestock" },
-  { icon: "🎮", name: "Gaming & Consoles", desc: "PS5, Xbox, VR, Gaming PCs", filter: "Gaming" },
-  { icon: "🛋️", name: "Home & Furniture", desc: "Sofas, Coffee Sets, Appliances", filter: "Furniture" },
-];
+// Emoji mapping for taxonomy categories (deterministic per-key lookup)
+const CATEGORY_EMOJIS = {
+  "Mobile Phones": "📱",
+  "Laptops & Computers": "💻",
+  "Tablets": "📟",
+  "Electronics": "🔌",
+  "Vehicles": "🚗",
+  "Property": "🏠",
+  "Home, Appliances & Furniture": "🛋️",
+  "Men's Fashion": "👔",
+  "Women's Fashion": "👗",
+  "Shoes": "👟",
+  "Health & Beauty": "💄",
+  "Commercial & Tools": "🔧",
+  "Sports, Arts & Outdoors": "⚽",
+  "Babies & Kids": "👶",
+  "Animals & Pets": "🐕",
+  "Agriculture & Food": "🌾",
+  "Services": "🛠️",
+  "Other": "📦",
+};
 
 const faqs = [
   { q: "Why build this for Telegram instead of a separate website?", a: "Because that's where Ethiopian commerce already happens. Over 80% of digital selling in Ethiopia occurs inside Telegram channels. Rather than forcing thousands of sellers to create website accounts, we bring search technology directly to where they post every single day." },
@@ -28,52 +33,124 @@ const faqs = [
   { q: "Is this service only available in Ethiopia?", a: "Yes. Today, Index Gebeya is specifically built for Ethiopia. Prices are processed in Ethiopian Birr (ETB), search keywords support English and Amharic, and locations cover key hubs across Addis Ababa and major regions." },
 ];
 
-const LandingPage = () => {
+const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [products, setProducts] = useState(sampleProducts);
   const [activeFilter, setActiveFilter] = useState(null);
   const [openFaq, setOpenFaq] = useState(null);
   const [phoneTab, setPhoneTab] = useState("search");
   const [postCount, setPostCount] = useState(5);
-  const [statProducts, setStatProducts] = useState(142000);
 
-  // Animate stats counter
+  // Real API state
+  const [searchResults, setSearchResults] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchingImage, setIsSearchingImage] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [searchError, setSearchError] = useState(null);
+
+  const fileInputRef = useRef(null);
+
+  // Fetch stats on mount
   useEffect(() => {
-    const target = 142890;
-    const timer = setInterval(() => {
-      setStatProducts(prev => {
-        const next = prev + 15;
-        return next >= target ? target : next;
-      });
-    }, 30);
-    return () => clearInterval(timer);
+    const fetchStats = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/items/stats`);
+        if (!res.ok) throw new Error("Stats fetch failed");
+        const data = await res.json();
+        setStats(data);
+      } catch {
+        setStats({ product_count: null, channel_count: null, category_counts: {} });
+      }
+    };
+    fetchStats();
   }, []);
 
-  const handleSearch = (e) => {
+  // Real API search
+  const handleSearch = async (e) => {
     e.preventDefault();
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) { setProducts(sampleProducts); setActiveFilter(null); return; }
+    const q = searchQuery.trim();
+    if (!q) { setSearchResults(null); setActiveFilter(null); setSearchError(null); return; }
+    setIsSearching(true);
+    setSearchError(null);
     setActiveFilter(null);
-    const filtered = sampleProducts.filter(p =>
-      p.title.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || p.location.toLowerCase().includes(q) || p.channel.toLowerCase().includes(q)
-    );
-    setProducts(filtered);
+    try {
+      const res = await fetch(`${API_BASE_URL}/search/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q, limit: 50 }),
+      });
+      if (!res.ok) throw new Error("Search failed");
+      const data = await res.json();
+      setSearchResults(data.items || []);
+    } catch (err) {
+      setSearchError(err.message || "Search failed. Please try again.");
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
-  const handleCategoryFilter = (cat) => {
-    setSearchQuery("");
-    setActiveFilter(cat);
-    setProducts(sampleProducts.filter(p => p.category.toLowerCase() === cat.toLowerCase()));
+  // Image search handler
+  const handleImageSearch = async (file) => {
+    if (!file) return;
+    setIsSearchingImage(true);
+    setSearchError(null);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch(`${API_BASE_URL}/search/by-image`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Image search failed");
+      const data = await res.json();
+      setSearchResults(Array.isArray(data) ? data : data.items || []);
+      setActiveFilter(null);
+    } catch (err) {
+      setSearchError("Could not process image. Please try another photo.");
+    } finally {
+      setIsSearchingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Category filter using taxonomy lookup
+  const handleCategoryFilter = (catName) => {
+    setSearchQuery(catName);
+    setActiveFilter(catName);
+    // Trigger a search with the category name
+    setIsSearching(true);
+    setSearchError(null);
+    fetch(`${API_BASE_URL}/search/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: catName, limit: 50 }),
+    })
+      .then(res => res.json())
+      .then(data => setSearchResults(data.items || []))
+      .catch(() => setSearchError("Category search failed"))
+      .finally(() => setIsSearching(false));
     document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleClear = () => {
     setSearchQuery("");
     setActiveFilter(null);
-    setProducts(sampleProducts);
+    setSearchResults(null);
+    setSearchError(null);
   };
 
   const estimatedReach = Math.round(postCount * 3700).toLocaleString();
+  const displayedItems = searchResults !== null
+    ? searchResults
+    : null;
+
+  // Build category list from TAXONOMY with stats from API
+  const categoryEntries = Object.entries(TAXONOMY).map(([catName, subcats]) => {
+    const emoji = CATEGORY_EMOJIS[catName] || "📁";
+    const description = subcats.slice(0, 3).join(", ") + (subcats.length > 3 ? "…" : "");
+    const count = stats?.category_counts?.[catName] ?? null;
+    return { name: catName, emoji, description, count };
+  });
 
   return (
     <div className="bg-ethiopia-paper text-slate-900 selection:bg-brand-500 selection:text-white min-h-screen overflow-x-hidden antialiased font-sans">
@@ -97,11 +174,18 @@ const LandingPage = () => {
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse-ring"></span>
               <span>Monitoring <strong className="text-slate-900 font-semibold">850+</strong> Channels</span>
             </div>
-            <a href="#sellers" className="hidden sm:inline-flex text-xs font-semibold text-slate-700 hover:text-brand-600 transition-colors px-3 py-2">For Sellers</a>
-            <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-brand-600 text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-brand-500/20 transition-all transform active:scale-95">
-              <svg className="w-4 h-4 fill-current text-sky-400" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-2.01 1.28-5.68 3.76-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.5-.85-.27-1.53-.42-1.47-.89.03-.25.38-.51 1.07-.78 4.2-1.82 7-3.03 8.4-3.61 4-.17 4.83 2.1 4.54 3.22z"/></svg>
-              <span>Open in Telegram</span>
-            </a>
+            {!isTelegram && (
+              <>
+                <a href="#sellers" className="hidden sm:inline-flex text-xs font-semibold text-slate-700 hover:text-brand-600 transition-colors px-3 py-2">For Sellers</a>
+                <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-brand-600 text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-brand-500/20 transition-all transform active:scale-95">
+                  <svg className="w-4 h-4 fill-current text-sky-400" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-2.01 1.28-5.68 3.76-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.5-.85-.27-1.53-.42-1.47-.89.03-.25.38-.51 1.07-.78 4.2-1.82 7-3.03 8.4-3.61 4-.17 4.83 2.1 4.54 3.22z"/></svg>
+                  <span>Open in Telegram</span>
+                </a>
+              </>
+            )}
+            {isTelegram && (
+              <span className="text-xs font-semibold text-slate-500 px-3 py-2">Welcome to Index Gebeya</span>
+            )}
           </div>
         </div>
       </header>
@@ -137,9 +221,21 @@ const LandingPage = () => {
                     </button>
                   )}
                 </div>
-                <button type="submit" className="w-full sm:w-auto px-7 py-3.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0">
-                  <span>Search Index</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                {/* Camera button for image search */}
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full sm:w-auto px-4 py-3.5 bg-white border border-slate-200 hover:border-brand-500 text-slate-600 hover:text-brand-600 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center gap-2" disabled={isSearchingImage}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  {isSearchingImage ? <span>Scanning…</span> : null}
+                </button>
+                <input type="file" ref={fileInputRef} onChange={e => { if (e.target.files?.[0]) handleImageSearch(e.target.files[0]); }} hidden accept="image/*" />
+                <button type="submit" className="w-full sm:w-auto px-7 py-3.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0" disabled={isSearching}>
+                  {isSearching ? (
+                    <span>Searching…</span>
+                  ) : (
+                    <>
+                      <span>Search Index</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </>
+                  )}
                 </button>
               </form>
             </div>
@@ -154,51 +250,51 @@ const LandingPage = () => {
 
           {/* Results */}
           <div id="results-section" className="max-w-4xl mx-auto text-left mt-8">
-            <div className="flex items-center justify-between mb-4 px-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-md bg-slate-900 text-brand-400 font-mono text-xs font-bold">{products.length} MATCHES</span>
-                <span className="text-xs sm:text-sm text-slate-500 font-medium">{activeFilter ? `Filtered by: "${activeFilter}"` : "Showing featured Telegram posts across indexed channels"}</span>
-              </div>
-              {activeFilter && <button onClick={handleClear} className="text-xs font-semibold text-brand-600 hover:underline">Show All</button>}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {products.map(p => (
-                <div key={p.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all group flex flex-col justify-between">
-                  <div>
-                    <div className="relative h-44 bg-slate-100 overflow-hidden">
-                      <img src={p.image} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={e => { e.target.src = 'https://placehold.co/600x400/1e293b/d97706?text=Telegram+Listing'; }}/>
-                      <div className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-md">{p.category}</div>
-                      <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md shadow-sm">{p.timeAgo}</div>
-                    </div>
-                    <div className="p-4">
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="text-xs text-brand-700 font-bold font-mono">{p.channel}</span>
-                        {p.verified && <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-semibold">Verified</span>}
-                      </div>
-                      <h4 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2 group-hover:text-brand-600 transition-colors">{p.title}</h4>
-                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><span>📍 {p.location}</span></p>
-                    </div>
+            {displayedItems !== null && (
+              <>
+                <div className="flex items-center justify-between mb-4 px-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-md bg-slate-900 text-brand-400 font-mono text-xs font-bold">{displayedItems.length} MATCHES</span>
+                    <span className="text-xs sm:text-sm text-slate-500 font-medium">{activeFilter ? `Filtered by: "${activeFilter}"` : "Showing search results across indexed channels"}</span>
                   </div>
-                  <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <div><span className="text-[10px] text-slate-400 block font-medium uppercase">Price</span><span className="text-base font-black text-slate-900 tracking-tight font-mono">{p.price} <span className="text-xs font-normal text-slate-500">ETB</span></span></div>
-                    <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-slate-900 hover:bg-brand-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1.5">
-                      <span>Open Post</span>
-                      <svg className="w-3.5 h-3.5 fill-current text-sky-400" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-2.01 1.28-5.68 3.76-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.5-.85-.27-1.53-.42-1.47-.89.03-.25.38-.51 1.07-.78 4.2-1.82 7-3.03 8.4-3.61 4-.17 4.83 2.1 4.54 3.22z"/></svg>
-                    </a>
-                  </div>
+                  {activeFilter && <button onClick={handleClear} className="text-xs font-semibold text-brand-600 hover:underline">Show All</button>}
                 </div>
-              ))}
-            </div>
+                {displayedItems.length === 0 && !isSearching && !isSearchingImage ? (
+                  <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
+                    <p className="text-slate-500 text-base font-medium">No items match this search.</p>
+                    <p className="text-slate-400 text-sm mt-1">Try different keywords or browse categories below.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {displayedItems.map(item => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        apiUrl={API_BASE_URL}
+                        onSelect={() => window.open(`https://t.me/${item.channel?.username}/${item.telegram_message_id}`, '_blank')}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            {searchError && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-medium text-center">
+                {searchError}
+              </div>
+            )}
           </div>
 
-          {/* Hero CTAs */}
-          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-8 py-4 bg-slate-900 hover:bg-brand-600 text-white font-bold text-base rounded-2xl shadow-xl hover:shadow-brand-500/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3">
-              <svg className="w-5 h-5 fill-current text-sky-400" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-2.01 1.28-5.68 3.76-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.5-.85-.27-1.53-.42-1.47-.89.03-.25.38-.51 1.07-.78 4.2-1.82 7-3.03 8.4-3.61 4-.17 4.83 2.1 4.54 3.22z"/></svg>
-              <span>Open Index Gebeya Bot in Telegram</span>
-            </a>
-            <a href="#how-it-works" className="w-full sm:w-auto px-6 py-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-semibold text-base rounded-2xl shadow-sm transition-all text-center">See How Indexing Works</a>
-          </div>
+          {/* Hero CTAs — hidden inside Telegram, shown on open web */}
+          {!isTelegram && (
+            <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-8 py-4 bg-slate-900 hover:bg-brand-600 text-white font-bold text-base rounded-2xl shadow-xl hover:shadow-brand-500/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3">
+                <svg className="w-5 h-5 fill-current text-sky-400" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-2.01 1.28-5.68 3.76-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.5-.85-.27-1.53-.42-1.47-.89.03-.25.38-.51 1.07-.78 4.2-1.82 7-3.03 8.4-3.61 4-.17 4.83 2.1 4.54 3.22z"/></svg>
+                <span>Open Index Gebeya Bot in Telegram</span>
+              </a>
+              <a href="#how-it-works" className="w-full sm:w-auto px-6 py-4 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-semibold text-base rounded-2xl shadow-sm transition-all text-center">See How Indexing Works</a>
+            </div>
+          )}
           <p className="text-xs text-slate-500 mt-4">🔒 Free for all buyers. No app installation required. Works directly inside your Telegram app.</p>
         </div>
       </section>
@@ -207,8 +303,8 @@ const LandingPage = () => {
       <section className="bg-slate-900 text-white py-12 border-b border-slate-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-slate-800/80">
-            <div className="pt-4 md:pt-0"><p className="text-3xl sm:text-4xl lg:text-5xl font-black text-brand-500 tracking-tight font-mono">{statProducts.toLocaleString()}</p><p className="text-xs sm:text-sm font-medium text-slate-400 mt-1 uppercase tracking-wider">Telegram Products Indexed</p></div>
-            <div className="pt-4 md:pt-0"><p className="text-3xl sm:text-4xl lg:text-5xl font-black text-emerald-400 tracking-tight font-mono">852</p><p className="text-xs sm:text-sm font-medium text-slate-400 mt-1 uppercase tracking-wider">Active Channels Monitored</p></div>
+            <div className="pt-4 md:pt-0"><p className="text-3xl sm:text-4xl lg:text-5xl font-black text-brand-500 tracking-tight font-mono">{stats?.product_count?.toLocaleString() || "--"}</p><p className="text-xs sm:text-sm font-medium text-slate-400 mt-1 uppercase tracking-wider">Telegram Products Indexed</p></div>
+            <div className="pt-4 md:pt-0"><p className="text-3xl sm:text-4xl lg:text-5xl font-black text-emerald-400 tracking-tight font-mono">{stats?.channel_count?.toLocaleString() || "--"}</p><p className="text-xs sm:text-sm font-medium text-slate-400 mt-1 uppercase tracking-wider">Active Channels Monitored</p></div>
             <div className="pt-4 md:pt-0"><p className="text-3xl sm:text-4xl lg:text-5xl font-black text-amber-400 tracking-tight font-mono">0.3s</p><p className="text-xs sm:text-sm font-medium text-slate-400 mt-1 uppercase tracking-wider">Average Search Speed</p></div>
             <div className="pt-4 md:pt-0"><p className="text-3xl sm:text-4xl lg:text-5xl font-black text-sky-400 tracking-tight font-mono">0 Birr</p><p className="text-xs sm:text-sm font-medium text-slate-400 mt-1 uppercase tracking-wider">Buyer Commission</p></div>
           </div>
@@ -275,14 +371,17 @@ const LandingPage = () => {
       <section className="py-16 md:py-24 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-12">
           <div><span className="text-xs font-bold text-brand-600 uppercase tracking-widest">Marketplace Scope</span><h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-1">What You Can Find Today</h2></div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-2 sm:mt-0">Click any category to test the search index demo above</p>
+          <p className="text-xs sm:text-sm text-slate-500 mt-2 sm:mt-0">Click any category to search the live index</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {categories.map(c => (
-            <button key={c.filter} onClick={() => handleCategoryFilter(c.filter)} className="group p-5 bg-white border border-slate-200 hover:border-brand-500 rounded-2xl text-left transition-all hover:shadow-md">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 text-brand-600 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition-transform">{c.icon}</div>
+          {categoryEntries.map(c => (
+            <button key={c.name} onClick={() => handleCategoryFilter(c.name)} className="group p-5 bg-white border border-slate-200 hover:border-brand-500 rounded-2xl text-left transition-all hover:shadow-md">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-brand-600 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition-transform">{c.emoji}</div>
               <h3 className="font-bold text-slate-900 text-sm sm:text-base">{c.name}</h3>
-              <p className="text-xs text-slate-500 mt-1">{c.desc}</p>
+              <p className="text-xs text-slate-500 mt-1 line-clamp-1">{c.description}</p>
+              {c.count !== null && c.count > 0 && (
+                <p className="text-[10px] font-mono font-bold text-brand-600 mt-1">{c.count.toLocaleString()} items</p>
+              )}
             </button>
           ))}
         </div>
@@ -301,7 +400,11 @@ const LandingPage = () => {
                   <div key={i} className="flex items-start gap-3"><div className="w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">✓</div><p className="text-sm text-slate-200"><strong className="text-white">{t.split(':')[0]}:</strong>{t.split(':').slice(1).join(':')}</p></div>
                 ))}
               </div>
-              <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm sm:text-base rounded-2xl shadow-lg transition-all"><span>+</span><span>Add Your Channel to Index</span></a>
+              {!isTelegram ? (
+                <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm sm:text-base rounded-2xl shadow-lg transition-all"><span>+</span><span>Add Your Channel to Index</span></a>
+              ) : (
+                <span className="inline-flex items-center gap-3 px-8 py-4 bg-brand-600/50 text-brand-200 font-bold text-sm sm:text-base rounded-2xl cursor-default"><span>✓</span><span>You're already on Index Gebeya</span></span>
+              )}
             </div>
             <div className="lg:col-span-5 bg-slate-800/90 border border-slate-700/80 p-6 sm:p-8 rounded-3xl shadow-2xl backdrop-blur-sm">
               <h3 className="text-lg font-bold text-white mb-2">⚡ Estimated Reach Calculator</h3>
@@ -397,14 +500,32 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* ── FINAL CTA ── */}
-      <section className="py-16 bg-slate-900 text-white border-t border-slate-800">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight mb-4">Stop Scrolling 50 Telegram Channels.<br/><span className="text-brand-500">Start Searching Index Gebeya.</span></h2>
-          <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto mb-8">Open our Mini App directly inside Telegram and find what you're looking for in seconds.</p>
-          <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-base rounded-2xl shadow-xl transition-all transform hover:-translate-y-0.5"><span>Open @IndexGebeyaBot</span></a>
-        </div>
-      </section>
+      {/* ── TELEGRAM GET STARTED BUTTON (onboarding gate) ── */}
+      {isTelegram && onGetStarted && (
+        <section className="py-12 bg-slate-900 text-white border-t border-slate-800">
+          <div className="max-w-lg mx-auto px-4 text-center">
+            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight mb-3">Ready to explore?</h2>
+            <p className="text-slate-400 text-sm mb-6">Jump into the marketplace and start searching thousands of products across Ethiopian Telegram channels.</p>
+            <button
+              onClick={onGetStarted}
+              className="w-full px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-base rounded-2xl shadow-xl hover:shadow-brand-500/20 transition-all transform hover:-translate-y-0.5 active:scale-95"
+            >
+              Get Started
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ── FINAL CTA (open web only) ── */}
+      {!isTelegram && (
+        <section className="py-16 bg-slate-900 text-white border-t border-slate-800">
+          <div className="max-w-4xl mx-auto px-4 text-center">
+            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight mb-4">Stop Scrolling 50 Telegram Channels.<br/><span className="text-brand-500">Start Searching Index Gebeya.</span></h2>
+            <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto mb-8">Open our Mini App directly inside Telegram and find what you're looking for in seconds.</p>
+            <a href="https://t.me/IndexGebeyaBot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white font-extrabold text-base rounded-2xl shadow-xl transition-all transform hover:-translate-y-0.5"><span>Open @IndexGebeyaBot</span></a>
+          </div>
+        </section>
+      )}
 
       {/* ── FOOTER ── */}
       <footer className="bg-slate-950 text-slate-400 py-10 border-t border-slate-900 text-xs">
@@ -414,7 +535,9 @@ const LandingPage = () => {
             <p className="text-slate-500">© 2026 Index Gebeya. Built for the Ethiopian Telegram Community.</p>
           </div>
           <div className="flex items-center gap-6">
-            <a href="https://t.me/IndexGebeyaBot" target="_blank" className="hover:text-white transition-colors">Telegram Bot</a>
+            {!isTelegram && (
+              <a href="https://t.me/IndexGebeyaBot" target="_blank" className="hover:text-white transition-colors">Telegram Bot</a>
+            )}
             <a href="#sellers" className="hover:text-white transition-colors">For Sellers</a>
             <a href="#how-it-works" className="hover:text-white transition-colors">About Indexing</a>
             <span className="text-slate-600">|</span>

@@ -62,12 +62,12 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
   return (
     <div 
       onClick={handleCardClick} // CHANGED from () => onSelect(item)
-      className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer group relative"
+      className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-soft hover:shadow-warm transition-all cursor-pointer group relative"
     >
       {getMatchBadge()}
 
       {/* Image Area */}
-      <div className="relative aspect-square bg-gray-100 overflow-hidden">
+      <div className="relative aspect-square bg-ethiopia-paper overflow-hidden">
         <img 
           src={`${apiUrl}/media/${mainImage}`} 
           alt={item.title || item.description}
@@ -76,7 +76,7 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
         />
         
         {/* Condition Badge */}
-        <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+        <div className="absolute top-2 right-2 bg-slate-900/70 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
           {item.condition || 'Used'}
         </div>
 
@@ -96,7 +96,7 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
           </h3>
         </div>
         
-        <div className="text-green-600 font-bold text-sm mb-2">
+        <div className="text-ethiopia-green font-bold text-sm mb-2">
           {formatPrice(item.price, item.currency)}
         </div>
 
@@ -108,7 +108,7 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
         )}
 
         <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-          <span className="bg-gray-100 px-2 py-1 rounded truncate max-w-[60%]">{item.category || "General"}</span>
+          <span className="bg-ethiopia-paper border border-ethiopia-border/50 px-2 py-1 rounded truncate max-w-[60%]">{item.category || "General"}</span>
           <span className="line-clamp-1">{item.location || 'Addis Ababa'}</span>
         </div>
 
@@ -118,7 +118,7 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
             <a 
               href={`tel:${item.phone_number}`}
               onClick={handleActionClick}
-              className="flex-1 flex items-center justify-center gap-1 bg-gray-50 hover:bg-green-50 text-gray-700 hover:text-green-600 py-2 rounded-lg transition-colors border border-gray-200"
+              className="flex-1 flex items-center justify-center gap-1 bg-gray-50 hover:bg-ethiopia-green/5 text-gray-700 hover:text-ethiopia-green py-2 rounded-lg transition-colors border border-slate-200"
             >
               <Phone size={14} />
               <span className="font-medium text-xs">Call</span>
@@ -129,7 +129,7 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
             target="_blank"
             rel="noopener noreferrer"
             onClick={handleActionClick}
-            className="flex-1 flex items-center justify-center gap-1 bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-600 py-2 rounded-lg transition-colors border border-gray-200"
+            className="flex-1 flex items-center justify-center gap-1 bg-gray-50 hover:bg-brand-50 text-gray-700 hover:text-brand-600 py-2 rounded-lg transition-colors border border-slate-200"
           >
             <MessageCircle size={14} />
             <span className="font-medium text-xs">Chat</span>
