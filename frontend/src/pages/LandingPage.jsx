@@ -38,7 +38,6 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
   const [activeFilter, setActiveFilter] = useState(null);
   const [openFaq, setOpenFaq] = useState(null);
   const [phoneTab, setPhoneTab] = useState("search");
-  const [postCount, setPostCount] = useState(5);
 
   // Real API state
   const [searchResults, setSearchResults] = useState(null);
@@ -139,7 +138,6 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
     setSearchError(null);
   };
 
-  const estimatedReach = Math.round(postCount * 3700).toLocaleString();
   const displayedItems = searchResults !== null
     ? searchResults
     : null;
@@ -250,6 +248,25 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
 
           {/* Results */}
           <div id="results-section" className="max-w-4xl mx-auto text-left mt-8">
+            {/* Loading skeleton while search is in progress */}
+            {(isSearching || isSearchingImage) && (
+              <div className="space-y-4 mb-6">
+                <div className="flex items-center gap-2 mb-4 px-1">
+                  <div className="px-2.5 py-0.5 rounded-md bg-slate-200 animate-pulse h-6 w-24"></div>
+                  <div className="h-4 bg-slate-100 animate-pulse rounded w-56"></div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <div key={i} className="bg-white rounded-2xl border border-slate-200 p-3 animate-pulse">
+                      <div className="w-full h-40 bg-slate-200 rounded-xl mb-3"></div>
+                      <div className="h-4 bg-slate-100 rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-slate-50 rounded w-1/2 mb-2"></div>
+                      <div className="h-3 bg-slate-50 rounded w-1/4"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {displayedItems !== null && (
               <>
                 <div className="flex items-center justify-between mb-4 px-1">
@@ -407,17 +424,13 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null }) => {
               )}
             </div>
             <div className="lg:col-span-5 bg-slate-800/90 border border-slate-700/80 p-6 sm:p-8 rounded-3xl shadow-2xl backdrop-blur-sm">
-              <h3 className="text-lg font-bold text-white mb-2">⚡ Estimated Reach Calculator</h3>
-              <p className="text-xs text-slate-400 mb-6">See how many extra monthly search impressions your channel could gain.</p>
+              <h3 className="text-lg font-bold text-white mb-2">⚡ What Sellers Get</h3>
+              <p className="text-xs text-slate-400 mb-6">Your products seen by thousands of active buyers across Ethiopia.</p>
               <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between text-xs font-semibold mb-2"><span className="text-slate-300">Daily Channel Posts:</span><span className="text-brand-400 font-mono text-sm">{postCount} posts/day</span></div>
-                  <input type="range" min="1" max="30" value={postCount} onChange={e => setPostCount(Number(e.target.value))} className="w-full accent-brand-500 bg-slate-700 h-2 rounded-lg cursor-pointer"/>
-                </div>
                 <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-700/60 text-center">
-                  <span className="text-xs text-slate-400 block mb-1">Estimated Monthly Extra Reach</span>
-                  <span className="text-3xl font-black text-emerald-400 font-mono tracking-tight">{estimatedReach}</span>
-                  <span className="text-xs text-slate-400 block mt-1">active buyer searches in Ethiopia</span>
+                  <span className="text-xs text-slate-400 block mb-1">Active Buyer Searches Monthly</span>
+                  <span className="text-3xl font-black text-emerald-400 font-mono tracking-tight">850,000+</span>
+                  <span className="text-xs text-slate-400 block mt-1">across Ethiopian Telegram channels</span>
                 </div>
                 <div className="text-[11px] text-slate-400 leading-relaxed bg-slate-800 p-3 rounded-xl border border-slate-700">💡 Channels indexed with Index Gebeya experience an average <strong className="text-white">+38% increase</strong> in direct Telegram buyer inquiries in Addis Ababa.</div>
               </div>
