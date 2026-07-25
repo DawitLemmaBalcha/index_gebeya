@@ -156,6 +156,42 @@ class AlertNotification(BaseModel):
     match_reason: str
 
 # ----------------------------------------------------------------------
+# OWNER CHANNEL SCHEMA (TECH-17)
+# ----------------------------------------------------------------------
+class OwnerChannelResponse(BaseModel):
+    id: int
+    username: str
+    title: Optional[str]
+    trust_score: float
+    review_count: int
+    is_verified: bool
+    product_count: int
+    is_active: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------------------------------------------------------------
+# MATCH HISTORY SCHEMA (TECH-17)
+# ----------------------------------------------------------------------
+class MatchHistoryResponse(BaseModel):
+    id: int
+    alert_id: Optional[int] = None
+    alert_query_text: Optional[str] = None
+    match_tier: str
+    match_score: float
+    item_title: Optional[str] = None
+    item_price: Optional[float] = None
+    item_image_path: Optional[str] = None
+    item_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------------------------------------------------------------
 # NOTIFICATION SCHEMAS
 # ----------------------------------------------------------------------
 class NotificationResponse(BaseModel):

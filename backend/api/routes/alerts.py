@@ -6,8 +6,8 @@ from sqlalchemy import select
 from typing import List, Optional
 
 from database import get_db
-from models import Alert, User
-from schemas import AlertCreate, AlertResponse
+from models import Alert, User, Notification, Item
+from schemas import AlertCreate, AlertResponse, MatchHistoryResponse
 from services.alerting import create_alert
 from services.analytics import AnalyticsService
 
@@ -154,3 +154,91 @@ def delete_alert(
     # -------------------------
 
     return {"status": "deleted"}
+
+
+# ----------------------------------------------------------------------
+# TECH-17: PATCH /alerts/{alert_id}/pause — toggle is_active
+# ----------------------------------------------------------------------
+@router.patch("/{alert_id}/pause")
+def toggle_alert_pause(
+    alert_id: int,
+    init_data: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    x_internal_service: Optional[str] = Header(None)
+):
+    """
+    Toggle an alert's is_active status (pause/resume).
+    Returns the new state.
+    """
+    user = get_current_user(init_data, db, x_internal_service)
+    alert = db.scalar(select(Alert).where(Alert.id == alert_id, Alert.user_id == user.id))
+
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    # Toggle
+    alert.is_active = not alert.is_active
+    db.commit()
+    db.refresh(alert)
+
+    new_status = "resumed" if alert.is_active else "paused"
+
+    # --- ANALYTICS LOGGING ---
+    session_id = request.headers.get("x-session-id")
+    background_tasks.add_task(
+        AnalyticsService.log_interaction,
+        user_id=user.id,
+        session_id=session_id,
+        interaction_type=f"alert_{new_status}",
+        item_id=None,
+        meta_data={"alert_id": alert_id, "new_state": alert.is_active}
+    )
+    # -------------------------
+
+    return {"status": new_status, "is_active": alert.is_active}
+
+
+# ----------------------------------------------------------------------
+# TECH-17: GET /alerts/matches — match history for user's alerts
+# ----------------------------------------------------------------------
+@router.get("/matches", response_model=List[MatchHistoryResponse])
+def get_alert_matches(
+    init_data: str,
+    db: Session = Depends(get_db),
+    x_internal_service: Optional[str] = Header(None)
+):
+    """
+    Returns recent match history (notifications) for the user's alerts.
+    Sorted by created_at DESC, limit 50.
+    """
+    user = get_current_user(init_data, db, x_internal_service)
+
+    # Query notifications for this user, joined with alert and item
+    notifications = db.scalars(
+        select(Notification)
+        .where(Notification.user_id == user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(50)
+    ).all()
+
+    result = []
+    for notif in notifications:
+        alert = db.scalar(select(Alert).where(Alert.id == notif.alert_id)) if notif.alert_id else None
+        item = db.scalar(select(Item).where(Item.id == notif.item_id)) if notif.item_id else None
+
+        result.append(MatchHistoryResponse(
+            id=notif.id,
+            alert_id=notif.alert_id,
+            alert_query_text=alert.query_text if alert else None,
+            match_tier=notif.match_tier,
+            match_score=notif.match_score,
+            item_title=item.title if item else None,
+            item_price=item.price if item else None,
+            item_image_path=item.image_path if item else None,
+            item_id=notif.item_id,
+            created_at=notif.created_at,
+        ))
+
+    return result

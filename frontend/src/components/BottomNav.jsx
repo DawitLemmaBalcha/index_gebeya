@@ -1,16 +1,15 @@
-import { Home, Search, Heart, User } from 'lucide-react';
+import { Compass, Bell, Store } from 'lucide-react';
 
 export default function BottomNav({ activeTab, setActiveTab }) {
   const navItems = [
-    { id: 'home', icon: Home, label: 'Home' },
-    { id: 'search', icon: Search, label: 'Visual' }, // Changed label for future Visual Search
-    { id: 'saved', icon: Heart, label: 'Saved' },
-    { id: 'profile', icon: User, label: 'Profile' },
+    { id: 'explore', icon: Compass, label: 'Explore' },
+    { id: 'alerts', icon: Bell, label: 'Alerts' },
+    { id: 'stores', icon: Store, label: 'Stores' },
   ];
 
   return (
-    <div className="bg-white/80 backdrop-blur-xl border border-gray-200/50 sm:rounded-full sm:mb-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] px-6 py-3">
-      <div className="flex justify-between items-center w-full">
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 pb-safe">
+      <div className="flex justify-between items-center w-full max-w-lg mx-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -18,16 +17,28 @@ export default function BottomNav({ activeTab, setActiveTab }) {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className="group flex flex-col items-center justify-center w-16 relative"
+              className="group relative flex flex-col items-center justify-center flex-1 py-2"
             >
-              <div className={`
-                p-2 rounded-xl transition-all duration-300 mb-1
-                ${isActive ? 'bg-blue-50 text-blue-600 translate-y-[-2px]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}
-              `}>
+              {/* Active indicator bar at top */}
+              {isActive && (
+                <div className="absolute top-0 left-1/4 right-1/4 h-0.5 rounded-full bg-brand-500" />
+              )}
+
+              <div
+                className={`p-1.5 rounded-xl transition-all duration-300 ${
+                  isActive
+                    ? 'bg-brand-50 text-brand-600'
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                }`}
+              >
                 <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
               </div>
-              
-              <span className={`text-[10px] font-semibold transition-colors duration-200 ${isActive ? 'text-blue-600' : 'text-gray-400'}`}>
+
+              <span
+                className={`text-[10px] font-semibold transition-colors duration-200 ${
+                  isActive ? 'text-brand-600' : 'text-gray-400'
+                }`}
+              >
                 {item.label}
               </span>
             </button>

@@ -6,7 +6,7 @@ import SearchFilters from '../components/SearchFilters';
 import CategoryBar from '../components/home/CategoryBar';
 import ProductGrid from '../components/home/ProductGrid';
 
-const Home = () => {
+const Home = ({ embedded = false }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -29,8 +29,12 @@ const Home = () => {
     shop.clearVisualSearch();
   };
 
+  const rootClasses = embedded
+    ? "font-sans"
+    : "min-h-screen bg-ethiopia-paper font-sans";
+
   return (
-    <div className="min-h-screen bg-ethiopia-paper font-sans">
+    <div className={rootClasses}>
       <NavBar 
         searchQuery={shop.searchQuery}
         setSearchQuery={shop.setSearchQuery}
