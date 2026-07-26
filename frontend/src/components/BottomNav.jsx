@@ -1,6 +1,6 @@
 import { Compass, Bell, Store } from 'lucide-react';
 
-export default function BottomNav({ activeTab, setActiveTab }) {
+export default function BottomNav({ activeTab, setActiveTab, onExploreClick }) {
   const navItems = [
     { id: 'explore', icon: Compass, label: 'Explore' },
     { id: 'alerts', icon: Bell, label: 'Alerts' },
@@ -16,7 +16,10 @@ export default function BottomNav({ activeTab, setActiveTab }) {
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                if (item.id === 'explore' && onExploreClick) onExploreClick();
+                setActiveTab(item.id);
+              }}
               className="group relative flex flex-col items-center justify-center flex-1 py-2"
             >
               {/* Active indicator bar at top */}

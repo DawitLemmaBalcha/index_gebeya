@@ -47,7 +47,7 @@ function MainLayout({ initialSearchQuery = '' }) {
 
       {/* Bottom Nav — hidden on product page */}
       {!isProductPage && (
-        <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+        <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} onExploreClick={() => { window.location.href = '/'; }} />
       )}
     </div>
   );
