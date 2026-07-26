@@ -15,8 +15,17 @@ export const useShop = () => {
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeSubCategory, setActiveSubCategory] = useState("All");
   
-  // View mode
-  const [viewMode, setViewMode] = useState("grid");
+  // View mode — persisted to localStorage
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('viewMode') || 'grid'; }
+    catch { return 'grid'; }
+  });
+  
+  // Persist viewMode changes
+  const setViewModePersisted = (mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem('viewMode', mode); } catch {}
+  };
   
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -249,7 +258,7 @@ export const useShop = () => {
     hasMore, isFetchingMore, fetchMore, LIMIT,
     minPrice, setMinPrice, maxPrice, setMaxPrice, filterCategory, setFilterCategory,
     excludeUnpriced, setExcludeUnpriced,
-    viewMode, setViewMode,
+    viewMode, setViewMode: setViewModePersisted,
     resetFeed
   };
 };

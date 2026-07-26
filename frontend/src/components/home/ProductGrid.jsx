@@ -1,11 +1,34 @@
 import React, { useRef, useEffect, useState } from 'react';
 import ItemCard from '../ItemCard';
-import { WifiOff, Camera, Search } from 'lucide-react';
+import { WifiOff, Camera, Search, ArrowDown } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
 
-const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults, searchResults, onClearVisual, activeCategory, activeSubCategory, hasMore, isFetchingMore, onLoadMore, isSearchingText = false, isSearchingVisual = false }) => {
+const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults, searchResults, onClearVisual, activeCategory, activeSubCategory, hasMore, isFetchingMore, onLoadMore, isSearchingText = false, isSearchingVisual = false, viewMode = 'grid', setViewMode }) => {
   
-  const [viewMode, setViewMode] = useState('grid');
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const touchStartY = useRef(0);
+  const mainRef = useRef(null);
+
+  // Pull-to-refresh touch handlers
+  const handleTouchStart = (e) => {
+    if (window.scrollY === 0) touchStartY.current = e.touches[0].clientY;
+  };
+  const handleTouchMove = (e) => {
+    if (touchStartY.current) {
+      const d = e.touches[0].clientY - touchStartY.current;
+      if (d > 0) setPullDistance(Math.min(d, 80));
+    }
+  };
+  const handleTouchEnd = async () => {
+    if (pullDistance > 60) {
+      setRefreshing(true);
+      await onRetry();
+      setRefreshing(false);
+    }
+    setPullDistance(0);
+    touchStartY.current = 0;
+  };
 
   // Compact results bar
   const CompactBar = () => (
@@ -35,8 +58,8 @@ const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults
     </div>
   );
 
-  // Skeleton card for loading state
-  const SkeletonCard = () => (
+  // Grid skeleton card
+  const SkeletonGrid = () => (
     <div className="bg-white rounded-2xl border border-slate-200 p-3 animate-pulse">
       <div className="w-full aspect-square bg-gray-200 rounded-xl mb-3" />
       <div className="h-3 bg-gray-200 rounded w-3/4 mb-2" />
@@ -45,134 +68,106 @@ const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults
     </div>
   );
 
-  // IntersectionObserver sentinel for infinite scroll
+  // List skeleton card
+  const SkeletonList = () => (
+    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 animate-pulse">
+      <div className="w-16 h-16 rounded-xl bg-gray-200 shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 bg-gray-200 rounded w-1/3" />
+        <div className="h-4 bg-gray-200 rounded w-3/4" />
+        <div className="h-3 bg-gray-200 rounded w-1/2" />
+      </div>
+      <div className="w-16 h-8 bg-gray-200 rounded-lg shrink-0" />
+    </div>
+  );
+
+  // Infinite scroll sentinel
   const sentinelRef = useRef(null);
   useEffect(() => {
     if (!hasMore) return;
-    
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !isFetchingMore) {
-          onLoadMore();
-        }
-      },
-      { rootMargin: '200px' }
-    );
-    
-    if (sentinelRef.current) {
-      observer.observe(sentinelRef.current);
-    }
-    
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !isFetchingMore) onLoadMore();
+    }, { rootMargin: '200px' });
+    if (sentinelRef.current) observer.observe(sentinelRef.current);
     return () => observer.disconnect();
   }, [hasMore, isFetchingMore, onLoadMore]);
 
-  // TECH-11: Search loading skeleton grid
+  if (loading) return (
+    <main className="max-w-6xl mx-auto px-4 py-4">
+      <CompactBar />
+      <div className={viewMode === 'list' ? 'space-y-3' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'}>
+        {[...Array(8)].map((_, i) => viewMode === 'list' ? <SkeletonList key={i} /> : <SkeletonGrid key={i} />)}
+      </div>
+    </main>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center h-64 text-center p-4 bg-red-50 rounded-2xl border border-red-100">
+      <div className="bg-red-100 p-3 rounded-full mb-3"><WifiOff className="text-red-500" size={32} /></div>
+      <h3 className="text-lg font-bold text-red-900">Connection Failed</h3>
+      <p className="text-red-600 mb-4 text-sm">{error}</p>
+      <button onClick={onRetry} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm">Try Again</button>
+    </div>
+  );
+
+  // Search loading skeleton
   if (isSearchingText || isSearchingVisual) {
     return (
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          {isSearchingText ? (
-            <p className="text-sm text-gray-500">Searching...</p>
-          ) : (
-            <p className="text-sm text-gray-500">Analyzing image...</p>
-          )}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm animate-pulse">
-              <div className="aspect-square bg-gray-200" />
-              <div className="p-3 space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-3/4" />
-                <div className="h-4 bg-gray-200 rounded w-1/2" />
-                <div className="h-4 bg-gray-200 rounded w-1/3" />
-              </div>
-            </div>
-          ))}
+      <main className="max-w-6xl mx-auto px-4 py-4">
+        <div className="mb-4"><p className="text-sm text-gray-500">{isSearchingText ? "Searching..." : "Analyzing image..."}</p></div>
+        <div className={viewMode === 'list' ? 'space-y-3' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'}>
+          {[...Array(6)].map((_, i) => viewMode === 'list' ? <SkeletonList key={i} /> : <SkeletonGrid key={i} />)}
         </div>
       </main>
     );
   }
 
-  // Initial loading skeleton grid (6 cards)
-  if (loading) return (
-    <main className="max-w-6xl mx-auto px-4 py-8">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <SkeletonCard key={i} />
-        ))}
-      </div>
-    </main>
-  );
-  
-  if (error) return (
-      <div className="flex flex-col items-center justify-center h-64 text-center p-4 bg-red-50 rounded-2xl border border-red-100">
-          <div className="bg-red-100 p-3 rounded-full mb-3"><WifiOff className="text-red-500" size={32} /></div>
-          <h3 className="text-lg font-bold text-red-900">Connection Failed</h3>
-          <p className="text-red-600 mb-4 text-sm">{error}</p>
-          <button onClick={onRetry} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm">Try Again</button>
-      </div>
-  );
-
   return (
-    <main className="max-w-6xl mx-auto px-4 py-4">
-      <CompactBar />
-
-      {items.length > 0 ? (
-        viewMode === 'list' ? (
-          <div className="space-y-3">
-            {items.map((item) => {
-              const mainImage = item.images && item.images.length > 0 ? item.images[0] : item.image_path;
-              return (
-                <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-brand-400 transition-all">
-                  <div className="flex items-center gap-4 w-full sm:w-auto">
-                    <img
-                      src={`${API_BASE_URL}/media/${mainImage}`}
-                      alt={item.title}
-                      className="w-16 h-16 rounded-xl object-cover shrink-0"
-                      onError={e => { e.target.src = 'https://placehold.co/400x400?text=No+Image'; }}
-                    />
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-brand-700">@{item.channel?.username || 'unknown'}</span>
-                        <span className="text-[10px] text-slate-400">• {item.category}</span>
-                      </div>
-                      <h4 className="font-bold text-slate-900 text-sm sm:text-base leading-snug">{item.title}</h4>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-0 border-slate-100">
-                    <div className="text-left sm:text-right">
-                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Price</span>
-                      <span className="text-base font-extrabold text-slate-900">
-                        {item.price?.toLocaleString?.() || item.price} {item.currency || 'ETB'}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => onNavigate(`/item/${item.id}`)}
-                      className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-brand-600 transition-colors"
-                    >
-                      View
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {items.map((item) => (
-              <ItemCard key={item.id} item={item} apiUrl={API_BASE_URL} onSelect={(itm) => onNavigate(`/item/${itm.id}`)} />
-            ))}
-          </div>
-        )
-      ) : (
-        <div className="text-center text-gray-500 py-10">No items found.</div>
-      )}
-      <div ref={sentinelRef} className="h-1" />
-      {isFetchingMore && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
-          {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+    <main ref={mainRef} className="max-w-6xl mx-auto px-4 py-4"
+      onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+      {/* Pull-to-refresh indicator */}
+      {pullDistance > 0 && (
+        <div className="flex justify-center py-2" style={{ opacity: Math.min(pullDistance / 60, 1) }}>
+          <ArrowDown size={20} className={`text-amber-500 transition-transform ${pullDistance > 60 ? 'rotate-180' : ''}`} />
+          <span className="text-xs text-slate-400 ml-2">{pullDistance > 60 ? 'Release to refresh' : 'Pull to refresh'}</span>
         </div>
       )}
+      {refreshing && (
+        <div className="flex justify-center py-2">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-500"></div>
+        </div>
+      )}
+      <CompactBar />
+      {items.length === 0 ? (
+        <div className="text-center text-gray-400 py-12">No items found.</div>
+      ) : viewMode === 'list' ? (
+        <div className="space-y-3">
+          {items.map(item => (
+            <div key={item.id} onClick={() => onNavigate(`/item/${item.id}`)} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-amber-400 transition-all cursor-pointer">
+              <img src={`${API_BASE_URL}/media/${item.image_path || item.images?.[0]}`} alt={item.title} className="w-16 h-16 rounded-xl object-cover shrink-0" onError={e => { e.target.src = 'https://placehold.co/400x400?text=No+Image'; }} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-amber-700">@{item.channel?.username || 'unknown'}</span>
+                  <span className="text-[10px] text-slate-400">{item.category}</span>
+                </div>
+                <h4 className="font-bold text-slate-900 text-sm leading-snug truncate">{item.title}</h4>
+                <span className="text-sm font-bold text-green-600 mt-1">{item.price ? `${item.price.toLocaleString()} ETB` : 'Ask for Price'}</span>
+              </div>
+              <button className="px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg shrink-0">View</button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {items.map(item => <ItemCard key={item.id} item={item} apiUrl={API_BASE_URL} onSelect={(itm) => onNavigate(`/item/${itm.id}`)} />)}
+        </div>
+      )}
+      {isFetchingMore && (
+        <div className={viewMode === 'list' ? 'space-y-3 mt-4' : 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4'}>
+          {[...Array(4)].map((_, i) => viewMode === 'list' ? <SkeletonList key={i} /> : <SkeletonGrid key={i} />)}
+        </div>
+      )}
+      <div ref={sentinelRef} className="h-1" />
       {!hasMore && items.length > 0 && (
         <p className="text-center text-gray-400 py-6 text-sm">You've seen everything!</p>
       )}
