@@ -53,6 +53,8 @@ const Home = ({ embedded = false, initialSearchQuery = '' }) => {
           setMaxPrice={shop.setMaxPrice}
           filterCategory={shop.filterCategory}
           setFilterCategory={shop.setFilterCategory}
+          excludeUnpriced={shop.excludeUnpriced}
+          setExcludeUnpriced={shop.setExcludeUnpriced}
         />
       )}
 

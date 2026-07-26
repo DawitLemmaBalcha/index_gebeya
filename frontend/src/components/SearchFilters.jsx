@@ -10,6 +10,8 @@ const SearchFilters = ({
   setMaxPrice,
   filterCategory,
   setFilterCategory,
+  excludeUnpriced,
+  setExcludeUnpriced,
 }) => {
   if (!searchQuery || searchQuery.trim().length === 0) {
     return null;
@@ -18,7 +20,8 @@ const SearchFilters = ({
   const activeFilterCount =
     (minPrice !== "" ? 1 : 0) +
     (maxPrice !== "" ? 1 : 0) +
-    (filterCategory !== "All" && filterCategory !== "" ? 1 : 0);
+    (filterCategory !== "All" && filterCategory !== "" ? 1 : 0) +
+    (excludeUnpriced ? 1 : 0);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-3">
@@ -57,6 +60,17 @@ const SearchFilters = ({
             </option>
           ))}
         </select>
+
+        {/* Exclude Unpriced Toggle */}
+        <label className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-xl text-sm cursor-pointer hover:bg-gray-200 transition-all">
+          <input
+            type="checkbox"
+            checked={excludeUnpriced}
+            onChange={(e) => setExcludeUnpriced(e.target.checked)}
+            className="accent-blue-600 w-4 h-4"
+          />
+          Only show items with price
+        </label>
 
         {/* Active Filter Badge */}
         {activeFilterCount > 0 && (

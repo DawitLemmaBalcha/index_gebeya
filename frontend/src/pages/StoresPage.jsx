@@ -136,7 +136,7 @@ const StoresPage = () => {
             <p className="text-xs text-brand-600 mt-0.5">Add @IndexGebeyaBot as admin to your channel.</p>
           </div>
           <a
-            href="https://t.me/IndexGebeyaBot"
+            href="https://t.me/IndexGebeyaBot?start=addchannel"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-2 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 transition-colors shrink-0"
@@ -188,7 +188,7 @@ const StoresPage = () => {
               </li>
             </ol>
             <a
-              href="https://t.me/IndexGebeyaBot"
+              href="https://t.me/IndexGebeyaBot?start=addchannel"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-colors"

@@ -5,7 +5,7 @@ import { getAnalyticsHeaders } from '../utils/analytics'; // IMPORT (for URL par
 const ItemCard = ({ item, onSelect, apiUrl }) => {
   
   const formatPrice = (price, currency) => {
-    if (!price) return 'Call for Price';
+    if (!price) return 'Ask for Price';
     return `${new Intl.NumberFormat('en-ET').format(price)} ${currency || 'ETB'}`;
   };
 
@@ -96,7 +96,7 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
           </h3>
         </div>
         
-        <div className="text-ethiopia-green font-bold text-sm mb-2">
+        <div className={`font-bold text-sm mb-2 ${!item.price ? 'text-green-600' : 'text-ethiopia-green'}`}>
           {formatPrice(item.price, item.currency)}
         </div>
 

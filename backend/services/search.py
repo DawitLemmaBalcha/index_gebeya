@@ -11,13 +11,17 @@ from ai_engine.vector_client import vectorize_text
 from schemas import ItemResponse, ChannelResponse
 from ai_engine.matcher import SEMANTIC_WEIGHT, LEXICAL_WEIGHT, DEFAULT_RESULT_LIMIT
 
-def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: int, offset: int) -> List[ItemResponse]:
+def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: int, offset: int, exclude_unpriced: bool = False) -> List[ItemResponse]:
     """
     Executes the Hybrid Search SQL using strict Top-K Ranking.
     
     CHANGE: Removed threshold filtering. 
     We now return the top 'limit' items sorted by score, regardless of how low the score is.
     """
+    
+    unpriced_clause = ""
+    if exclude_unpriced:
+        unpriced_clause = "AND i.price IS NOT NULL AND i.price > 0"
     
     sql = text(f"""
     WITH scored_items AS (
@@ -63,6 +67,7 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
             -- Item must have SOME text match (> 0.01 very loose) to be worth scoring.
             -- We keep this loose filter to avoid sorting the entire database for 0.0 score items.
             (i.image_vector IS NOT NULL OR (:q != '' AND similarity(coalesce(i.title, '') || ' ' || i.description, :q) > 0.01))
+            {unpriced_clause}
     )
     SELECT 
         *,
@@ -132,7 +137,7 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
         
     return items
 
-def perform_hybrid_search(db: Session, query_text: str, limit: int = None, offset: int = 0, threshold: float = 0.2, min_price: float = None, max_price: float = None, category: str = None) -> Tuple[List[ItemResponse], int]:
+def perform_hybrid_search(db: Session, query_text: str, limit: int = None, offset: int = 0, threshold: float = 0.2, min_price: float = None, max_price: float = None, category: str = None, exclude_unpriced: bool = False) -> Tuple[List[ItemResponse], int]:
     """
     Main Entry point for Text-triggered Hybrid Search.
     Returns: (List[ItemResponse], TotalCount)
@@ -161,7 +166,7 @@ def perform_hybrid_search(db: Session, query_text: str, limit: int = None, offse
     fetch_limit = limit + 10 
     
     # Note: 'threshold' argument is now ignored in favor of pure ranking
-    items = _execute_search_sql(db, vec_literal, query_text, fetch_limit, offset)
+    items = _execute_search_sql(db, vec_literal, query_text, fetch_limit, offset, exclude_unpriced=exclude_unpriced)
 
     # 4. Apply Post-SQL Filters
     filtered_items = []

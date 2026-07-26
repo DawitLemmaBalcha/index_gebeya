@@ -27,7 +27,11 @@ def search_items(
     results_raw = search_service.perform_hybrid_search(
         db=db,
         query_text=query.query,
-        limit=query.limit
+        limit=query.limit,
+        min_price=query.min_price,
+        max_price=query.max_price,
+        category=query.category,
+        exclude_unpriced=query.exclude_unpriced,
     )
     
     # Handle Tuple Return (items, count)

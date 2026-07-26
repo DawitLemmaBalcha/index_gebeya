@@ -29,6 +29,7 @@ export const useShop = () => {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
+  const [excludeUnpriced, setExcludeUnpriced] = useState(false);
 
   // Infinite scroll state
   const LIMIT = 20;
@@ -69,7 +70,7 @@ export const useShop = () => {
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (searchQuery.trim().length > 0) {
-        handleTextSearch(searchQuery, { minPrice, maxPrice, filterCategory });
+        handleTextSearch(searchQuery, { minPrice, maxPrice, filterCategory, excludeUnpriced });
       } else {
         setMinPrice("");
         setMaxPrice("");
@@ -78,7 +79,7 @@ export const useShop = () => {
       }
     }, 600); 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, minPrice, maxPrice, filterCategory]);
+  }, [searchQuery, minPrice, maxPrice, filterCategory, excludeUnpriced]);
 
   const fetchItems = useCallback(async (pageOffset = 0) => {
     // Build URL with limit, offset, and exclude params
@@ -159,14 +160,17 @@ export const useShop = () => {
     setIsSearchingText(true); setVisualResults(null); setActiveCategory("All"); 
     
     const body = { query, limit: 50 };
-    if (filters.minPrice && filters.minPrice !== "") {
+    if (filters.minPrice !== "" && !isNaN(Number(filters.minPrice))) {
       body.min_price = Number(filters.minPrice);
     }
-    if (filters.maxPrice && filters.maxPrice !== "") {
+    if (filters.maxPrice !== "" && !isNaN(Number(filters.maxPrice))) {
       body.max_price = Number(filters.maxPrice);
     }
     if (filters.filterCategory && filters.filterCategory !== "All") {
       body.category = filters.filterCategory;
+    }
+    if (filters.excludeUnpriced) {
+      body.exclude_unpriced = true;
     }
 
     const analyticsHeaders = getAnalyticsHeaders();
@@ -244,6 +248,7 @@ export const useShop = () => {
     displayItems, isSearchingText, isSearchingVisual,
     hasMore, isFetchingMore, fetchMore, LIMIT,
     minPrice, setMinPrice, maxPrice, setMaxPrice, filterCategory, setFilterCategory,
+    excludeUnpriced, setExcludeUnpriced,
     viewMode, setViewMode,
     resetFeed
   };

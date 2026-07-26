@@ -121,6 +121,7 @@ class SearchQuery(BaseModel):
     min_price: Optional[float] = None
     max_price: Optional[float] = None
     category: Optional[str] = None
+    exclude_unpriced: bool = False
 
 class SearchResponse(BaseModel):
     items: List[ItemResponse]
