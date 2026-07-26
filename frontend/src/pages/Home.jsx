@@ -22,7 +22,7 @@ const Home = ({ embedded = false, initialSearchQuery = '' }) => {
     } else if (initialSearchQuery && initialSearchQuery.trim().length > 0) {
       shop.setSearchQuery(initialSearchQuery);
     }
-  }, []); // Run once on mount
+  }, [searchParams, initialSearchQuery, shop.setSearchQuery]); // Re-run on URL change
 
   // TECH-10: Include resetFeed to clear cache
   const handleReset = () => {

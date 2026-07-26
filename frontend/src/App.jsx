@@ -73,8 +73,10 @@ const App = () => {
     } catch {}
     setShowOnboarding(false);
     if (params?.searchQuery) {
-      // Navigate to explore with search query — Home picks up ?q= param
       window.location.href = `/?q=${encodeURIComponent(params.searchQuery)}`;
+    } else {
+      // Navigate to explore tab — Router picks up and renders MainLayout at /*
+      window.location.href = '/';
     }
   };
 
