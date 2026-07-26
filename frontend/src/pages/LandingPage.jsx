@@ -428,35 +428,35 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null, compact = false 
           <p className="text-sm text-slate-600 mt-2 font-medium">Tap below to switch views inside our live Telegram Mini App preview mockup.</p>
         </div>
         <div className="flex justify-center">
-          <div className="w-full max-w-sm bg-slate-900 p-4 rounded-[40px] shadow-2xl border-4 border-slate-800 relative">
-            <div className="w-28 h-4 bg-slate-950 rounded-full mx-auto absolute top-4 left-1/2 -translate-x-1/2 z-20"></div>
-            <div className="bg-slate-950 rounded-[30px] pt-8 pb-4 px-3 text-white overflow-hidden min-h-[500px] flex flex-col justify-between relative z-10 border border-slate-800">
+          <div className="w-full max-w-sm bg-slate-200 p-4 rounded-[40px] shadow-2xl border-4 border-slate-300 relative">
+            <div className="w-28 h-5 bg-slate-300 rounded-b-xl mx-auto absolute top-4 left-1/2 -translate-x-1/2 z-20"></div>
+            <div className="bg-white rounded-[30px] pt-8 pb-4 px-3 text-slate-900 overflow-hidden min-h-[500px] flex flex-col justify-between relative z-10 border border-slate-200">
               <div>
-                <div className="flex items-center justify-between px-2 pb-3 border-b border-slate-800">
-                  <div className="flex items-center gap-2"><div className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center">IG</div><div><h4 className="font-bold text-xs text-white">Index Gebeya Bot</h4><p className="text-[10px] text-slate-400">Telegram Mini App</p></div></div>
-                  <span className="text-[10px] bg-slate-900 border border-slate-800 text-amber-400 px-2 py-0.5 rounded-full font-mono">v2.4</span>
+                <div className="flex items-center justify-between px-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2"><div className="w-7 h-7 rounded-lg bg-amber-500 text-white font-black text-xs flex items-center justify-center">IG</div><div><h4 className="font-bold text-xs text-slate-900">Index Gebeya Bot</h4><p className="text-[10px] text-slate-400">Telegram Mini App</p></div></div>
+                  <span className="text-[10px] bg-slate-100 border border-slate-200 text-amber-600 px-2 py-0.5 rounded-full font-mono">v2.4</span>
                 </div>
                 <div className="py-4 px-1 space-y-3">
                   {phoneTab === 'explore' && (<>
-                    <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 flex items-center gap-2 text-xs text-slate-300"><span>🔍</span><span className="text-slate-500 text-[11px]">Search 142k+ Telegram items...</span></div>
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center gap-2 text-xs text-slate-500"><span>🔍</span><span className="text-slate-400 text-[11px]">Search 142k+ Telegram items...</span></div>
                     {[{ icon:"📱", title:"iPhone 13 128GB Gold", channel:"@EthioTechHub", price:"48,500 ETB" },{ icon:"🚗", title:"Toyota Vitz 2019", channel:"@AddisAutoDeals", price:"1.25M ETB" },{ icon:"💻", title:"MacBook Air M1 256GB", channel:"@LaptopsAddis", price:"52,000 ETB" }].map((p,i) => (
-                      <div key={i} className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-sm font-bold shrink-0">{p.icon}</div>
-                        <div className="flex-1 min-w-0"><h5 className="text-xs font-bold truncate text-white">{p.title}</h5><p className="text-[10px] text-slate-400">{p.channel} • {p.price}</p></div>
-                        <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold">Match</span>
+                      <div key={i} className="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-sm font-bold shrink-0">{p.icon}</div>
+                        <div className="flex-1 min-w-0"><h5 className="text-xs font-bold truncate text-slate-900">{p.title}</h5><p className="text-[10px] text-slate-400">{p.channel} • {p.price}</p></div>
+                        <span className="text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded font-bold">Match</span>
                       </div>
                     ))}
                   </>)}
                   {phoneTab === 'alerts' && (<>
-                    <div className="text-xs text-amber-400 font-bold mb-2 flex items-center gap-1.5"><span>🔔</span><span>Active Telegram Keyword Alerts</span></div>
+                    <div className="text-xs text-amber-600 font-bold mb-2 flex items-center gap-1.5"><span>🔔</span><span>Active Telegram Keyword Alerts</span></div>
                     {[{ q:'"Toyota Vitz"', max:'1,300,000 Birr' },{ q:'"MacBook Air M1"', max:'55,000 Birr' }].map((a,i) => (
-                      <div key={i} className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between mb-2"><div><span className="text-xs font-bold text-white block">{a.q}</span><span className="text-[10px] text-slate-400">Max limit: {a.max}</span></div><span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">ACTIVE</span></div>
+                      <div key={i} className="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between mb-2"><div><span className="text-xs font-bold text-slate-900 block">{a.q}</span><span className="text-[10px] text-slate-400">Max limit: {a.max}</span></div><span className="text-[9px] bg-amber-50 text-amber-600 border border-amber-100 px-2 py-0.5 rounded-full font-bold">ACTIVE</span></div>
                     ))}
                   </>)}
-                  {phoneTab === 'stores' && (<div className="p-4 bg-slate-900 rounded-xl border border-slate-800 text-center text-xs text-slate-400"><div className="text-2xl mb-1">🏪</div><p className="font-semibold text-white mb-1">Your Indexed Channels</p><p className="text-[11px] leading-relaxed text-slate-400">Add your Telegram channel to get products listed and reach thousands of buyers across Ethiopia.</p></div>)}
+                  {phoneTab === 'stores' && (<div className="p-4 bg-white rounded-xl border border-slate-100 shadow-sm text-center text-xs text-slate-500"><div className="text-2xl mb-1">🏪</div><p className="font-semibold text-slate-900 mb-1">Your Indexed Channels</p><p className="text-[11px] leading-relaxed text-slate-400">Add your Telegram channel to get products listed and reach thousands of buyers across Ethiopia.</p></div>)}
                 </div>
               </div>
-                <div className="bg-slate-900 rounded-2xl p-1.5 grid grid-cols-3 gap-1 text-center border border-slate-800">
+              <div className="bg-slate-50 rounded-2xl p-1.5 grid grid-cols-3 gap-1 text-center border border-slate-100">
                   {['explore','alerts','stores'].map(tab => (
                     <button key={tab} onClick={() => setPhoneTab(tab)} className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${phoneTab === tab ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}>{tab === 'explore' ? '🔍 Explore' : tab === 'alerts' ? '🔔 Alerts' : '🏪 Stores'}</button>
                   ))}
