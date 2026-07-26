@@ -12,10 +12,25 @@ WEB_APP_URL = "https://indexgebeya.cfd"
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Responds to /start with a button to open the Mini App.
-    TECH-18: Enhanced with welcome message, /addchannel button, and bot commands.
+    Supports deep link payload: /start addchannel → shows addchannel instructions directly.
     """
     user = update.effective_user
     logger.info(f"👤 User {user.id} ({user.first_name}) started the bot.")
+
+    # Check for deep link payload (e.g., t.me/IndexGebeyaBot?start=addchannel)
+    if context.args and context.args[0] == "addchannel":
+        bot_username = context.bot.username
+        instruction_text = (
+            "To list your products on Index Gebeya, add me to your channel or group as an **admin**:\n\n"
+            "1. Open your channel or group → **Info** → **Administrators**\n"
+            f"2. Tap **Add Admin** and search for `@{bot_username}`\n"
+            "3. ⚠️ **Turn OFF all permissions.** I don't need to delete messages, ban users, or post. "
+            "Admin is only needed so I can verify you own this channel/group.\n"
+            "4. Confirm.\n\n"
+            "Once added, post a product — it'll appear in the marketplace within a minute or two."
+        )
+        await update.message.reply_text(instruction_text, parse_mode="Markdown")
+        return
 
     # 0. Register Bot Commands Menu
     try:
