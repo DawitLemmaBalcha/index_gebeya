@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from database import get_db
 from models import Channel, User, Item
 from schemas import ChannelResponse, ChannelUpsert, OwnerChannelResponse
+from schemas import ChannelInfoResponse, ChannelPauseRequest, ChannelActionResponse
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 router = APIRouter()
@@ -180,8 +181,12 @@ def get_my_channels(
     user = _auth_user_from_init_data(init_data, db)
 
     # Query channels where registered_by matches the user's telegram_id
+    # TECH-19: Filter out inactive (removed) channels
     channels = db.scalars(
-        select(Channel).where(Channel.registered_by == user.telegram_id)
+        select(Channel).where(
+            Channel.registered_by == user.telegram_id,
+            Channel.is_active == True,
+        )
     ).all()
 
     result = []
@@ -198,7 +203,180 @@ def get_my_channels(
             review_count=channel.review_count,
             is_verified=channel.is_verified,
             product_count=product_count or 0,
-            is_active=True,
+            indexing_paused=channel.indexing_paused,
+            is_active=not channel.indexing_paused,
         ))
 
     return result
+
+
+# ----------------------------------------------------------------------
+# TECH-19: GET /channels/by-username/{username} — internal channel info lookup
+# ----------------------------------------------------------------------
+@router.get("/by-username/{username}", response_model=ChannelInfoResponse)
+def get_channel_by_username(
+    username: str,
+    x_internal_service: Optional[str] = Header(None, alias="X-Internal-Service"),
+    db: Session = Depends(get_db),
+):
+    """
+    Look up channel info by Telegram username. Internal endpoint for the listener worker.
+    Requires X-Internal-Service header for authentication.
+    """
+    if x_internal_service != "index-listener":
+        raise HTTPException(status_code=403, detail="Forbidden: internal service only")
+
+    channel = db.query(Channel).filter(Channel.username == username).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    return ChannelInfoResponse(
+        id=channel.id,
+        username=channel.username,
+        registered_by=channel.registered_by,
+        indexing_paused=channel.indexing_paused,
+        is_active=channel.is_active,
+    )
+
+
+# ----------------------------------------------------------------------
+# TECH-19: PATCH /channels/{channel_id}/pause — toggle indexing_paused
+# ----------------------------------------------------------------------
+@router.patch("/{channel_id}/pause", response_model=ChannelActionResponse)
+async def toggle_channel_pause(
+    channel_id: int,
+    body: ChannelPauseRequest,
+    init_data: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Pause or resume indexing for a channel owned by the authenticated user.
+    Sends a DM notification to the channel owner via Telegram Bot API.
+    """
+    user = _auth_user_from_init_data(init_data, db)
+
+    channel = db.query(Channel).filter(
+        Channel.id == channel_id,
+        Channel.registered_by == user.telegram_id,
+    ).first()
+
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    channel.indexing_paused = body.indexing_paused
+    db.commit()
+    db.refresh(channel)
+
+    # Send DM notification via Telegram Bot API
+    if BOT_TOKEN:
+        try:
+            if body.indexing_paused:
+                msg = (
+                    f"⏸️ @{channel.username} is paused. "
+                    f"Your products remain indexed but new posts won't appear. "
+                    f"Tap Resume in Stores anytime."
+                )
+            else:
+                msg = (
+                    f"▶️ @{channel.username} is active again. "
+                    f"New posts will appear in the marketplace."
+                )
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                dm_resp = await client.post(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": channel.registered_by,
+                        "text": msg,
+                    },
+                )
+                if dm_resp.status_code != 200:
+                    logger.warning(f"⚠️ DM send failed for channel {channel_id}: {dm_resp.text[:200]}")
+        except Exception as e:
+            logger.warning(f"⚠️ DM notification exception for channel {channel_id}: {e}")
+
+    return ChannelActionResponse(status="ok")
+
+
+# ----------------------------------------------------------------------
+# TECH-19: DELETE /channels/{channel_id} — remove channel with auto-leave
+# ----------------------------------------------------------------------
+@router.delete("/{channel_id}", response_model=ChannelActionResponse)
+async def remove_channel(
+    channel_id: int,
+    init_data: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Remove a channel owned by the authenticated user. Attempts to make the bot
+    leave the channel via Telegram API (leaveChat), then soft-deletes the channel
+    (sets is_active=False). Sends a DM notification to the owner.
+    """
+    user = _auth_user_from_init_data(init_data, db)
+
+    channel = db.query(Channel).filter(
+        Channel.id == channel_id,
+        Channel.registered_by == user.telegram_id,
+    ).first()
+
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    # Attempt auto-leave from the Telegram channel
+    if BOT_TOKEN:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # Step 1: Get chat_id from username
+                get_chat_resp = await client.get(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/getChat",
+                    params={"chat_id": f"@{channel.username}"},
+                )
+                if get_chat_resp.status_code == 200:
+                    chat_data = get_chat_resp.json()
+                    if chat_data.get("ok") and chat_data.get("result", {}).get("id"):
+                        chat_id = chat_data["result"]["id"]
+                        # Step 2: Leave the channel
+                        leave_resp = await client.post(
+                            f"https://api.telegram.org/bot{BOT_TOKEN}/leaveChat",
+                            json={"chat_id": chat_id},
+                        )
+                        if leave_resp.status_code != 200:
+                            logger.warning(
+                                f"⚠️ leaveChat failed for channel {channel_id}: "
+                                f"{leave_resp.text[:200]}"
+                            )
+                    else:
+                        logger.warning(f"⚠️ getChat returned no id for channel {channel_id}")
+                else:
+                    logger.warning(
+                        f"⚠️ getChat failed for channel {channel_id}: "
+                        f"{get_chat_resp.status_code} — {get_chat_resp.text[:200]}"
+                    )
+        except Exception as e:
+            logger.warning(f"⚠️ Telegram leaveChat exception for channel {channel_id}: {e}")
+
+    # Soft-delete: mark channel as inactive (Rule 3.3: DB is source of truth)
+    channel.is_active = False
+    db.commit()
+    db.refresh(channel)
+
+    # Send DM notification via Telegram Bot API
+    if BOT_TOKEN and channel.registered_by:
+        try:
+            msg = (
+                f"👋 I've left @{channel.username}. "
+                f"Your existing products stay indexed. Add me back anytime to resume."
+            )
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                dm_resp = await client.post(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": channel.registered_by,
+                        "text": msg,
+                    },
+                )
+                if dm_resp.status_code != 200:
+                    logger.warning(f"⚠️ DM send failed for channel {channel_id}: {dm_resp.text[:200]}")
+        except Exception as e:
+            logger.warning(f"⚠️ DM notification exception for channel {channel_id}: {e}")
+
+    return ChannelActionResponse(status="ok")

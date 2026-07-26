@@ -120,6 +120,10 @@ class Channel(Base):
     photo_file_id = Column(String, nullable=True)  # Telegram big_file_id for channel profile photo
     registered_by = Column(BigInteger, nullable=True)
     
+    # TECH-19: Processing DM lifecycle — pause/resume/remove gates
+    indexing_paused = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

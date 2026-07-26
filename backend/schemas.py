@@ -167,10 +167,34 @@ class OwnerChannelResponse(BaseModel):
     review_count: int
     is_verified: bool
     product_count: int
+    indexing_paused: bool = False
     is_active: bool = True
 
     class Config:
         from_attributes = True
+
+
+# ----------------------------------------------------------------------
+# TECH-19: Channel Management Schemas
+# ----------------------------------------------------------------------
+class ChannelPauseRequest(BaseModel):
+    indexing_paused: bool
+
+
+class ChannelInfoResponse(BaseModel):
+    id: int
+    username: str
+    registered_by: Optional[int] = None
+    indexing_paused: bool
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class ChannelActionResponse(BaseModel):
+    status: str
+    message: Optional[str] = None
 
 
 # ----------------------------------------------------------------------

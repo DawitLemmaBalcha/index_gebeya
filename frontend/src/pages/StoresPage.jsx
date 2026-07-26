@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, PlusCircle, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, PlusCircle, Loader2, RefreshCw, AlertCircle, X } from 'lucide-react';
 import { useOwnerChannels } from '../hooks/useOwnerChannels';
 
 const StoresPage = () => {
-  const { channels, loading, error, fetchChannels, hasBeenFetched } = useOwnerChannels();
+  const { channels, loading, error, fetchChannels, hasBeenFetched, togglePause, removeChannel } = useOwnerChannels();
   const [howToExpanded, setHowToExpanded] = useState(false);
+  const [modalState, setModalState] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Lazy load: fetch only on first activation
   useEffect(() => {
@@ -16,6 +18,26 @@ const StoresPage = () => {
   const formatNumber = (num) => {
     if (num == null) return '—';
     return new Intl.NumberFormat('en-ET').format(num);
+  };
+
+  const handleAction = async () => {
+    if (!modalState) return;
+
+    setActionLoading(true);
+    try {
+      if (modalState.type === 'pause') {
+        await togglePause(modalState.channel.id, true);
+      } else if (modalState.type === 'resume') {
+        await togglePause(modalState.channel.id, false);
+      } else if (modalState.type === 'remove') {
+        await removeChannel(modalState.channel.id);
+      }
+      setModalState(null);
+    } catch (e) {
+      // Error is set in the hook, keep modal open so user can retry
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   // Not-in-Telegram state
@@ -63,6 +85,14 @@ const StoresPage = () => {
       <div className="px-4 pt-4 pb-24">
         <h1 className="text-xl font-bold text-gray-900 mb-4">My Stores</h1>
 
+        {/* Error toast for action failures */}
+        {error && error !== 'NOT_IN_TELEGRAM' && channels.length > 0 && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-center gap-2">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
         <div className="space-y-3 mb-6">
           {channels.map((channel) => (
             <div
@@ -78,12 +108,12 @@ const StoresPage = () => {
                 </div>
                 <span
                   className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                    channel.is_active
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'
+                    channel.indexing_paused
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-green-100 text-green-700'
                   }`}
                 >
-                  {channel.is_active ? 'ACTIVE' : 'PAUSED'}
+                  {channel.indexing_paused ? 'PAUSED' : 'ACTIVE'}
                 </span>
               </div>
 
@@ -110,16 +140,28 @@ const StoresPage = () => {
 
               {/* Action buttons */}
               <div className="flex items-center gap-2">
+                {channel.indexing_paused ? (
+                  // Resume button — fires immediately, no modal
+                  <button
+                    onClick={() => togglePause(channel.id, false)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    <Play size={14} />
+                    Resume
+                  </button>
+                ) : (
+                  // Pause button — opens confirmation modal
+                  <button
+                    onClick={() => setModalState({ type: 'pause', channel })}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors"
+                  >
+                    <Pause size={14} />
+                    Pause
+                  </button>
+                )}
                 <button
-                  disabled
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-400 cursor-not-allowed"
-                >
-                  {channel.is_active ? <Pause size={14} /> : <Play size={14} />}
-                  {channel.is_active ? 'Pause' : 'Resume'}
-                </button>
-                <button
-                  disabled
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-300 cursor-not-allowed"
+                  onClick={() => setModalState({ type: 'remove', channel })}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                 >
                   <Trash2 size={14} />
                   Remove
@@ -145,6 +187,83 @@ const StoresPage = () => {
             Add Channel
           </a>
         </div>
+
+        {/* Confirmation Modal */}
+        {modalState && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/40" onClick={() => !actionLoading && setModalState(null)} />
+            {/* Card */}
+            <div className="relative bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+              {/* Close button */}
+              {!actionLoading && (
+                <button
+                  onClick={() => setModalState(null)}
+                  className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              )}
+
+              {/* Pause Modal */}
+              {modalState.type === 'pause' && (
+                <>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Pause Indexing</h3>
+                  <p className="text-sm text-gray-600 mb-6">
+                    Pause indexing for @{modalState.channel.username}? Your products stay in
+                    the catalog but new posts won't appear. You can resume anytime.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setModalState(null)}
+                      disabled={actionLoading}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleAction}
+                      disabled={actionLoading}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {actionLoading && <Loader2 size={16} className="animate-spin" />}
+                      Pause
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Remove Modal */}
+              {modalState.type === 'remove' && (
+                <>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Remove Channel</h3>
+                  <p className="text-sm text-gray-600 mb-6">
+                    Remove @{modalState.channel.username} from Index Gebeya? The bot will
+                    leave your channel. Existing products stay in the catalog but new posts
+                    won't be indexed. You can add the bot back anytime.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setModalState(null)}
+                      disabled={actionLoading}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleAction}
+                      disabled={actionLoading}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {actionLoading && <Loader2 size={16} className="animate-spin" />}
+                      Remove
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }

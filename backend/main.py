@@ -64,7 +64,23 @@ def startup_event():
         logger.warning(f"⚠️ Table creation failed: {e}")
 
     # ===================================================================
-    # Phase 3 — Create indexes (SINGLE SOURCE OF TRUTH)
+    # Phase 3 — Schema migrations (idempotent ALTER TABLE for new columns)
+    # ===================================================================
+    try:
+        with engine.begin() as conn:
+            # TECH-19: Add indexing_paused and is_active columns to channels
+            conn.execute(text(
+                "ALTER TABLE channels ADD COLUMN IF NOT EXISTS indexing_paused BOOLEAN DEFAULT FALSE"
+            ))
+            conn.execute(text(
+                "ALTER TABLE channels ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"
+            ))
+            logger.info("✅ TECH-19 schema migration verified (indexing_paused, is_active)")
+    except Exception as e:
+        logger.warning(f"⚠️ Schema migration failed: {e}")
+
+    # ===================================================================
+    # Phase 4 — Create indexes (SINGLE SOURCE OF TRUTH)
     # ===================================================================
     try:
         with engine.begin() as conn:
@@ -109,7 +125,7 @@ def startup_event():
         logger.warning(f"⚠️ Index setup connection failed: {e}")
 
     # ===================================================================
-    # Phase 4 — Initialize taxonomy index (existing behavior, preserved)
+    # Phase 5 — Initialize taxonomy index (existing behavior, preserved)
     # ===================================================================
     try:
         initialize_taxonomy_index()

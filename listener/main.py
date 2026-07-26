@@ -54,7 +54,7 @@ if __name__ == '__main__':
     # 4. Start Background Workers
     async def post_init(app):
         # A. Ingestion Worker
-        asyncio.create_task(background_worker(job_queue))
+        asyncio.create_task(background_worker(job_queue, app.bot))
         logger.info("✅ Ingestion Worker Injected")
         
         # B. Notification Poller (The Mailman)
