@@ -72,10 +72,11 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
     SELECT 
         *,
         -- Final Weighted Calculation
-        (
-            (semantic_score * :w_sem) + 
-            (lexical_raw * :w_lex)
-        ) as total_score
+        -- Items without vectors get full lexical weight instead of zero semantic
+        CASE 
+            WHEN semantic_score = 0 THEN lexical_raw
+            ELSE (semantic_score * :w_sem) + (lexical_raw * :w_lex)
+        END as total_score
     FROM scored_items
     -- REMOVED: WHERE total_score > threshold
     -- REASON: We want Top-K ranking. Even low scores should appear if they are the "best available".

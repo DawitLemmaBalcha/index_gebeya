@@ -29,15 +29,17 @@ def process_new_item(db: Session, item_id: int):
     try:
         # 1. Load the Item
         item = db.scalar(select(Item).where(Item.id == item_id))
-        if not item or item.image_vector is None:
-            logger.warning(f"⚠️ Alerting skipped: Item {item_id} invalid or no vector.")
+        if not item:
+            logger.warning(f"⚠️ Alerting skipped: Item {item_id} not found.")
             return
 
-        # Handle vector conversion once
-        if hasattr(item.image_vector, "tolist"):
-            item_vec = item.image_vector.tolist()
-        else:
-            item_vec = list(item.image_vector)
+        # Handle vector conversion (may be None for text-only posts)
+        item_vec = None
+        if item.image_vector is not None:
+            if hasattr(item.image_vector, "tolist"):
+                item_vec = item.image_vector.tolist()
+            else:
+                item_vec = list(item.image_vector)
 
         # 2. Load Active Alerts
         alerts = db.scalars(select(Alert).where(Alert.is_active == True)).all()
