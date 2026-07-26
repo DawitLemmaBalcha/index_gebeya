@@ -1,5 +1,5 @@
 # Technical Backlog
 
-*TECH-01 through TECH-17 implemented. See `docs/plans/` for blueprints.*
+*TECH-01 through TECH-19 implemented.*
 
-*Remaining NB tickets: NB-17, NB-18, NB-19, NB-20 (low priority).*
+*Remaining NB: NB-17, NB-18, NB-19, NB-20 (low priority).*

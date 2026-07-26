@@ -119,3 +119,21 @@ Channel owners who add the bot have no way to see their channels' performance or
 ## NB-20: LLM Judge "Fail-Open" Does Not Distinguish Between Error Types (existing, low priority)
 
 *(Unchanged — retained from original ledger)*
+
+---
+
+## NB-38: Processing Notifications & Store Management (Pause/Remove) [IMPLEMENTED]
+
+**Priority:** HIGH
+**Affected Features:** Listener, Stores, Ingestion
+**File(s):** `listener/worker.py`, `listener/client.py`, `backend/models.py`, `frontend/src/pages/StoresPage.jsx`
+
+**The Gap:**
+Channel owners have no visibility into whether their posts are being processed. Stores tab has non-functional Pause/Remove buttons. No confirmation modals. No auto-leave on remove.
+
+**User Acceptance Criteria:**
+- Processing DM: When a post from a registered channel is ingested, the owner gets one DM that starts as "⏳ Processing..." and is edited to "✅ Indexed: [Title] — [Price] ETB" on completion.
+- Pause: Confirmation modal → sets `indexing_paused` on channel → bot DMs owner → ingestion skips paused channels.
+- Resume: No confirmation needed. Clears flag → bot DMs owner.
+- Remove: Confirmation modal → `getChat` + `leaveChat` → mark removed → bot DMs owner.
+- DMs only sent to channels with `registered_by` set.
