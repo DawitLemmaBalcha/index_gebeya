@@ -55,7 +55,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. Send a Welcome Message with Inline Buttons
     keyboard = [
         [InlineKeyboardButton("🚀 Launch Store", web_app=WebAppInfo(url=WEB_APP_URL))],
-        [InlineKeyboardButton("📋 /addchannel — Add your channel", callback_data="cmd_addchannel")],
+        [InlineKeyboardButton("📋 Add your channel", callback_data="cmd_addchannel")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 

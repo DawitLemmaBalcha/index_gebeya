@@ -169,8 +169,8 @@ const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults
       )}
       <div ref={sentinelRef} className="h-1" />
       {isFetchingMore && (
-        <div className="flex justify-center items-center py-6">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4">
+          {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
         </div>
       )}
       {!hasMore && items.length > 0 && (
