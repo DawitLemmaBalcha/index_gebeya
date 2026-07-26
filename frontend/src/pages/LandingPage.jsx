@@ -16,7 +16,7 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null, compact = false 
   const [activeFilter, setActiveFilter] = useState(null);
   const [priceFilter, setPriceFilter] = useState("all");
   const [openFaq, setOpenFaq] = useState(null);
-  const [phoneTab, setPhoneTab] = useState("search");
+  const [phoneTab, setPhoneTab] = useState("explore");
   const [viewMode, setViewMode] = useState("grid");
 
   const [searchResults, setSearchResults] = useState(null);
@@ -213,10 +213,14 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null, compact = false 
                   </div>
                   <div className="flex items-center gap-3">
                     {(activeFilter || searchQuery || priceFilter !== "all") && <button onClick={handleClear} className="text-xs font-bold text-amber-600 hover:underline">Reset Filters</button>}
-                    {searchResults !== null && (
+                    {displayedItems !== null && (
                       <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-xs">
-                        <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-600'}`} title="Grid">⊞</button>
-                        <button onClick={() => setViewMode("list")} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-600'}`} title="List">≡</button>
+                        <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-600'}`} title="Grid">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 002-2h2a2 2 0 002 2v2a2 2 0 00-2 2h-2a2 2 0 00-2-2V5zM11 11a2 2 0 002-2h2a2 2 0 002 2v2a2 2 0 00-2 2h-2a2 2 0 00-2-2v-2z"/></svg>
+                        </button>
+                        <button onClick={() => setViewMode("list")} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-600'}`} title="List">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/></svg>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -252,9 +256,31 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null, compact = false 
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {displayedItems.map(item => (
-                      <ItemCard key={item.id} item={item} apiUrl={API_BASE_URL} onSelect={() => {}} />
-                    ))}
+                    {displayedItems.map(item => {
+                      const imgSrc = item.image_path ? `${API_BASE_URL}/media/${item.image_path}` : (item.images?.[0] ? `${API_BASE_URL}/media/${item.images[0]}` : 'https://placehold.co/400x400?text=No+Image');
+                      return (
+                        <div key={item.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl hover:border-amber-400 transition-all duration-300 group flex flex-col justify-between">
+                          <div>
+                            <div className="relative h-44 bg-slate-100 overflow-hidden">
+                              <img src={imgSrc} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={e => { e.target.src = 'https://placehold.co/400x400?text=No+Image'; }}/>
+                              <div className="absolute top-2.5 left-2.5 bg-slate-900/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">{item.category || "General"}</div>
+                              <div className="absolute top-2.5 right-2.5 bg-white/80 backdrop-blur-md text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-md">{item.created_at ? new Date(item.created_at).toLocaleDateString() : "Today"}</div>
+                            </div>
+                            <div className="p-4">
+                              <div className="flex items-center justify-between gap-1 mb-1.5">
+                                <span className="text-xs text-amber-700 font-bold">@{item.channel?.username || 'unknown'}</span>
+                                <span className="text-[10px] text-slate-400 font-medium">{item.location || 'Addis Ababa'}</span>
+                              </div>
+                              <h4 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2 group-hover:text-amber-600 transition-colors">{item.title}</h4>
+                            </div>
+                          </div>
+                          <div className="px-4 pb-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <div><span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Price</span><span className="text-base font-extrabold text-slate-900 tracking-tight">{item.price?.toLocaleString?.() || item.price || "Call"} <span className="text-xs font-semibold text-slate-500">{item.currency || 'ETB'}</span></span></div>
+                            <a href={`https://t.me/${item.channel?.username}/${item.telegram_message_id}`} target="_blank" rel="noopener noreferrer" className="px-3.5 py-2 bg-slate-900 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5"><span>Open Post</span><svg className="w-3.5 h-3.5 fill-current text-amber-400" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-2.01 1.28-5.68 3.76-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.5-.85-.27-1.53-.42-1.47-.89.03-.25.38-.51 1.07-.78 4.2-1.82 7-3.03 8.4-3.61 4-.17 4.83 2.1 4.54 3.22z"/></svg></a>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </>
@@ -411,7 +437,7 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null, compact = false 
                   <span className="text-[10px] bg-slate-900 border border-slate-800 text-amber-400 px-2 py-0.5 rounded-full font-mono">v2.4</span>
                 </div>
                 <div className="py-4 px-1 space-y-3">
-                  {phoneTab === 'search' && (<>
+                  {phoneTab === 'explore' && (<>
                     <div className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 flex items-center gap-2 text-xs text-slate-300"><span>🔍</span><span className="text-slate-500 text-[11px]">Search 142k+ Telegram items...</span></div>
                     {[{ icon:"📱", title:"iPhone 13 128GB Gold", channel:"@EthioTechHub", price:"48,500 ETB" },{ icon:"🚗", title:"Toyota Vitz 2019", channel:"@AddisAutoDeals", price:"1.25M ETB" },{ icon:"💻", title:"MacBook Air M1 256GB", channel:"@LaptopsAddis", price:"52,000 ETB" }].map((p,i) => (
                       <div key={i} className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 flex items-center gap-2.5">
@@ -427,14 +453,14 @@ const LandingPage = ({ isTelegram = false, onGetStarted = null, compact = false 
                       <div key={i} className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between mb-2"><div><span className="text-xs font-bold text-white block">{a.q}</span><span className="text-[10px] text-slate-400">Max limit: {a.max}</span></div><span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">ACTIVE</span></div>
                     ))}
                   </>)}
-                  {phoneTab === 'saved' && (<div className="p-4 bg-slate-900 rounded-xl border border-slate-800 text-center text-xs text-slate-400"><div className="text-2xl mb-1">⭐</div><p className="font-semibold text-white mb-1">Saved Telegram Listings</p><p className="text-[11px] leading-relaxed text-slate-400">Bookmark items inside Telegram to inspect or compare prices later.</p></div>)}
+                  {phoneTab === 'stores' && (<div className="p-4 bg-slate-900 rounded-xl border border-slate-800 text-center text-xs text-slate-400"><div className="text-2xl mb-1">🏪</div><p className="font-semibold text-white mb-1">Your Indexed Channels</p><p className="text-[11px] leading-relaxed text-slate-400">Add your Telegram channel to get products listed and reach thousands of buyers across Ethiopia.</p></div>)}
                 </div>
               </div>
-              <div className="bg-slate-900 rounded-2xl p-1.5 grid grid-cols-3 gap-1 text-center border border-slate-800">
-                {['search','alerts','saved'].map(tab => (
-                  <button key={tab} onClick={() => setPhoneTab(tab)} className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${phoneTab === tab ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}>{tab === 'search' ? '🔍 Search' : tab === 'alerts' ? '🔔 Alerts' : '⭐ Saved'}</button>
-                ))}
-              </div>
+                <div className="bg-slate-900 rounded-2xl p-1.5 grid grid-cols-3 gap-1 text-center border border-slate-800">
+                  {['explore','alerts','stores'].map(tab => (
+                    <button key={tab} onClick={() => setPhoneTab(tab)} className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${phoneTab === tab ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}>{tab === 'explore' ? '🔍 Explore' : tab === 'alerts' ? '🔔 Alerts' : '🏪 Stores'}</button>
+                  ))}
+                </div>
             </div>
           </div>
         </div>
