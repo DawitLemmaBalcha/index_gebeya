@@ -1,5 +1,5 @@
 import asyncio
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.error import TelegramError
 from config import logger, WEB_APP_URL
 from client import get_pending_notifications, ack_notification
@@ -8,20 +8,24 @@ from client import get_pending_notifications, ack_notification
 # COURIER: OUTBOUND NOTIFICATIONS
 # ------------------------------------------------------------------
 
-async def send_alert_dm(bot: Bot, user_id: int, text: str, alert_id: int = None):
+async def send_alert_dm(bot: Bot, user_id: int, text: str, alert_id: int = None, item_url: str = None):
     """
     Sends a direct message to a user.
-    Includes a "Stop Alert" button if alert_id is provided.
+    Includes a "Stop Alert" button if alert_id is provided,
+    and a "View Item" Mini App button if item_url is provided.
     """
     try:
-        reply_markup = None
+        keyboard = []
         
-        # Add "Stop Alert" button
+        # "View Item" as Mini App button (opens inside Telegram)
+        if item_url:
+            keyboard.append([InlineKeyboardButton("🛒 View Item", web_app=WebAppInfo(url=item_url))])
+        
+        # "Stop Alert" button
         if alert_id:
-            keyboard = [[
-                InlineKeyboardButton("🔕 Found it / Stop Alert", callback_data=f"stop_{alert_id}")
-            ]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            keyboard.append([InlineKeyboardButton("🔕 Found it / Stop Alert", callback_data=f"stop_{alert_id}")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
 
         await bot.send_message(
             chat_id=user_id, 
@@ -86,13 +90,12 @@ async def notification_poller(bot: Bot):
                 msg_text = (
                     f"{emoji} **Match Found!**\n\n"
                     f"**{item['title']}**\n"
-                    f"💰 {price_display}\n"
-                    f"🛒 [View Item]({WEB_APP_URL}/item/{item['id']})"
+                    f"💰 {price_display}"
                 )
+                item_url = f"{WEB_APP_URL}/item/{item['id']}"
 
                 # 3. Deliver
-                # We pass the alert_id (if available) to generate the Stop button
-                success = await send_alert_dm(bot, notif['user_telegram_id'], msg_text, alert_id=notif_alert_id)
+                success = await send_alert_dm(bot, notif['user_telegram_id'], msg_text, alert_id=notif_alert_id, item_url=item_url)
 
                 # 4. Acknowledge (Mark as Sent)
                 if success:
