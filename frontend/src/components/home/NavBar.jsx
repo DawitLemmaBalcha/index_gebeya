@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Search, ShoppingBag, Menu, X, Camera, ArrowLeft } from 'lucide-react';
+import { Search, Menu, Camera, ArrowLeft, ShoppingBag } from 'lucide-react';
 import { TAXONOMY } from '../../constants/taxonomy';
 import CategorySheet from '../CategorySheet';
 
-const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, setActiveCategory, activeCategory, activeSubCategory, setActiveSubCategory, variant = "home", onBack, onSearchSubmit, onLogoClick }) => {
+const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, setActiveCategory, activeCategory, activeSubCategory, setActiveSubCategory, variant = "home", onBack, onSearchSubmit, onLogoClick, viewMode, setViewMode }) => {
   const fileInputRef = useRef(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -14,47 +14,74 @@ const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, setActive
     }
   };
 
+  // Product page: minimal header with back arrow + search
+  if (variant === "product") {
+    return (
+      <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-3 h-14 flex items-center gap-2">
+          <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full shrink-0">
+            <ArrowLeft size={20} className="text-slate-700" />
+          </button>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input type="text" placeholder="Search..." className="w-full pl-9 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-amber-500 focus:bg-white transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && onSearchSubmit) onSearchSubmit(searchQuery); }}/>
+            {!searchQuery ? (
+              <button onClick={() => fileInputRef.current?.click()} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600"><Camera size={16} /></button>
+            ) : (
+              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">✕</button>
+            )}
+          </div>
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+        </div>
+      </nav>
+    );
+  }
+
+  // Home/Explore: compact single-row header
   return (
     <>
-    <nav className="bg-ethiopia-paper/90 backdrop-blur-md border-b border-ethiopia-border sticky top-0 z-30">
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
-        
-        <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
-          {variant === "product" ? (
-            <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full">
-              <ArrowLeft size={24} className="text-gray-700" />
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 cursor-pointer" onClick={onLogoClick || onReset}>
-              <div className="bg-slate-900 p-2 rounded-lg"><ShoppingBag className="text-brand-500" size={20} /></div>
-              <span className="font-extrabold text-xl tracking-tight text-slate-900">Index<span className="text-brand-600"> Gebeya</span></span>
-            </div>
-          )}
-          
-          <div className="hidden md:flex flex-1 max-w-md mx-4 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input type="text" placeholder="Search..." className="w-full pl-10 pr-12 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-brand-500 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && onSearchSubmit) onSearchSubmit(searchQuery); }} />
-              {!searchQuery ? (
-                  <button onClick={() => fileInputRef.current?.click()} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-600"><Camera size={20} /></button>
-              ) : (
-                  <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={14} /></button>
-              )}
+    <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30">
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+      <div className="max-w-6xl mx-auto px-3 h-14 flex items-center gap-2">
+        {/* Hamburger */}
+        <button onClick={() => setIsSheetOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg shrink-0">
+          <Menu size={20} className="text-slate-600" />
+        </button>
+
+        {/* Compact brand — logo click */}
+        <div className="flex items-center gap-1.5 cursor-pointer shrink-0" onClick={onLogoClick || onReset}>
+          <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center">
+            <ShoppingBag className="text-amber-500" size={16} />
           </div>
-
-          <button className="md:hidden p-2 text-gray-600 hover:bg-ethiopia-border/50 rounded-lg" onClick={() => setIsSheetOpen(true)}>
-            <Menu size={24} />
-          </button>
+          <span className="hidden sm:inline font-extrabold text-base tracking-tight text-slate-900">Index<span className="text-amber-600">Gebeya</span></span>
         </div>
 
-        {/* Mobile Search */}
-        <div className="md:hidden px-4 pb-4">
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input type="text" placeholder="Search..." className="w-full pl-10 pr-12 py-2 bg-white border border-slate-200 rounded-xl outline-none text-sm focus:border-brand-500" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && onSearchSubmit) onSearchSubmit(searchQuery); }} />
-                {!searchQuery && <button onClick={() => fileInputRef.current?.click()} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-600"><Camera size={18} /></button>}
-            </div>
+        {/* Search bar */}
+        <div className="relative flex-1 max-w-lg">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input type="text" placeholder="Search products..." className="w-full pl-9 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-amber-500 focus:bg-white transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && onSearchSubmit) onSearchSubmit(searchQuery); }}/>
+          {!searchQuery ? (
+            <button onClick={() => fileInputRef.current?.click()} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-600"><Camera size={16} /></button>
+          ) : (
+            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+          )}
         </div>
+      </div>
+
+      {/* Active filter chip — only when category selected */}
+      {activeCategory && activeCategory !== "All" && (
+        <div className="max-w-6xl mx-auto px-3 pb-2 flex items-center gap-1.5">
+          <span className="text-[10px] text-slate-400 font-medium">Filter:</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold">
+            {activeCategory}
+            {activeSubCategory && activeSubCategory !== "All" && <span className="text-amber-400">›</span>}
+            {activeSubCategory && activeSubCategory !== "All" && activeSubCategory}
+            <button onClick={() => { setActiveCategory("All"); setActiveSubCategory("All"); }} className="ml-0.5 text-amber-400 hover:text-amber-600">✕</button>
+          </span>
+        </div>
+      )}
     </nav>
+
     <CategorySheet
       isOpen={isSheetOpen}
       onClose={() => setIsSheetOpen(false)}
@@ -64,6 +91,7 @@ const NavBar = ({ searchQuery, setSearchQuery, onImageSearch, onReset, setActive
       setActiveSubCategory={setActiveSubCategory}
       TAXONOMY={TAXONOMY}
     />
-  </>);
+    </>
+  );
 };
 export default NavBar;

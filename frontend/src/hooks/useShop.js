@@ -15,6 +15,9 @@ export const useShop = () => {
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeSubCategory, setActiveSubCategory] = useState("All");
   
+  // View mode
+  const [viewMode, setViewMode] = useState("grid");
+  
   // Search
   const [searchQuery, setSearchQuery] = useState("");
   const [visualResults, setVisualResults] = useState(null);
@@ -241,6 +244,7 @@ export const useShop = () => {
     displayItems, isSearchingText, isSearchingVisual,
     hasMore, isFetchingMore, fetchMore, LIMIT,
     minPrice, setMinPrice, maxPrice, setMaxPrice, filterCategory, setFilterCategory,
+    viewMode, setViewMode,
     resetFeed
   };
 };

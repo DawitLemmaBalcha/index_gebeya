@@ -7,21 +7,31 @@ const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults
   
   const [viewMode, setViewMode] = useState('grid');
 
-  // Status Line
-  const StatusLine = () => (
-    <div className="mb-6 flex items-baseline gap-2 text-sm text-gray-500">
-       {visualResults ? (
-           <div className="flex items-center gap-2 w-full">
-               <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-bold flex items-center gap-1"><Camera size={14}/> Visual Results</span>
-               <button onClick={onClearVisual} className="text-gray-400 underline hover:text-gray-700 text-xs">Clear</button>
-           </div>
-       ) : searchResults ? (
-           <div className="flex items-center gap-2 w-full">
-               <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold flex items-center gap-1"><Search size={14}/> Results ({searchResults.length})</span>
-           </div>
-       ) : (
-         <><span>Showing:</span><span className="font-semibold text-gray-900">{activeCategory}</span>{activeSubCategory !== "All" && <span className="font-semibold text-gray-900"> › {activeSubCategory}</span>}</>
-       )}
+  // Compact results bar
+  const CompactBar = () => (
+    <div className="flex items-center justify-between mb-4 px-1">
+      <div className="flex items-center gap-2 text-xs text-slate-500">
+        {visualResults ? (
+          <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold text-[11px]"><Camera size={12}/> Visual ({items.length})</span>
+        ) : searchResults ? (
+          <span className="flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-bold text-[11px]"><Search size={12}/> Results ({items.length})</span>
+        ) : activeCategory !== "All" ? (
+          <span className="text-[11px] font-medium">{activeCategory}{activeSubCategory !== "All" && ` › ${activeSubCategory}`}</span>
+        ) : (
+          <span className="text-[11px] text-slate-400">Explore</span>
+        )}
+        {visualResults && <button onClick={onClearVisual} className="text-slate-400 hover:text-slate-600 underline text-[10px]">Clear</button>}
+      </div>
+      {items.length > 0 && (
+        <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-xs shrink-0">
+          <button onClick={() => setViewMode("grid")} className={`p-1 rounded ${viewMode === 'grid' ? 'bg-amber-500 text-white' : 'text-slate-400 hover:text-slate-600'}`} title="Grid">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 002-2h2a2 2 0 002 2v2a2 2 0 00-2 2h-2a2 2 0 00-2-2V5zM11 11a2 2 0 002-2h2a2 2 0 002 2v2a2 2 0 00-2 2h-2a2 2 0 00-2-2v-2z"/></svg>
+          </button>
+          <button onClick={() => setViewMode("list")} className={`p-1 rounded ${viewMode === 'list' ? 'bg-amber-500 text-white' : 'text-slate-400 hover:text-slate-600'}`} title="List">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/></svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -104,21 +114,8 @@ const ProductGrid = ({ loading, error, items, onRetry, onNavigate, visualResults
   );
 
   return (
-    <main className="max-w-6xl mx-auto px-4 py-8">
-      {/* Results header with view toggle */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
-        <StatusLine />
-        {items.length > 0 && (
-          <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-xs shrink-0">
-            <button onClick={() => setViewMode("grid")} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-slate-600'}`} title="Grid">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 002-2h2a2 2 0 002 2v2a2 2 0 00-2 2h-2a2 2 0 00-2-2V5zM11 11a2 2 0 002-2h2a2 2 0 002 2v2a2 2 0 00-2 2h-2a2 2 0 00-2-2v-2z"/></svg>
-            </button>
-            <button onClick={() => setViewMode("list")} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-slate-600'}`} title="List">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/></svg>
-            </button>
-          </div>
-        )}
-      </div>
+    <main className="max-w-6xl mx-auto px-4 py-4">
+      <CompactBar />
 
       {items.length > 0 ? (
         viewMode === 'list' ? (

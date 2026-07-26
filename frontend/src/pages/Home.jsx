@@ -1,20 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useShop } from '../hooks/useShop';
 import NavBar from '../components/home/NavBar';
 import SearchFilters from '../components/SearchFilters';
-import CategoryBar from '../components/home/CategoryBar';
 import ProductGrid from '../components/home/ProductGrid';
 
 const Home = ({ embedded = false, initialSearchQuery = '' }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
   const shop = useShop();
 
-  // TECH-13: Handle ?q= query parameter from ProductPage search
-  // Also handle initialSearchQuery prop from landing page onboarding
   useEffect(() => {
     const q = searchParams.get('q');
     if (q && q.trim().length > 0) {
@@ -22,9 +17,8 @@ const Home = ({ embedded = false, initialSearchQuery = '' }) => {
     } else if (initialSearchQuery && initialSearchQuery.trim().length > 0) {
       shop.setSearchQuery(initialSearchQuery);
     }
-  }, [searchParams, initialSearchQuery, shop.setSearchQuery]); // Re-run on URL change
+  }, [searchParams, initialSearchQuery, shop.setSearchQuery]);
 
-  // TECH-10: Include resetFeed to clear cache
   const handleReset = () => {
     shop.resetFeed();
     shop.setActiveCategory("All");
@@ -32,13 +26,11 @@ const Home = ({ embedded = false, initialSearchQuery = '' }) => {
     shop.clearVisualSearch();
   };
 
-  const rootClasses = embedded
-    ? "font-sans"
-    : "min-h-screen bg-ethiopia-paper font-sans";
+  const rootClasses = embedded ? "font-sans" : "min-h-screen bg-ethiopia-paper font-sans";
 
   return (
     <div className={rootClasses}>
-      <NavBar 
+      <NavBar
         searchQuery={shop.searchQuery}
         setSearchQuery={shop.setSearchQuery}
         onImageSearch={shop.handleImageSearch}
@@ -48,8 +40,10 @@ const Home = ({ embedded = false, initialSearchQuery = '' }) => {
         setActiveCategory={shop.setActiveCategory}
         activeSubCategory={shop.activeSubCategory}
         setActiveSubCategory={shop.setActiveSubCategory}
+        viewMode={shop.viewMode}
+        setViewMode={shop.setViewMode}
       />
-      
+
       {shop.searchQuery && !shop.visualResults && (
         <SearchFilters
           searchQuery={shop.searchQuery}
@@ -62,16 +56,7 @@ const Home = ({ embedded = false, initialSearchQuery = '' }) => {
         />
       )}
 
-      {!shop.visualResults && !shop.searchResults && !shop.searchQuery && !isMobileMenuOpen && (
-        <CategoryBar 
-          activeCategory={shop.activeCategory}
-          setActiveCategory={shop.setActiveCategory}
-          activeSubCategory={shop.activeSubCategory}
-          setActiveSubCategory={shop.setActiveSubCategory}
-        />
-      )}
-
-      <ProductGrid 
+      <ProductGrid
         loading={shop.loading}
         error={shop.error}
         items={shop.displayItems}
@@ -87,6 +72,8 @@ const Home = ({ embedded = false, initialSearchQuery = '' }) => {
         onLoadMore={shop.fetchMore}
         isSearchingText={shop.isSearchingText}
         isSearchingVisual={shop.isSearchingVisual}
+        viewMode={shop.viewMode}
+        setViewMode={shop.setViewMode}
       />
     </div>
   );
