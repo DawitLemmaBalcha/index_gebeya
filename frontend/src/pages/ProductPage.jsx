@@ -82,7 +82,78 @@ const ProductPage = () => {
         return `${new Intl.NumberFormat('en-ET').format(price)} ${currency || 'ETB'}`;
     };
 
-    if (loading) return <div className="min-h-screen flex justify-center items-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+    // Skeleton loading layout for product page
+    if (loading) return (
+      <div className="min-h-screen bg-gray-50 font-sans pb-10">
+        {/* NavBar skeleton */}
+        <div className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 h-20 flex items-center px-4">
+          <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse" />
+        </div>
+
+        <div className="max-w-6xl mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* LEFT COL skeleton */}
+          <div className="md:col-span-2 space-y-4">
+            {/* Image placeholder */}
+            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 animate-pulse">
+              <div className="aspect-square md:aspect-video bg-gray-200" />
+            </div>
+            {/* Specs + Description skeleton */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 animate-pulse">
+              <div className="h-5 bg-gray-200 rounded w-1/3 mb-4" />
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="bg-gray-100 p-3 rounded-lg">
+                    <div className="h-3 bg-gray-200 rounded w-1/2 mb-2" />
+                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  </div>
+                ))}
+              </div>
+              <div className="h-5 bg-gray-200 rounded w-1/4 mb-2" />
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-200 rounded w-full" />
+                <div className="h-4 bg-gray-200 rounded w-full" />
+                <div className="h-4 bg-gray-200 rounded w-2/3" />
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COL skeleton */}
+          <div className="space-y-4">
+            {/* Price card skeleton */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-3/4 mb-2" />
+              <div className="h-10 bg-gray-200 rounded w-1/2 mb-4" />
+              <div className="space-y-3">
+                <div className="h-12 bg-gray-200 rounded-xl w-full" />
+                <div className="h-12 bg-gray-200 rounded-xl w-full" />
+              </div>
+            </div>
+
+            {/* Channel card skeleton */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 animate-pulse">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full bg-gray-200" />
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-24" />
+                  <div className="h-3 bg-gray-200 rounded w-32" />
+                </div>
+              </div>
+              <div className="bg-gray-100 p-3 rounded-xl mb-3">
+                <div className="flex justify-between items-center">
+                  <div className="h-4 bg-gray-200 rounded w-20" />
+                  <div className="h-4 bg-gray-200 rounded w-24" />
+                </div>
+              </div>
+              <div className="h-10 bg-gray-200 rounded-xl w-full mb-4" />
+              <div className="space-y-2">
+                <div className="h-12 bg-gray-100 rounded-lg" />
+                <div className="h-12 bg-gray-100 rounded-lg" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
 
     if (error || !item) return (
         <div className="min-h-screen flex flex-col justify-center items-center text-center p-4">
