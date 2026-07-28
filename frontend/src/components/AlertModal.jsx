@@ -69,7 +69,12 @@ const AlertModal = ({ isOpen, onClose, initialQuery, currentPrice }) => {
         }
 
         onClose(true); // Success
-        alert("Alert Created! We'll notify you when a match is found.");
+        // Use Telegram's native popup instead of window.alert().
+        // window.alert() shows an OS-level dialog that corrupts the Telegram
+        // WebView's touch/focus state, making inputs non-writable afterward.
+        if (window.Telegram?.WebApp?.showAlert) {
+          window.Telegram.WebApp.showAlert("Alert Created! We'll notify you when a match is found.");
+        }
         
     } catch (e) {
         console.error("Alert Error:", e);

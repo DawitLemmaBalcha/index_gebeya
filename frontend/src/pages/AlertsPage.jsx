@@ -38,10 +38,26 @@ const AlertsPage = () => {
   };
 
   const handleDelete = async (alertId) => {
-    if (!window.confirm('Delete this alert?')) return;
-    setSubmittingActionId(alertId);
-    await deleteAlert(alertId);
-    setSubmittingActionId(null);
+    const performDelete = async () => {
+      setSubmittingActionId(alertId);
+      await deleteAlert(alertId);
+      setSubmittingActionId(null);
+    };
+
+    // Use Telegram's native confirm popup instead of window.confirm().
+    // window.confirm() shows an OS-level dialog that corrupts the Telegram
+    // WebView's touch/focus state, making inputs non-writable afterward.
+    if (window.Telegram?.WebApp?.showConfirm) {
+      window.Telegram.WebApp.showConfirm('Delete this alert?', (confirmed) => {
+        if (confirmed) performDelete();
+      });
+      return;
+    }
+
+    // Fallback for non-Telegram environments
+    if (window.confirm('Delete this alert?')) {
+      await performDelete();
+    }
   };
 
   const handleModalClose = (success) => {
