@@ -21,12 +21,6 @@ const AlertsPage = () => {
   } = useAlerts();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [modalKey, setModalKey] = useState(0);
-
-  const handleOpenModal = () => {
-    setModalKey(prev => prev + 1);
-    handleOpenModal();
-  };
   const [submittingActionId, setSubmittingActionId] = useState(null);
 
   // Lazy load: fetch only on first activation
@@ -297,14 +291,15 @@ const AlertsPage = () => {
         )}
       </div>
 
-      {/* Create Alert Modal — key forces fresh mount every open */}
-      <AlertModal
-        key={modalKey}
-        isOpen={isCreateModalOpen}
-        onClose={handleModalClose}
-        initialQuery=""
-        currentPrice={null}
-      />
+      {/* Create Alert Modal — only rendered when open for fresh mount */}
+      {isCreateModalOpen && (
+        <AlertModal
+          isOpen={isCreateModalOpen}
+          onClose={handleModalClose}
+          initialQuery=""
+          currentPrice={null}
+        />
+      )}
     </div>
   );
 };
