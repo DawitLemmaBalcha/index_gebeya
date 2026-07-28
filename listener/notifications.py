@@ -2,7 +2,7 @@ import asyncio
 import json
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.error import TelegramError
-from config import logger, WEB_APP_URL, API_BASE
+from config import logger, WEB_APP_URL
 from client import get_pending_notifications, ack_notification
 
 # ------------------------------------------------------------------
@@ -139,7 +139,7 @@ async def notification_poller(bot: Bot):
                 image_url = None
                 img_path = item.get('image_path') or (item.get('images') and item['images'][0] if item.get('images') else None)
                 if img_path:
-                    image_url = f"{API_BASE}/media/{img_path}"
+                    image_url = f"{WEB_APP_URL}/media/{img_path}"
 
                 success = await send_alert_dm(bot, notif['user_telegram_id'], msg_text, alert_id=notif_alert_id, item_url=item_url, image_url=image_url)
 
