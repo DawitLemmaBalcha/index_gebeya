@@ -192,6 +192,9 @@ class Item(Base):
     # Vector Embeddings
     image_vector = mapped_column(Vector(512))
     
+    # Dedup flag — set when item replaces a previous listing (soft-deleted)
+    is_dedup = Column(Boolean, default=False)
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

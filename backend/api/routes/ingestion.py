@@ -207,7 +207,8 @@ async def parse_telegram_post(
             subcategory=getattr(ext, 'subcategory', 'General'),
             specs=str(getattr(ext, 'item_metadata', {})),
             image_path=post.image_path,
-            image_vector=visual_vector # Storing the CENTROID
+            image_vector=visual_vector, # Storing the CENTROID
+            is_dedup=was_replaced     # TECH-21: flag dedup replacements
         )
 
         db.add(new_item)

@@ -89,6 +89,16 @@ def startup_event():
     except Exception as e:
         logger.warning(f"⚠️ TECH-21 schema migration failed: {e}")
 
+    try:
+        with engine.begin() as conn:
+            # TECH-21b: Add is_dedup column to items for dedup replacement tracking
+            conn.execute(text(
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS is_dedup BOOLEAN DEFAULT FALSE"
+            ))
+            logger.info("✅ TECH-21b schema migration verified (items.is_dedup)")
+    except Exception as e:
+        logger.warning(f"⚠️ TECH-21b schema migration failed: {e}")
+
     # ===================================================================
     # Phase 4 — Create indexes (SINGLE SOURCE OF TRUTH)
     # ===================================================================

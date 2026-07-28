@@ -224,10 +224,11 @@ def process_new_item(db: Session, item_id: int):
                 alert.last_triggered_at = now_utc
                 _dispatch_notification(db, alert.user_id, alert.id, item, result)
 
-                # --- Match Counter Increment ---
-                alert.total_matches += 1
-                if result and result.tier == MatchTier.BULLSEYE:
-                    alert.bullseye_matches += 1
+                # --- Match Counter Increment (skip for dedup replacements) ---
+                if not item.is_dedup:
+                    alert.total_matches += 1
+                    if result and result.tier == MatchTier.BULLSEYE:
+                        alert.bullseye_matches += 1
 
                 # --- Auto-Pause Check ---
                 # Bullseye limit takes priority
