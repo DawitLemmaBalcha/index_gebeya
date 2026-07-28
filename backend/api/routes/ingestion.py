@@ -5,10 +5,10 @@ import numpy as np
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from database import get_db
-from models import Item, Channel, ItemImage
+from models import Item, Channel, ItemImage, Notification
 from schemas import TelegramPost, IngestionResponse
 from ai_engine import extract_product_info
 from ai_engine.vector_client import vectorize_image, get_visual_hints
@@ -179,7 +179,14 @@ async def parse_telegram_post(
                 # with the new item below (line ~249). On error, db.rollback() restores it.
                 best_match.is_active = False
                 was_replaced = True
-                logger.info(f"Dedup: soft-deleted item #{best_match.id} (sim={best_sim:.4f}), creating replacement")
+                # Suppress undelivered notifications for the old item so the buyer
+                # doesn't get double-alerted when both PENDING and new notification deliver
+                db.execute(
+                    update(Notification)
+                    .where(Notification.item_id == best_match.id, Notification.status == "PENDING")
+                    .values(status="REPLACED")
+                )
+                logger.info(f"Dedup: soft-deleted item #{best_match.id} (sim={best_sim:.4f}), suppressed pending notifications, creating replacement")
 
             else:
                 if len(candidates) == 0:
