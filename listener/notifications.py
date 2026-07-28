@@ -120,10 +120,10 @@ async def notification_poller(bot: Bot):
                         except:
                             specs = None
                     if isinstance(specs, dict):
-                    skip_keys = {'location', 'condition', 'contact_phone', 'phone_number'}
-                    relevant = {k: v for k, v in specs.items() if k.lower() not in skip_keys}
-                    if relevant:
-                        specs_text = ' | '.join(f"{v}" for v in list(relevant.values())[:4])
+                        skip_keys = {'location', 'condition', 'contact_phone', 'phone_number'}
+                        relevant = {k: v for k, v in specs.items() if k.lower() not in skip_keys}
+                        if relevant:
+                            specs_text = ' | '.join(f"{v}" for v in list(relevant.values())[:4])
                 
                 description = item.get('description', '')
                 
