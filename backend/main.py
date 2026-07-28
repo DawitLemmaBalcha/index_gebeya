@@ -79,6 +79,16 @@ def startup_event():
     except Exception as e:
         logger.warning(f"⚠️ Schema migration failed: {e}")
 
+    try:
+        with engine.begin() as conn:
+            # TECH-21: Add is_active column to items for soft-delete dedup
+            conn.execute(text(
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"
+            ))
+            logger.info("✅ TECH-21 schema migration verified (items.is_active)")
+    except Exception as e:
+        logger.warning(f"⚠️ TECH-21 schema migration failed: {e}")
+
     # ===================================================================
     # Phase 4 — Create indexes (SINGLE SOURCE OF TRUTH)
     # ===================================================================

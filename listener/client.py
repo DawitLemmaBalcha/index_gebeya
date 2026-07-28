@@ -16,12 +16,14 @@ async def send_to_api(payload: dict):
                 extracted = data.get('extracted_data', {}) or {}
                 title = extracted.get('title')
                 price = extracted.get('price')
+                replaced = data.get('replaced', False)
                 logger.info(f"✅ SUCCESS: Item #{item_id} created.")
                 return {
                     "success": True,
                     "item_id": item_id,
                     "title": title,
                     "price": price,
+                    "replaced": replaced,
                     "status_code": 200,
                 }
             elif response.status_code == 429:

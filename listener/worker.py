@@ -83,12 +83,20 @@ async def background_worker(queue: asyncio.Queue, bot):
                 if result.get('success'):
                     title = result.get('title')
                     price = result.get('price')
+                    is_replaced = result.get('replaced', False)
+
                     if price:
-                        edit_text = f"✅ Indexed: {title} — {price:.0f} ETB"
+                        formatted_price = f"{price:.0f} ETB"
                     else:
-                        edit_text = f"✅ Indexed: {title} — Ask for Price"
+                        formatted_price = "Ask for Price"
+
+                    if is_replaced:
+                        edit_text = f"✅ Updated: {title} — {formatted_price}\n⚠️ Replaced previous listing. Use different images for different products."
+                    else:
+                        edit_text = f"✅ Indexed: {title} — {formatted_price}"
+
                     await dm_message.edit_text(edit_text)
-                    logger.info(f"📝 Edited DM with success for msg #{message_id}")
+                    logger.info(f"📝 Edited DM with success for msg #{message_id} (replaced={is_replaced})")
                 else:
                     await dm_message.edit_text(
                         f"❌ Could not process your post from @{channel_name}. "

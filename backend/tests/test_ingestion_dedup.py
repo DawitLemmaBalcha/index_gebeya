@@ -45,7 +45,7 @@ def _unique_message_id():
 
 def test_exact_duplicate_repost_matched():
     """T1: Ingesting the same image twice from the same channel within 30 days
-    should UPDATE the existing item instead of creating a new one."""
+    should SOFT-DELETE the old item and CREATE a NEW one (TECH-21 behavior)."""
     channel = _unique_channel()
     
     # First ingestion
@@ -83,9 +83,13 @@ def test_exact_duplicate_repost_matched():
     assert data2["status"] == "success", f"Second ingest error: {data2}"
     item2_id = data2["item_id"]
     
-    # CRITICAL ASSERTION: Should return the SAME item ID (updated, not duplicated)
-    assert item2_id == item1_id, \
-        f"Expected dedup to return item {item1_id}, but got new item {item2_id}"
+    # TECH-21: Should return DIFFERENT item ID (soft-delete + recreate)
+    assert item2_id != item1_id, \
+        f"Expected new item (soft-delete+recreate), but got same item {item1_id}"
+    
+    # Verify replaced=True
+    assert data2.get("replaced") is True, \
+        f"Expected replaced=True, got replaced={data2.get('replaced')}"
 
 
 # =========================================================================
@@ -212,8 +216,8 @@ def test_no_vector_skips_dedup():
 # =========================================================================
 
 def test_dedup_updates_fields():
-    """T5: When a duplicate is matched, the existing item's fields
-    should be updated with the new extraction data."""
+    """T5: When a duplicate is matched, a NEW item is created (TECH-21).
+    The old item is soft-deleted and the new item carries the updated fields."""
     channel = _unique_channel()
     
     # First ingestion
@@ -244,15 +248,25 @@ def test_dedup_updates_fields():
     if data2["status"] == "error":
         pytest.skip(f"Second ingest failed (rate limit): {data2.get('error', '')}")
     assert data2["status"] == "success"
-    assert data2["item_id"] == item_id, "Should match existing item"
     
-    # Verify the item was updated via the API
-    item_resp = httpx.get(f"{BASE_URL}/items/{item_id}", timeout=10.0)
-    if item_resp.status_code == 200:
-        item_data = item_resp.json()
-        # The original_caption should reflect the new post text
-        assert "PRICE DROP" in item_data.get("original_caption", ""), \
-            f"Expected updated caption, got: {item_data.get('original_caption')}"
+    # TECH-21: New item should have a different ID
+    new_item_id = data2["item_id"]
+    assert new_item_id != item_id, "Should create new item (soft-delete+recreate)"
+    assert data2.get("replaced") is True, "Should indicate replacement"
+    
+    # Verify the NEW item has the updated caption
+    new_item_resp = httpx.get(f"{BASE_URL}/items/{new_item_id}", timeout=10.0)
+    if new_item_resp.status_code == 200:
+        new_item_data = new_item_resp.json()
+        assert "PRICE DROP" in new_item_data.get("original_caption", ""), \
+            f"Expected updated caption on new item, got: {new_item_data.get('original_caption')}"
+    
+    # Verify old item is now inactive
+    old_item_resp = httpx.get(f"{BASE_URL}/items/{item_id}", timeout=10.0)
+    if old_item_resp.status_code == 200:
+        old_item_data = old_item_resp.json()
+        assert old_item_data.get("is_active") is False, \
+            f"Old item should be inactive, got is_active={old_item_data.get('is_active')}"
 
 
 if __name__ == "__main__":

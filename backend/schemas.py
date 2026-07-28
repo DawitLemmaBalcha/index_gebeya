@@ -80,6 +80,9 @@ class ItemResponse(ItemBase):
 
     specs: Union[Dict[str, Any], str, None] = None 
 
+    # TECH-21: Expose soft-delete status
+    is_active: bool = True 
+
     @field_validator('images', mode='before')
     @classmethod
     def extract_image_paths(cls, v: Any) -> List[str]:
@@ -111,6 +114,7 @@ class IngestionResponse(BaseModel):
     item_id: Optional[int] = None
     extracted_data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    replaced: bool = False
 
 # ----------------------------------------------------------------------
 # SEARCH SCHEMAS

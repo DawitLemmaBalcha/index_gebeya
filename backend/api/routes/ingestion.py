@@ -1,12 +1,11 @@
 import os
-import time
 import logging
 import httpx
 import numpy as np
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import select, delete
+from sqlalchemy import select
 
 from database import get_db
 from models import Item, Channel, ItemImage
@@ -123,10 +122,11 @@ async def parse_telegram_post(
                 logger.warning("⚠️ TELEGRAM_BOT_TOKEN not set, skipping photo fetch")
 
         # ---------------------------------------------------------
-        # TECH-06: DEDUP BLOCK — Compare visual vector against recent items
-        # in the same channel. If a near-identical match is found
-        # (cosine similarity >= 0.98), update the existing item instead
-        # of creating a duplicate.
+        # TECH-06 / TECH-21: DEDUP BLOCK — Compare visual vector against
+        # recent ACTIVE items in the same channel. If a near-identical
+        # match is found (cosine similarity >= 0.98), the old item is
+        # SOFT-DELETED (is_active=False) and a REPLACEMENT item is created.
+        # This avoids re-matching against already-replaced items.
         #
         # NOTE: Two concurrent workers processing the same channel could
         # both read the same stale candidate list and both decide "no match",
@@ -135,6 +135,11 @@ async def parse_telegram_post(
         # unique constraint on (channel_id, image_vector) with a pgvector
         # distance operator.
         # ---------------------------------------------------------
+        # ---------------------------------------------------------
+        # TECH-21: INITIALIZE replaced flag before dedup block
+        # ---------------------------------------------------------
+        was_replaced = False
+
         if visual_vector is not None:
             cutoff_date = datetime.utcnow() - timedelta(days=30)
             stmt_candidates = (
@@ -142,7 +147,8 @@ async def parse_telegram_post(
                 .where(
                     Item.channel_id == channel.id,
                     Item.created_at >= cutoff_date,
-                    Item.image_vector != None
+                    Item.image_vector != None,
+                    Item.is_active == True  # TECH-21: only match against active items
                 )
             )
             candidates = db.scalars(stmt_candidates).all()
@@ -168,44 +174,12 @@ async def parse_telegram_post(
                     continue
 
             if best_match is not None and best_sim >= 0.98:
-                logger.info(f"Dedup: matched item #{best_match.id} (sim={best_sim:.4f})")
-
-                # Update fields on the existing item
-                best_match.title = getattr(ext, 'title', getattr(ext, 'item_name', 'Unknown Item'))
-                best_match.description = getattr(ext, 'description', 'No description')
-                best_match.price = getattr(ext, 'price', 0)
-                best_match.currency = getattr(ext, 'currency', 'ETB')
-                best_match.phone_number = getattr(ext, 'contact_phone', None) or getattr(ext, 'phone_number', None)
-                best_match.category = getattr(ext, 'category', 'Uncategorized')
-                best_match.subcategory = getattr(ext, 'subcategory', 'General')
-                best_match.specs = str(getattr(ext, 'item_metadata', {}))
-                best_match.image_path = post.image_path
-                best_match.image_vector = visual_vector
-                best_match.original_caption = post.text
-                best_match.created_at = datetime.utcnow()
-
-                # Refresh gallery images
-                db.execute(
-                    delete(ItemImage).where(ItemImage.item_id == best_match.id)
-                )
-                if post.album_paths:
-                    for path in post.album_paths:
-                        db.add(ItemImage(item_id=best_match.id, image_path=path))
-                elif post.image_path:
-                    db.add(ItemImage(item_id=best_match.id, image_path=post.image_path))
-
-                db.commit()
-                db.refresh(best_match)
-
-                # Re-run alert matching on the updated item
-                process_new_item(db, best_match.id)
-
-                return IngestionResponse(
-                    status="success",
-                    item_id=best_match.id,
-                    extracted_data=extraction_data if isinstance(extraction_data, dict) else extraction_data.dict(),
-                    error=None
-                )
+                # TECH-21: Soft-delete the old item, then fall through to create a new one.
+                # The pending soft-delete stays in the session and is committed atomically
+                # with the new item below (line ~249). On error, db.rollback() restores it.
+                best_match.is_active = False
+                was_replaced = True
+                logger.info(f"Dedup: soft-deleted item #{best_match.id} (sim={best_sim:.4f}), creating replacement")
 
             else:
                 if len(candidates) == 0:
@@ -268,7 +242,8 @@ async def parse_telegram_post(
             status="success",
             item_id=new_item.id,
             extracted_data=extraction_data if isinstance(extraction_data, dict) else extraction_data.dict(),
-            error=None
+            error=None,
+            replaced=was_replaced
         )
 
     except Exception as e:

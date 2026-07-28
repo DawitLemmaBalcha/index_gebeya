@@ -158,20 +158,25 @@ const AlertsPage = () => {
                 </div>
 
                 {/* Smart filter toggles */}
-                {Object.keys(prefs).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {Object.entries(prefs).map(([key, val]) => (
-                      <span
-                        key={key}
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-medium ${
-                          val ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
-                        }`}
-                      >
-                        {key.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                {Object.keys(prefs).length > 0 && (() => {
+                  const strictEntries = Object.entries(prefs).filter(
+                    ([key, val]) => (key === 'strict_brand' || key === 'strict_model') && val === true
+                  );
+                  if (strictEntries.length === 0) return null;
+                  const labelMap = { strict_brand: 'Strict Brand', strict_model: 'Strict Model' };
+                  return (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {strictEntries.map(([key]) => (
+                        <span
+                          key={key}
+                          className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-blue-100 text-blue-700"
+                        >
+                          {labelMap[key] || key.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {/* Action buttons */}
                 <div className="flex items-center gap-2">

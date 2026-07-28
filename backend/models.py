@@ -195,6 +195,9 @@ class Item(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Soft-delete (TECH-21: dedup now soft-deletes + creates replacement)
+    is_active = Column(Boolean, default=True, nullable=False)
+
     # Relationships
     channel = relationship("Channel", back_populates="items")
     images = relationship("ItemImage", back_populates="item", cascade="all, delete-orphan")

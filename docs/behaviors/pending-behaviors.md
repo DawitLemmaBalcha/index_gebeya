@@ -143,6 +143,27 @@ Channel owners have no visibility into whether their posts are being processed. 
 ## NB-39: Alert Guardrails — Configurable Limits, Auto-Pause, Throttle, Dedup [IMPLEMENTED]
 
 **Priority:** HIGH
+*(Implemented — see above)*
+
+---
+
+## NB-40: Dedup Redesign — Soft-Delete + Recreate + Alert Filter Badges
+
+**Priority:** HIGH
+**Affected Features:** Ingestion, Alerts
+**File(s):** `backend/api/routes/ingestion.py`, `listener/worker.py`, `frontend/src/pages/AlertsPage.jsx`
+
+**The Gap:**
+The current dedup system edits the existing item in place when a repost is detected. This keeps the same `item_id`, which means alert duplicate suppression (NB-39) permanently blocks re-notifications for price changes. The seller has no idea their listing was replaced. Alert cards in the Alerts tab don't show active smart filters.
+
+**User Acceptance Criteria:**
+- On repost detection: soft-delete old item (`is_active=False`), create new item with new `item_id`. Alert matching fires fresh.
+- Processing DM edited to: "✅ Updated: [Title] — [Price] ETB. ⚠️ This replaced your previous listing. Use different images for different products."
+- Old edit-in-place code in `ingestion.py` is removed.
+- Alert cards in the Alerts tab show smart filter badges: "Strict Brand" and/or "Strict Model" when active.
+- `parse_mode="Markdown"` handling in processing DMs fixed.
+
+**Priority:** HIGH
 **Affected Features:** Alerts
 **File(s):** `backend/constants.py` (new), `backend/services/alerting.py`, `backend/api/routes/alerts.py`
 
