@@ -147,7 +147,7 @@ Channel owners have no visibility into whether their posts are being processed. 
 
 ---
 
-## NB-40: Dedup Redesign — Soft-Delete + Recreate + Alert Filter Badges
+## NB-40: Dedup Redesign — Soft-Delete + Recreate + Alert Filter Badges [IMPLEMENTED]
 
 **Priority:** HIGH
 **Affected Features:** Ingestion, Alerts
