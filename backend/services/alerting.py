@@ -206,15 +206,34 @@ def process_new_item(db: Session, item_id: int):
 
             if should_notify:
                 # --- Duplicate Suppression ---
-                existing = db.scalar(
-                    select(Notification).where(
-                        Notification.alert_id == alert.id,
-                        Notification.item_id == item.id
-                    ).limit(1)
-                )
-                if existing is not None:
-                    logger.info(f"🔁 Duplicate suppressed: Alert {alert.id} already notified for Item {item.id}.")
-                    should_notify = False
+                if item.is_dedup:
+                    # For dedup replacements: suppress if alert already fired for ANY item
+                    # from this channel within the last hour. First repost (after original
+                    # aged out) notifies; rapid subsequent reposts don't.
+                    from models import Notification as Notif, Item as Itm
+                    one_hour_ago = now_utc - timedelta(hours=1)
+                    existing_from_channel = db.scalar(
+                        select(Notif.id).join(Itm, Notif.item_id == Itm.id).where(
+                            Notif.alert_id == alert.id,
+                            Itm.channel_id == item.channel_id,
+                            Notif.created_at >= one_hour_ago,
+                            Notif.item_id != item.id
+                        ).limit(1)
+                    )
+                    if existing_from_channel is not None:
+                        logger.info(f"🔁 Dedup suppressed: Alert {alert.id} already notified from channel {item.channel_id}.")
+                        should_notify = False
+                else:
+                    # Normal items: suppress if same alert+item already notified
+                    existing = db.scalar(
+                        select(Notification).where(
+                            Notification.alert_id == alert.id,
+                            Notification.item_id == item.id
+                        ).limit(1)
+                    )
+                    if existing is not None:
+                        logger.info(f"🔁 Duplicate suppressed: Alert {alert.id} already notified for Item {item.id}.")
+                        should_notify = False
 
             if should_notify:
                 matches_found += 1
@@ -224,7 +243,7 @@ def process_new_item(db: Session, item_id: int):
                 alert.last_triggered_at = now_utc
                 _dispatch_notification(db, alert.user_id, alert.id, item, result)
 
-                # --- Match Counter Increment (skip for dedup replacements) ---
+                # --- Match Counter — skip for dedup replacements ---
                 if not item.is_dedup:
                     alert.total_matches += 1
                     if result and result.tier == MatchTier.BULLSEYE:
