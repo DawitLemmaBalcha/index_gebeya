@@ -145,6 +145,7 @@ class AlertResponse(BaseModel):
     id: int
     query_text: str
     max_price: Optional[float] = None
+    preferences: Optional[Union[Dict[str, Any], str]] = None
     is_active: bool
     created_at: datetime
     expires_at: Optional[datetime]
