@@ -137,3 +137,23 @@ Channel owners have no visibility into whether their posts are being processed. 
 - Resume: No confirmation needed. Clears flag → bot DMs owner.
 - Remove: Confirmation modal → `getChat` + `leaveChat` → mark removed → bot DMs owner.
 - DMs only sent to channels with `registered_by` set.
+
+---
+
+## NB-39: Alert Guardrails — Configurable Limits, Auto-Pause, Throttle, Dedup [IMPLEMENTED]
+
+**Priority:** HIGH
+**Affected Features:** Alerts
+**File(s):** `backend/constants.py` (new), `backend/services/alerting.py`, `backend/api/routes/alerts.py`
+
+**The Gap:**
+Alerts have no guardrails. Users can create unlimited alerts. Matches generate unlimited notifications with no throttle. The same item can notify the same alert repeatedly. Limits are hardcoded in business logic. A buyer searching for "iPhone" could get 50+ DMs in an hour from a single channel post batch.
+
+**User Acceptance Criteria:**
+- All alert limits are in `backend/constants.py` with env var overrides, not hardcoded.
+- Max 20 active alerts per user (configurable, 0 = unlimited).
+- Alert auto-pauses after 10 total matches or 3 bullseye matches, with DM notification.
+- Notification throttle: max 1 Ring notification per alert per hour. Bullseye bypasses throttle.
+- Duplicate suppression: same alert+item combination never generates more than one notification.
+- Match counters reset on alert resume.
+- Alert lifespan is configurable (default 14 days).

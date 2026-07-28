@@ -95,3 +95,20 @@
 - Does sorting by price override relevance entirely, or does it re-rank within relevance tiers?
 - Should sort be a backend parameter (new SQL logic) or client-side re-sorting of the already-fetched results?
 - If backend, does this significantly change the search query structure?
+
+---
+
+## UF-8: Text-Only Items Invisible in Category-Level Searches
+
+**Source:** Vision session — "the iPhone post is not coming up when i search for 'mobile'"
+
+**Current State:** The search WHERE clause requires `similarity > 0.01` for items without image vectors. `pg_trgm` similarity is character-level trigram matching — "mobile" and "iPhone 13" share zero trigrams and get similarity ~0.0, so the item is filtered before scoring. But the item has `category = "Mobile Phones"` — it should match.
+
+**Suggested Solutions:**
+- **A) Lower threshold:** Drop the 0.01 gate. Risk: junk items appear in unrelated searches.
+- **B) Search across category:** Include `i.category` in the similarity string so "Mobile Phones" contributes to the match.
+- **C) ILIKE fallback:** For text-only items, use `ILIKE '%query%'` as a parallel filter gate.
+
+**Open Questions:**
+- Which approach provides the best precision/recall trade-off?
+- Should the fix apply to ALL items or only text-only ones?
