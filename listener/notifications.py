@@ -57,6 +57,24 @@ async def notification_poller(bot: Bot):
                 logger.info(f"📬 Found {len(pending)} pending notifications")
 
             for notif in pending:
+                # 2. System DM Branch (TECH-20)
+                if notif.get('message_text') is not None:
+                    # System DM: deliver exact message, no item
+                    msg_text = notif['message_text']
+                    notif_alert_id = notif.get('alert_id')
+
+                    success = await send_alert_dm(
+                        bot, notif['user_telegram_id'], msg_text,
+                        alert_id=notif_alert_id, item_url=None
+                    )
+
+                    if success:
+                        await ack_notification(notif['id'])
+                    else:
+                        logger.warning(f"⚠️ Could not deliver system DM {notif['id']}. Will retry.")
+                    continue
+
+                # 3. Normal Match Notification
                 # 2. Format Message
                 item = notif['item']
                 alert_id = notif.get('alert_id') # Ensure backend Notification schema has alert_id linked in response?

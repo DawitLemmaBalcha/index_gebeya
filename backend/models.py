@@ -74,6 +74,10 @@ class Alert(Base):
     # The High Water Mark
     best_opportunity_score = Column(Float, default=0.0)
 
+    # Match counters (TECH-20: Alert Guardrails)
+    total_matches = Column(Integer, default=0, nullable=False)
+    bullseye_matches = Column(Integer, default=0, nullable=False)
+
     # Relationships
     user = relationship("User", back_populates="alerts")
 
@@ -84,7 +88,7 @@ class Notification(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=True)
     alert_id = Column(Integer, ForeignKey("alerts.id"), nullable=True)
     
     # Payload Data
@@ -93,6 +97,7 @@ class Notification(Base):
     
     # Status
     status = Column(String, default="PENDING") # PENDING, SENT, FAILED
+    message_text = Column(Text, nullable=True)  # For system DMs (auto-pause, expiry)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     sent_at = Column(DateTime(timezone=True), nullable=True)
 

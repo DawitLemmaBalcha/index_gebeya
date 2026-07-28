@@ -5,6 +5,8 @@ from enum import Enum
 from typing import List, Dict, Optional, Tuple
 from difflib import SequenceMatcher
 
+from constants import TIER_1_THRESHOLD, TIER_2_THRESHOLD
+
 # ==========================================
 # CONFIGURATION & WEIGHTS
 # ==========================================
@@ -13,10 +15,6 @@ from difflib import SequenceMatcher
 SEMANTIC_WEIGHT = float(os.getenv("SEARCH_SEMANTIC_WEIGHT", "0.6"))
 LEXICAL_WEIGHT = float(os.getenv("SEARCH_LEXICAL_WEIGHT", "0.4"))
 DEFAULT_RESULT_LIMIT = int(os.getenv("SEARCH_RESULT_LIMIT", "20"))
-
-# NEW THRESHOLDS
-TIER_1_THRESHOLD = 0.82  # Bullseye (Strong match)
-TIER_2_THRESHOLD = 0.55  # Ring (Good opportunity)
 
 class MatchTier(Enum):
     BULLSEYE = "bullseye"

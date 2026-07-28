@@ -2,7 +2,7 @@ import json
 from urllib.parse import parse_qs
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Header
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func
 from typing import List, Optional
 
 from database import get_db
@@ -10,6 +10,7 @@ from models import Alert, User, Notification, Item
 from schemas import AlertCreate, AlertResponse, MatchHistoryResponse
 from services.alerting import create_alert
 from services.analytics import AnalyticsService
+from constants import MAX_ALERTS_PER_USER
 
 router = APIRouter()
 
@@ -86,6 +87,20 @@ def create_new_alert(
     """
     # Pass header manually to helper
     user = get_current_user(payload.init_data, db, x_internal_service)
+    
+    # --- Route-level max alerts guard ---
+    if MAX_ALERTS_PER_USER > 0:
+        active_count = db.scalar(
+            select(func.count()).select_from(Alert).where(
+                Alert.user_id == user.id,
+                Alert.is_active == True
+            )
+        )
+        if active_count >= MAX_ALERTS_PER_USER:
+            raise HTTPException(
+                status_code=400,
+                detail=f"You've reached the maximum of {MAX_ALERTS_PER_USER} active alerts. Pause or delete an existing alert to create a new one."
+            )
     
     alert = create_alert(
         db=db,
@@ -178,8 +193,19 @@ def toggle_alert_pause(
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
 
+    # Capture state before toggle
+    was_active = alert.is_active
+
     # Toggle
     alert.is_active = not alert.is_active
+
+    # Reset match counters on resume
+    if was_active is False and alert.is_active is True:
+        alert.total_matches = 0
+        alert.bullseye_matches = 0
+        logger = __import__('logging').getLogger("index_alerts")
+        logger.info(f"🔄 Reset match counters for Alert {alert.id} on resume.")
+
     db.commit()
     db.refresh(alert)
 

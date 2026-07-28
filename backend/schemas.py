@@ -146,6 +146,8 @@ class AlertResponse(BaseModel):
     expires_at: Optional[datetime]
     last_triggered_at: Optional[datetime]
     best_opportunity_score: float
+    total_matches: int = 0
+    bullseye_matches: int = 0
 
     class Config:
         from_attributes = True
@@ -222,9 +224,10 @@ class MatchHistoryResponse(BaseModel):
 class NotificationResponse(BaseModel):
     id: int
     user_telegram_id: int
-    item: ItemResponse
+    item: Optional[ItemResponse] = None
     alert_id: Optional[int] = None
     match_tier: str
+    message_text: Optional[str] = None
     created_at: datetime
 
     class Config:
