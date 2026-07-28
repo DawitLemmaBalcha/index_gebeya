@@ -1,4 +1,5 @@
 import asyncio
+import json
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.error import TelegramError
 from config import logger, WEB_APP_URL, API_BASE
@@ -108,18 +109,29 @@ async def notification_poller(bot: Bot):
                 
                 emoji = "🎯" if notif['match_tier'] == "bullseye" else "⭕"
                 price_display = f"{item['price']:,} ETB" if item['price'] else "Call for Price"
+                
+                # Build specs line: pick relevant 3-4 specs, skip location/condition
+                specs_text = ""
+                specs = item.get('specs')
+                if specs:
+                    if isinstance(specs, str):
+                        try:
+                            specs = json.loads(specs.replace("'", '"'))
+                        except:
+                            specs = None
+                    if isinstance(specs, dict):
+                    skip_keys = {'location', 'condition', 'contact_phone', 'phone_number'}
+                    relevant = {k: v for k, v in specs.items() if k.lower() not in skip_keys}
+                    if relevant:
+                        specs_text = ' | '.join(f"{v}" for v in list(relevant.values())[:4])
+                
                 description = item.get('description', '')
                 
-                # Build caption with emoji, title, price, and AI description
-                msg_text = (
-                    f"{emoji} **Match Found!**\n\n"
-                    f"**{item['title']}**\n"
-                    f"💰 {price_display}"
-                )
+                msg_text = f"{emoji} **Match Found!**\n\n**{item['title']}**\n💰 {price_display}"
+                if specs_text:
+                    msg_text += f"\n\n_{specs_text}_"
                 if description and description != 'No description':
-                    # Truncate description to fit Telegram caption limits
-                    desc = description[:200] + ('...' if len(description) > 200 else '')
-                    msg_text += f"\n\n📝 {desc}"
+                    msg_text += f"\n\n📝 {description}"
 
                 item_url = f"{WEB_APP_URL}/item/{item['id']}"
                 
