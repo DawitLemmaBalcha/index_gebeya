@@ -215,7 +215,7 @@ class MatchHistoryResponse(BaseModel):
     item_title: Optional[str] = None
     item_price: Optional[float] = None
     item_image_path: Optional[str] = None
-    item_id: int
+    item_id: Optional[int] = None
     created_at: datetime
 
     class Config:
