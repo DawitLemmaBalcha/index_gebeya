@@ -1,38 +1,42 @@
 import asyncio
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.error import TelegramError
-from config import logger, WEB_APP_URL
+from config import logger, WEB_APP_URL, API_BASE
 from client import get_pending_notifications, ack_notification
 
 # ------------------------------------------------------------------
 # COURIER: OUTBOUND NOTIFICATIONS
 # ------------------------------------------------------------------
 
-async def send_alert_dm(bot: Bot, user_id: int, text: str, alert_id: int = None, item_url: str = None):
+async def send_alert_dm(bot: Bot, user_id: int, text: str, alert_id: int = None, item_url: str = None, image_url: str = None):
     """
-    Sends a direct message to a user.
-    Includes a "Stop Alert" button if alert_id is provided,
-    and a "View Item" Mini App button if item_url is provided.
+    Sends a direct message to a user. Uses send_photo if image_url is provided,
+    otherwise falls back to text-only message.
+    Includes "Stop Alert" and "View Item" buttons.
     """
     try:
         keyboard = []
-        
-        # "View Item" as Mini App button (opens inside Telegram)
         if item_url:
             keyboard.append([InlineKeyboardButton("🛒 View Item", web_app=WebAppInfo(url=item_url))])
-        
-        # "Stop Alert" button
         if alert_id:
             keyboard.append([InlineKeyboardButton("🔕 Found it / Stop Alert", callback_data=f"stop_{alert_id}")])
-        
         reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
 
-        await bot.send_message(
-            chat_id=user_id, 
-            text=text, 
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
+        if image_url:
+            await bot.send_photo(
+                chat_id=user_id,
+                photo=image_url,
+                caption=text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+        else:
+            await bot.send_message(
+                chat_id=user_id,
+                text=text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
             
         logger.info(f"📨 Alert sent to User {user_id}")
         return True
@@ -104,16 +108,28 @@ async def notification_poller(bot: Bot):
                 
                 emoji = "🎯" if notif['match_tier'] == "bullseye" else "⭕"
                 price_display = f"{item['price']:,} ETB" if item['price'] else "Call for Price"
+                description = item.get('description', '')
                 
+                # Build caption with emoji, title, price, and AI description
                 msg_text = (
                     f"{emoji} **Match Found!**\n\n"
                     f"**{item['title']}**\n"
                     f"💰 {price_display}"
                 )
-                item_url = f"{WEB_APP_URL}/item/{item['id']}"
+                if description and description != 'No description':
+                    # Truncate description to fit Telegram caption limits
+                    desc = description[:200] + ('...' if len(description) > 200 else '')
+                    msg_text += f"\n\n📝 {desc}"
 
-                # 3. Deliver
-                success = await send_alert_dm(bot, notif['user_telegram_id'], msg_text, alert_id=notif_alert_id, item_url=item_url)
+                item_url = f"{WEB_APP_URL}/item/{item['id']}"
+                
+                # Get image URL if available
+                image_url = None
+                img_path = item.get('image_path') or (item.get('images') and item['images'][0] if item.get('images') else None)
+                if img_path:
+                    image_url = f"{API_BASE}/media/{img_path}"
+
+                success = await send_alert_dm(bot, notif['user_telegram_id'], msg_text, alert_id=notif_alert_id, item_url=item_url, image_url=image_url)
 
                 # 4. Acknowledge (Mark as Sent)
                 if success:
