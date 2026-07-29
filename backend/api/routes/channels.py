@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from database import get_db
 from models import Channel, User, Item
 from schemas import ChannelResponse, ChannelUpsert, OwnerChannelResponse
-from schemas import ChannelInfoResponse, ChannelPauseRequest, ChannelActionResponse
+from schemas import ChannelInfoResponse, ChannelPauseRequest, ChannelActionResponse, ItemResponse
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 router = APIRouter()
@@ -380,3 +380,68 @@ async def remove_channel(
             logger.warning(f"⚠️ DM notification exception for channel {channel_id}: {e}")
 
     return ChannelActionResponse(status="ok")
+
+
+# ----------------------------------------------------------------------
+# TECH-23: GET /channels/{channel_id}/items — inventory management
+# ----------------------------------------------------------------------
+@router.get("/{channel_id}/items", response_model=List[ItemResponse])
+def get_channel_items(
+    channel_id: int,
+    init_data: str,
+    limit: int = 20,
+    offset: int = 0,
+    status: Optional[str] = None,
+    sort: Optional[str] = "recent",
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns paginated, filterable, sortable items for a channel owned
+    by the authenticated user.
+    """
+    user = _auth_user_from_init_data(init_data, db)
+
+    # Verify ownership
+    channel = db.scalar(
+        select(Channel).where(
+            Channel.id == channel_id,
+            Channel.registered_by == user.telegram_id,
+        )
+    )
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    # Base query: active items owned by this channel
+    stmt = select(Item).where(
+        Item.channel_id == channel_id,
+        Item.is_active == True,
+    )
+
+    # Status filter
+    if status == "sold":
+        stmt = stmt.where(Item.status == "sold")
+    elif status == "reported":
+        stmt = stmt.where(Item.status == "reported_sold")
+    elif status == "active":
+        stmt = stmt.where(Item.status == "active")
+    # "all" or None: no status filter
+
+    # Search filter (case-insensitive by title)
+    if search:
+        stmt = stmt.where(Item.title.ilike(f"%{search}%"))
+
+    # Sorting
+    if sort == "price_asc":
+        stmt = stmt.order_by(Item.price.asc())
+    elif sort == "price_desc":
+        stmt = stmt.order_by(Item.price.desc())
+    else:
+        # Default: most recent first
+        stmt = stmt.order_by(Item.created_at.desc())
+
+    # Pagination
+    stmt = stmt.offset(offset).limit(limit)
+
+    items = db.scalars(stmt).all()
+    return items

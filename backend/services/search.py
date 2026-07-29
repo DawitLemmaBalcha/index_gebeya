@@ -68,6 +68,8 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
             -- We keep this loose filter to avoid sorting the entire database for 0.0 score items.
             (i.image_vector IS NOT NULL OR (:q != '' AND similarity(coalesce(i.title, '') || ' ' || i.description, :q) > 0.01))
             {unpriced_clause}
+            -- TECH-22: Only return active items in search
+            AND i.status = 'active'
     )
     SELECT 
         *,

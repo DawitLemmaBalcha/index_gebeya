@@ -178,3 +178,43 @@ Alerts have no guardrails. Users can create unlimited alerts. Matches generate u
 - Duplicate suppression: same alert+item combination never generates more than one notification.
 - Match counters reset on alert resume.
 - Alert lifespan is configurable (default 14 days).
+
+---
+
+## NB-41: Crowdsourced Sold Reports & Product Status Lifecycle
+
+**Priority:** HIGH
+**Affected Features:** Items, Notifications
+**File(s):** `backend/models.py`, `backend/constants.py`, `backend/services/cleanup.py` (new), `frontend/src/pages/ProductPage.jsx`
+
+**The Gap:**
+Stale/sold products clutter the marketplace. No mechanism for buyers to report sold items. No automated cleanup. Channel owners have no visibility into status changes.
+
+**User Acceptance Criteria:**
+- Any buyer can report an item as sold. One report per buyer per item.
+- When reports reach `CROWDSOURCE_SOLD_THRESHOLD` (default 3), item becomes `reported_sold` and is excluded from search/feed.
+- Channel owner gets DM for every status transition (sold, reported_sold, auto-deleted).
+- Owner can re-list to clear all reports and reset to `active`.
+- `SOFT_DELETED_RETENTION_DAYS`, `STALE_ITEM_DAYS`, `CROWDSOURCE_SOLD_THRESHOLD`, `REPORTED_SOLD_RETENTION_DAYS` all configurable in `constants.py`.
+- Background cleanup task runs daily for expired items.
+
+---
+
+## NB-42: Inventory Management — Store Owner Product Control
+
+**Priority:** HIGH
+**Affected Features:** Stores, Items
+**File(s):** `frontend/src/pages/StoresPage.jsx`, new inventory modal component, `backend/api/routes/channels.py`
+
+**The Gap:**
+Store owners see a flat list of channels with no product-level management. They cannot view, edit, or manage their indexed products. No inventory interface exists.
+
+**User Acceptance Criteria:**
+- Tapping a channel in Stores opens a full-page inventory modal with Products and Settings tabs.
+- Products tab shows all items from that channel in a filterable, sortable infinite-scroll grid with status badges.
+- Tapping a product opens an edit panel: editable title, description, price, category, subcategory, specs.
+- Status controls: Mark as Sold (owner), Re-list, Clear Reports.
+- Edit panel saves trigger alert re-matching if price/specs changed.
+- "View original Telegram post" link always visible.
+- Settings tab preserves current pause/resume/remove functionality.
+- Modal uses tab registry pattern for forward extensibility.

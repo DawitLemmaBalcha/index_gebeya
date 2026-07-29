@@ -201,6 +201,12 @@ class Item(Base):
     # Soft-delete (TECH-21: dedup now soft-deletes + creates replacement)
     is_active = Column(Boolean, default=True, nullable=False)
 
+    # TECH-22: Item lifecycle status (active, sold, reported_sold, soft_deleted, removed, stale)
+    status = Column(String, default="active", nullable=False)
+
+    # TECH-22: Stale flag for items with zero interactions after STALE_ITEM_DAYS
+    is_stale = Column(Boolean, default=False, nullable=False)
+
     # Relationships
     channel = relationship("Channel", back_populates="items")
     images = relationship("ItemImage", back_populates="item", cascade="all, delete-orphan")
@@ -216,3 +222,37 @@ class ItemImage(Base):
     
     # Relationship
     item = relationship("Item", back_populates="images")
+
+
+class SoldReport(Base):
+    """TECH-22: Crowdsourced sold-reporting — one report per user per item."""
+    __tablename__ = "sold_reports"
+    __table_args__ = (
+        UniqueConstraint('user_id', 'item_id', name='_user_item_sold_report_uc'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user = relationship("User")
+    item = relationship("Item")
+
+
+class ItemEdit(Base):
+    """TECH-23: Edit history audit log for inventory management."""
+    __tablename__ = "item_edits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
+    field = Column(String, nullable=False)
+    old_value = Column(Text, nullable=True)
+    new_value = Column(Text, nullable=True)
+    edited_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    item = relationship("Item")
+    editor = relationship("User")

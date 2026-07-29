@@ -99,6 +99,50 @@ def startup_event():
     except Exception as e:
         logger.warning(f"⚠️ TECH-21b schema migration failed: {e}")
 
+    try:
+        with engine.begin() as conn:
+            # TECH-22: Add status, is_stale columns to items + create sold_reports table
+            conn.execute(text(
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'active'"
+            ))
+            conn.execute(text(
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS is_stale BOOLEAN DEFAULT FALSE"
+            ))
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS sold_reports (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    CONSTRAINT _user_item_sold_report_uc UNIQUE(user_id, item_id)
+                )
+                """
+            ))
+            logger.info("✅ TECH-22 schema migration verified (items.status, items.is_stale, sold_reports)")
+    except Exception as e:
+        logger.warning(f"⚠️ TECH-22 schema migration failed: {e}")
+
+    try:
+        with engine.begin() as conn:
+            # TECH-23: Create item_edits table for inventory edit history audit log
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS item_edits (
+                    id SERIAL PRIMARY KEY,
+                    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    field VARCHAR NOT NULL,
+                    old_value TEXT,
+                    new_value TEXT,
+                    edited_by INTEGER NOT NULL REFERENCES users(id),
+                    timestamp TIMESTAMPTZ DEFAULT NOW()
+                )
+                """
+            ))
+            logger.info("✅ TECH-23 schema migration verified (item_edits)")
+    except Exception as e:
+        logger.warning(f"⚠️ TECH-23 schema migration failed: {e}")
+
     # ===================================================================
     # Phase 4 — Create indexes (SINGLE SOURCE OF TRUTH)
     # ===================================================================
@@ -152,6 +196,27 @@ def startup_event():
         logger.info("✅ Visual Taxonomy Index Initialized")
     except Exception as e:
         logger.error(f"❌ Failed to init Taxonomy Index: {e}")
+
+    # ===================================================================
+    # Phase 5.5 — TECH-22: Schedule daily cleanup background task
+    # ===================================================================
+    try:
+        import threading
+        from services.cleanup import run_cleanup_and_log
+
+        def _schedule_cleanup():
+            try:
+                run_cleanup_and_log()
+            except Exception as e:
+                logger.warning(f"⚠️ Cleanup task failed: {e}")
+            threading.Timer(86400, _schedule_cleanup).start()  # 24h
+
+        threading.Timer(60, _schedule_cleanup).start()  # first run after 60s
+        logger.info("✅ TECH-22 daily cleanup scheduler registered")
+    except ImportError as e:
+        logger.warning(f"⚠️ Could not import cleanup service: {e}")
+    except Exception as e:
+        logger.warning(f"⚠️ Cleanup scheduler setup failed: {e}")
 
 @app.get("/")
 def read_root():

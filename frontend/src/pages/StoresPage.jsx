@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, PlusCircle, Loader2, RefreshCw, AlertCircle, X } from 'lucide-react';
 import { useOwnerChannels } from '../hooks/useOwnerChannels';
+import ChannelInventory from '../components/ChannelInventory';
 
 const StoresPage = () => {
   const { channels, loading, error, fetchChannels, hasBeenFetched, togglePause, removeChannel } = useOwnerChannels();
   const [howToExpanded, setHowToExpanded] = useState(false);
   const [modalState, setModalState] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState(null);
 
   // Lazy load: fetch only on first activation
   useEffect(() => {
@@ -81,6 +83,16 @@ const StoresPage = () => {
 
   // Owner view (has channels)
   if (channels.length > 0) {
+    // TECH-23: Show inventory modal when a channel is selected
+    if (selectedChannel) {
+      return (
+        <ChannelInventory
+          channel={selectedChannel}
+          onClose={() => setSelectedChannel(null)}
+        />
+      );
+    }
+
     return (
       <div className="px-4 pt-4 pb-24">
         <h1 className="text-xl font-bold text-gray-900 mb-4">My Stores</h1>
@@ -97,7 +109,8 @@ const StoresPage = () => {
           {channels.map((channel) => (
             <div
               key={channel.id}
-              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100"
+              onClick={() => setSelectedChannel(channel)}
+              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1 min-w-0">

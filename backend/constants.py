@@ -65,3 +65,9 @@ ALERT_LIFESPAN_DAYS: int = _get_config("ALERT_LIFESPAN_DAYS", 14, int)
 RING_TOLERANCE: float = _get_config("ALERT_RING_TOLERANCE", 0.05, float)
 TIER_1_THRESHOLD: float = _get_config("ALERT_BULLSEYE_THRESHOLD", 0.82, float)
 TIER_2_THRESHOLD: float = _get_config("ALERT_RING_THRESHOLD", 0.55, float)
+
+# --- Sold Reports & Cleanup (TECH-22) ---
+CROWDSOURCE_SOLD_THRESHOLD: int = _get_config("CROWDSOURCE_SOLD_THRESHOLD", 3, int)
+SOFT_DELETED_RETENTION_DAYS: int = _get_config("SOFT_DELETED_RETENTION_DAYS", 30, int)
+REPORTED_SOLD_RETENTION_DAYS: int = _get_config("REPORTED_SOLD_RETENTION_DAYS", 7, int)
+STALE_ITEM_DAYS: int = _get_config("STALE_ITEM_DAYS", 14, int)

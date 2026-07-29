@@ -62,6 +62,8 @@ class ItemBase(BaseModel):
     category: Optional[str] = None
     subcategory: Optional[str] = None
     specs: Optional[Dict[str, Any]] = None
+    # TECH-22: Item lifecycle status
+    status: Optional[str] = "active"
 
 class ItemCreate(ItemBase):
     telegram_message_id: int
@@ -82,6 +84,15 @@ class ItemResponse(ItemBase):
 
     # TECH-21: Expose soft-delete status
     is_active: bool = True 
+
+    # TECH-22: Item lifecycle status
+    status: str = "active"
+
+    # TECH-22: Stale flag (zero interactions after STALE_ITEM_DAYS)
+    is_stale: bool = False
+
+    # TECH-22: Crowdsourced report count (injected by route, not in DB model)
+    report_count: Optional[int] = None
 
     @field_validator('images', mode='before')
     @classmethod
@@ -237,3 +248,56 @@ class NotificationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ----------------------------------------------------------------------
+# TECH-22: Sold Report Schemas
+# ----------------------------------------------------------------------
+class SoldReportCreate(BaseModel):
+    init_data: str
+
+
+class SoldReportResponse(BaseModel):
+    id: int
+    user_id: int
+    item_id: int
+    created_at: datetime
+    report_count: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------------------------------------------------------------
+# TECH-23: Inventory Management Schemas
+# ----------------------------------------------------------------------
+class ItemUpdateRequest(BaseModel):
+    """
+    Partial update request for inventory management. All fields optional —
+    only provided fields are updated. Use exclude_unset to detect which
+    fields were sent vs unset.
+    """
+    title: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    specs: Optional[Dict[str, Any]] = None
+
+
+class ItemEditResponse(BaseModel):
+    id: int
+    item_id: int
+    field: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    edited_by: int
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ItemStatusResponse(BaseModel):
+    status: str
+    message: str

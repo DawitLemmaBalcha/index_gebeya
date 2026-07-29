@@ -1,5 +1,5 @@
 import React from 'react';
-import { Phone, MessageCircle, Sparkles } from 'lucide-react';
+import { Phone, MessageCircle, Sparkles, Ban, AlertTriangle, Clock } from 'lucide-react';
 import { getAnalyticsHeaders } from '../utils/analytics'; // IMPORT (for URL param only if needed, otherwise use headers)
 
 const ItemCard = ({ item, onSelect, apiUrl }) => {
@@ -57,6 +57,32 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
       return null;
   };
 
+  // TECH-22: Status badge for non-active or stale items
+  const getStatusBadge = () => {
+      if (item.status === 'sold') {
+          return (
+              <div className="absolute top-2 right-2 bg-red-600/80 text-white text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 z-10">
+                  <Ban size={10} /> Sold
+              </div>
+          );
+      }
+      if (item.status === 'reported_sold') {
+          return (
+              <div className="absolute top-2 right-2 bg-amber-500/80 text-white text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 z-10">
+                  <AlertTriangle size={10} /> Reported
+              </div>
+          );
+      }
+      if (item.status === 'stale' || item.is_stale) {
+          return (
+              <div className="absolute top-2 right-2 bg-gray-400/70 text-white text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 z-10">
+                  <Clock size={10} /> Stale
+              </div>
+          );
+      }
+      return null;
+  };
+
   const mainImage = (item.images && item.images.length > 0) ? item.images[0] : item.image_path;
 
   return (
@@ -65,6 +91,7 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
       className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-soft hover:shadow-warm transition-all cursor-pointer group relative"
     >
       {getMatchBadge()}
+      {getStatusBadge()}
 
       {/* Image Area */}
       <div className="relative aspect-square bg-ethiopia-paper overflow-hidden">
@@ -75,10 +102,12 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
           onError={(e) => { e.target.src = 'https://placehold.co/400x400?text=No+Image'; }}
         />
         
-        {/* Condition Badge */}
-        <div className="absolute top-2 right-2 bg-slate-900/70 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
-          {item.condition || 'Used'}
-        </div>
+        {/* Condition Badge — only for active items */}
+        {(!item.status || item.status === 'active') && !item.is_stale && (
+          <div className="absolute top-2 right-2 bg-slate-900/70 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+            {item.condition || 'Used'}
+          </div>
+        )}
 
         {/* Gallery Indicator */}
         {item.images && item.images.length > 1 && (

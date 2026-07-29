@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, MessageCircle, Phone, Sparkles, AlertCircle, Star, User, Bell } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, MessageCircle, Phone, Sparkles, AlertCircle, Star, User, Bell, AlertTriangle, Flag, RefreshCw, Clock } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import ItemCard from '../components/ItemCard';
 import ReviewModal from '../components/ReviewModal';
@@ -30,6 +30,18 @@ const ProductPage = () => {
     // Channel photo state for graceful fallback
     const [channelPhotoLoaded, setChannelPhotoLoaded] = useState(true);
 
+    // TECH-22: Sold report state
+    const [reportLoading, setReportLoading] = useState(false);
+    const [reportError, setReportError] = useState(null);
+    const [reportCount, setReportCount] = useState(null);
+    const [currentUserId, setCurrentUserId] = useState(null);
+
+    // TECH-22: Get initData from Telegram WebApp (or dummy for dev)
+    const getInitData = () => {
+        if (window.Telegram?.WebApp?.initData) return window.Telegram.WebApp.initData;
+        return "user=%7B%22id%22%3A%200%7D"; // dummy for dev
+    };
+
     useEffect(() => {
         const fetchProductData = async () => {
             try {
@@ -40,6 +52,15 @@ const ProductPage = () => {
                 const itemData = await itemRes.json();
                 setItem(itemData);
                 
+                // TECH-22: Extract report_count and current user
+                setReportCount(itemData.report_count ?? 0);
+
+                // TECH-22: Read current user id from localStorage
+                const storedUserId = localStorage.getItem('index_user_id');
+                if (storedUserId) {
+                    setCurrentUserId(Number(storedUserId));
+                }
+
                 if (itemData.images && itemData.images.length > 0) {
                     setActiveImage(itemData.images[0]);
                 } else {
@@ -80,6 +101,69 @@ const ProductPage = () => {
     const formatPrice = (price, currency) => {
         if (!price) return 'Call for Price';
         return `${new Intl.NumberFormat('en-ET').format(price)} ${currency || 'ETB'}`;
+    };
+
+    // TECH-22: Handle "Report as Sold"
+    const handleReportSold = async () => {
+        setReportLoading(true);
+        setReportError(null);
+        try {
+            const res = await fetch(`${API_BASE_URL}/items/${id}/report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ init_data: getInitData() }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                if (res.status === 409) {
+                    setReportError("You already reported this as sold.");
+                } else if (res.status === 403) {
+                    setReportError("Cannot report your own product.");
+                } else {
+                    setReportError(data.detail || "Failed to report item.");
+                }
+            } else {
+                setReportCount(data.report_count);
+                if (data.report_count >= 3) {
+                    setItem(prev => ({ ...prev, status: 'reported_sold' }));
+                }
+                // Show success toast
+                if (window.Telegram?.WebApp?.showPopup) {
+                    window.Telegram.WebApp.showPopup({ message: "Reported! Thank you." });
+                }
+            }
+        } catch (err) {
+            setReportError("Network error. Please try again.");
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
+    // TECH-22: Handle "Re-list" (owner only)
+    const handleRelist = async () => {
+        setReportLoading(true);
+        setReportError(null);
+        try {
+            const res = await fetch(`${API_BASE_URL}/items/${id}/relist`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ init_data: getInitData() }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setReportError(data.detail || "Failed to re-list item.");
+            } else {
+                setItem(prev => ({ ...prev, status: 'active' }));
+                setReportCount(0);
+                if (window.Telegram?.WebApp?.showPopup) {
+                    window.Telegram.WebApp.showPopup({ message: "Item re-listed successfully!" });
+                }
+            }
+        } catch (err) {
+            setReportError("Network error. Please try again.");
+        } finally {
+            setReportLoading(false);
+        }
     };
 
     // Skeleton loading layout for product page
@@ -255,6 +339,72 @@ const ProductPage = () => {
                                 <span className="text-xs font-bold">Alert Me</span>
                             </button>
                         </div>
+
+                        {/* TECH-22: Status Badge */}
+                        {item.status && item.status !== 'active' && (
+                            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium mb-3 ${
+                                item.status === 'sold' || item.status === 'soft_deleted' || item.status === 'removed'
+                                    ? 'bg-red-50 text-red-700 border border-red-200'
+                                    : item.status === 'reported_sold'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : item.status === 'stale'
+                                    ? 'bg-gray-100 text-gray-600 border border-gray-200'
+                                    : ''
+                            }`}>
+                                {item.status === 'reported_sold' && <AlertTriangle size={16} />}
+                                {(item.status === 'sold' || item.status === 'soft_deleted' || item.status === 'removed') && <AlertTriangle size={16} />}
+                                {item.status === 'stale' && <Clock size={16} />}
+                                <span>
+                                    {item.status === 'reported_sold'
+                                        ? `⚠️ Reported Sold (${reportCount ?? 0} reports)`
+                                        : item.status === 'sold'
+                                        ? 'Sold'
+                                        : item.status === 'stale'
+                                        ? 'May be outdated'
+                                        : 'Removed'}
+                                </span>
+                            </div>
+                        )}
+                        {item.is_stale && item.status === 'active' && (
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium mb-3 bg-gray-100 text-gray-600 border border-gray-200">
+                                <Clock size={16} />
+                                <span>May be outdated</span>
+                            </div>
+                        )}
+
+                        {/* TECH-22: Report as Sold button (buyer only, active items) */}
+                        {item.status === 'active' && currentUserId && item.channel?.registered_by && currentUserId !== item.channel.registered_by && (
+                            <div className="mb-3">
+                                <button
+                                    onClick={handleReportSold}
+                                    disabled={reportLoading}
+                                    className="w-full flex items-center justify-center gap-2 border border-gray-300 text-gray-700 py-2.5 rounded-xl hover:bg-gray-50 transition-all font-medium text-sm disabled:opacity-50"
+                                >
+                                    <Flag size={16} />
+                                    {reportLoading ? 'Reporting...' : 'Report as Sold'}
+                                </button>
+                                {reportError && (
+                                    <p className="text-red-500 text-xs mt-1 text-center">{reportError}</p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* TECH-22: Re-list button (owner only, reported_sold items) */}
+                        {item.status === 'reported_sold' && currentUserId && item.channel?.registered_by && currentUserId === item.channel.registered_by && (
+                            <div className="mb-3">
+                                <button
+                                    onClick={handleRelist}
+                                    disabled={reportLoading}
+                                    className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-2.5 rounded-xl hover:bg-green-700 transition-all font-medium text-sm disabled:opacity-50"
+                                >
+                                    <RefreshCw size={16} />
+                                    {reportLoading ? 'Re-listing...' : 'Re-list Item'}
+                                </button>
+                                {reportError && (
+                                    <p className="text-red-500 text-xs mt-1 text-center">{reportError}</p>
+                                )}
+                            </div>
+                        )}
 
                         <div className="flex flex-col gap-3">
                             <a href={`tel:${item.phone_number}`} className="flex items-center justify-center gap-2 bg-gray-900 text-white py-3 rounded-xl hover:bg-gray-800 transition-all font-medium"><Phone size={18} /> Call Seller</a>
