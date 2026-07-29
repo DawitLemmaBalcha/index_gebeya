@@ -7,7 +7,7 @@ import StatusBadge from './StatusBadge';
  * TECH-23: Products tab within ChannelInventory modal.
  * Displays a filterable, sortable, infinitely-scrollable product grid.
  */
-const InventoryProductsTab = ({ channelId, channel, onSelectProduct, inventory }) => {
+const InventoryProductsTab = ({ channelId, channel, onSelectProduct, inventory, onMarkSold }) => {
   const sentinelRef = useRef(null);
 
   const {
@@ -150,7 +150,7 @@ const InventoryProductsTab = ({ channelId, channel, onSelectProduct, inventory }
             <div className="grid grid-cols-2 gap-3">
               {items.map((item) => (
                 <div key={item.id} className="relative cursor-pointer" onClick={() => onSelectProduct(item)}>
-                  <ItemCard item={item} onSelect={() => {}} />
+                  <ItemCard item={item} apiUrl="" variant="inventory" onSelect={() => {}} onMarkSold={onMarkSold} onEdit={onSelectProduct} />
                   <div className="absolute top-2 right-2 z-10">
                     <StatusBadge status={item.status} indexingPaused={channel?.indexing_paused} />
                   </div>

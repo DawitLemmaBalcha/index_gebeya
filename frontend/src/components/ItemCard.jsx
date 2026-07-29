@@ -2,7 +2,7 @@ import React from 'react';
 import { Phone, MessageCircle, Sparkles, Ban, AlertTriangle, Clock } from 'lucide-react';
 import { getAnalyticsHeaders } from '../utils/analytics'; // IMPORT (for URL param only if needed, otherwise use headers)
 
-const ItemCard = ({ item, onSelect, apiUrl }) => {
+const ItemCard = ({ item, onSelect, apiUrl, variant, onMarkSold, onEdit }) => {
   
   const formatPrice = (price, currency) => {
     if (!price) return 'Ask for Price';
@@ -142,7 +142,23 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2 mt-auto">
+        {variant === 'inventory' ? (
+          <div className="flex gap-2 mt-auto">
+            <button
+              onClick={(e) => { e.stopPropagation(); onMarkSold?.(item); }}
+              className="flex-1 flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-700 py-2 rounded-lg transition-colors border border-amber-200"
+            >
+              <span className="font-medium text-xs">Mark Sold</span>
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit?.(item); }}
+              className="flex-1 flex items-center justify-center gap-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2 rounded-lg transition-colors border border-slate-200"
+            >
+              <span className="font-medium text-xs">Edit</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2 mt-auto">
           {item.phone_number && (
             <a 
               href={`tel:${item.phone_number}`}
@@ -164,6 +180,7 @@ const ItemCard = ({ item, onSelect, apiUrl }) => {
             <span className="font-medium text-xs">Chat</span>
           </a>
         </div>
+        )}
       </div>
     </div>
   );

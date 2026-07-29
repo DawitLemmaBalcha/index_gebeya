@@ -153,6 +153,12 @@ const StoresPage = () => {
 
               {/* Action buttons */}
               <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedChannel(channel); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors"
+                >
+                  Manage
+                </button>
                 {channel.indexing_paused ? (
                   // Resume button — fires immediately, no modal
                   <button
