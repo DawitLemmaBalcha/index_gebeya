@@ -205,14 +205,21 @@ export function useChannelInventory() {
   }, []);
 
   const markSold = useCallback(async (channelId, itemId) => {
+    // Optimistic UI update — mark as sold immediately
+    setItems(prev => prev.map(item => 
+      item.id === itemId ? { ...item, status: 'sold' } : item
+    ));
     const result = await postAction(channelId, `/items/${itemId}/sold`);
-    // Refresh the items list
+    // Refresh to sync with backend
     await fetchItems(channelId, true);
     return result;
   }, [postAction, fetchItems]);
 
   const relist = useCallback(async (channelId, itemId) => {
-    // Use the TECH-22 relist endpoint which uses body for init_data
+    // Optimistic UI update — mark as active immediately
+    setItems(prev => prev.map(item => 
+      item.id === itemId ? { ...item, status: 'active' } : item
+    ));
     const initData = getInitData();
     if (!initData) throw new Error('NOT_IN_TELEGRAM');
 
