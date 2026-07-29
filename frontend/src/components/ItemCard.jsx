@@ -145,7 +145,7 @@ const ItemCard = ({ item, onSelect, apiUrl, variant, onMarkSold, onEdit }) => {
         {variant === 'inventory' ? (
           <div className="flex gap-2 mt-auto">
             <button
-              onClick={(e) => { e.stopPropagation(); onMarkSold?.(item); }}
+              onClick={(e) => { e.stopPropagation(); onMarkSold?.(item.id); }}
               className="flex-1 flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-700 py-2 rounded-lg transition-colors border border-amber-200"
             >
               <span className="font-medium text-xs">Mark Sold</span>
