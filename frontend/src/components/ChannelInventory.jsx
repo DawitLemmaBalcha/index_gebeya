@@ -61,6 +61,10 @@ const ChannelInventory = ({ channel, onClose }) => {
   }, [channel.id, selectedProduct, inventory, showToast]);
 
   const handleMarkSold = useCallback(async (itemId) => {
+    const confirmed = window.Telegram?.WebApp?.showConfirm
+      ? await new Promise(resolve => { window.Telegram.WebApp.showConfirm('Mark this item as sold?', resolve); })
+      : window.confirm('Mark this item as sold?');
+    if (!confirmed) return;
     try {
       await inventory.markSold(channel.id, itemId);
       showToast('Item marked as sold', 'success');
@@ -170,6 +174,7 @@ const ChannelInventory = ({ channel, onClose }) => {
             channelId={channel.id}
             channel={channel}
             onSelectProduct={handleSelectProduct}
+            onMarkSold={handleMarkSold}
             inventory={inventory}
           />
         ) : (
