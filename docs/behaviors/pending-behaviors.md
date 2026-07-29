@@ -181,7 +181,7 @@ Alerts have no guardrails. Users can create unlimited alerts. Matches generate u
 
 ---
 
-## NB-41: Crowdsourced Sold Reports & Product Status Lifecycle
+## NB-41: Crowdsourced Sold Reports & Product Status Lifecycle [IMPLEMENTED]
 
 **Priority:** HIGH
 **Affected Features:** Items, Notifications
@@ -200,7 +200,7 @@ Stale/sold products clutter the marketplace. No mechanism for buyers to report s
 
 ---
 
-## NB-42: Inventory Management — Store Owner Product Control
+## NB-42: Inventory Management — Store Owner Product Control [IMPLEMENTED]
 
 **Priority:** HIGH
 **Affected Features:** Stores, Items
