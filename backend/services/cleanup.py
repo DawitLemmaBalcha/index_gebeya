@@ -8,14 +8,13 @@ Performs three cleanup phases:
   3. Stale item flagging (after STALE_ITEM_DAYS, zero interactions)
 """
 
-import os
 import logging
-import httpx
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, func
 
 from database import SessionLocal
 from models import Item, Channel, UserInteraction
+from services.owner_dm import send_owner_dm_sync
 from constants import (
     SOFT_DELETED_RETENTION_DAYS,
     REPORTED_SOLD_RETENTION_DAYS,
@@ -23,37 +22,6 @@ from constants import (
 )
 
 logger = logging.getLogger("index_cleanup")
-
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-
-
-def _send_cleanup_dm(channel_id: int, message: str) -> None:
-    """
-    Send a DM to the channel owner via Telegram Bot API.
-    Best-effort: logs warning on failure, never raises.
-    (Synchronous version for background thread.)
-    """
-    try:
-        db = SessionLocal()
-        channel = db.get(Channel, channel_id)
-        db.close()
-
-        if not channel or channel.registered_by is None:
-            return  # No owner to notify
-
-        if not BOT_TOKEN:
-            logger.warning("BOT_TOKEN not set, cannot send cleanup DM")
-            return
-
-        resp = httpx.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json={"chat_id": channel.registered_by, "text": message},
-            timeout=10.0,
-        )
-        if resp.status_code != 200:
-            logger.warning(f"⚠️ Cleanup DM send failed for channel {channel_id}: {resp.text[:200]}")
-    except Exception as e:
-        logger.warning(f"⚠️ Cleanup DM exception for channel {channel_id}: {e}")
 
 
 def run_daily_cleanup() -> dict:
@@ -81,7 +49,7 @@ def run_daily_cleanup() -> dict:
         for item in soft_items:
             channel = db.get(Channel, item.channel_id)
             if channel and channel.username:
-                _send_cleanup_dm(
+                send_owner_dm_sync(
                     item.channel_id,
                     f"🗑️ Your listing '{item.title}' on @{channel.username} "
                     f"has been permanently removed after {SOFT_DELETED_RETENTION_DAYS} days.",
@@ -109,7 +77,7 @@ def run_daily_cleanup() -> dict:
         for item in reported_items:
             channel = db.get(Channel, item.channel_id)
             if channel and channel.username:
-                _send_cleanup_dm(
+                send_owner_dm_sync(
                     item.channel_id,
                     f"🗑️ Your listing '{item.title}' on @{channel.username} "
                     f"was removed after being reported sold and unaddressed "

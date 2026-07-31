@@ -1,9 +1,7 @@
 import os
 import logging
-import json
 import httpx
 from typing import List, Optional
-from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.responses import RedirectResponse
@@ -12,9 +10,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, select
 
 from database import get_db
-from models import Channel, User, Item
+from models import Channel, Item
 from schemas import ChannelResponse, ChannelUpsert, OwnerChannelResponse
 from schemas import ChannelInfoResponse, ChannelPauseRequest, ChannelActionResponse, ItemResponse
+from services.auth import authenticate
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 router = APIRouter()
@@ -120,53 +119,6 @@ async def serve_channel_photo(channel_id: int, db: Session = Depends(get_db)):
 
 
 # ----------------------------------------------------------------------
-# TECH-17: Auth helper for init_data-based authentication
-# ----------------------------------------------------------------------
-def _auth_user_from_init_data(init_data: str, db: Session) -> User:
-    """
-    Parse Telegram WebApp initData to authenticate/identify the user.
-    Returns the User object. Raises 403 if init_data is missing or invalid.
-    """
-    try:
-        tg_id = None
-        username = "unknown"
-
-        if "user=" not in init_data:
-            raise HTTPException(
-                status_code=403,
-                detail="Restricted: Valid Telegram init_data required."
-            )
-
-        parsed = parse_qs(init_data)
-        if 'user' in parsed:
-            user_json = parsed['user'][0]
-            user_data = json.loads(user_json)
-            tg_id = user_data.get('id')
-            username = user_data.get('username', 'unknown')
-        else:
-            raise ValueError("init_data missing 'user' field")
-
-        if not tg_id:
-            raise ValueError("Could not extract Telegram ID from init_data")
-
-        # Database Lookup or Auto-Create
-        user = db.scalar(select(User).where(User.telegram_id == tg_id))
-
-        if not user:
-            user = User(telegram_id=tg_id, username=username)
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-
-        return user
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=403, detail="Authentication Failed")
-
-
-# ----------------------------------------------------------------------
 # TECH-17: GET /channels/mine — return channels owned by authenticated user
 # ----------------------------------------------------------------------
 @router.get("/mine", response_model=List[OwnerChannelResponse])
@@ -178,7 +130,7 @@ def get_my_channels(
     Returns the list of channels owned by the authenticated user,
     including product count for each channel.
     """
-    user = _auth_user_from_init_data(init_data, db)
+    user = authenticate(init_data, db)
 
     # Query channels where registered_by matches the user's telegram_id
     # TECH-19: Filter out inactive (removed) channels
@@ -253,7 +205,7 @@ async def toggle_channel_pause(
     Pause or resume indexing for a channel owned by the authenticated user.
     Sends a DM notification to the channel owner via Telegram Bot API.
     """
-    user = _auth_user_from_init_data(init_data, db)
+    user = authenticate(init_data, db)
 
     channel = db.query(Channel).filter(
         Channel.id == channel_id,
@@ -311,7 +263,7 @@ async def remove_channel(
     leave the channel via Telegram API (leaveChat), then soft-deletes the channel
     (sets is_active=False). Sends a DM notification to the owner.
     """
-    user = _auth_user_from_init_data(init_data, db)
+    user = authenticate(init_data, db)
 
     channel = db.query(Channel).filter(
         Channel.id == channel_id,
@@ -400,7 +352,7 @@ def get_channel_items(
     Returns paginated, filterable, sortable items for a channel owned
     by the authenticated user.
     """
-    user = _auth_user_from_init_data(init_data, db)
+    user = authenticate(init_data, db)
 
     # Verify ownership
     channel = db.scalar(
