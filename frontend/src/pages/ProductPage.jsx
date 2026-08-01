@@ -93,35 +93,9 @@ const ProductPage = () => {
                 }
 
         } catch (err) {
-            setReportError("Network error. Please try again.");
+            setError(err.message);
         } finally {
-            setReportLoading(false);
-        }
-    };
-
-    // Owner one-tap "Mark as Sold" from the modal
-    const handleOwnerMarkSold = async () => {
-        setOwnerSoldLoading(true);
-        setOwnerSoldError(null);
-        try {
-            const res = await fetch(`${API_BASE_URL}/items/${id}/sold?init_data=${encodeURIComponent(getInitData())}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                setOwnerSoldError(data.detail || "Failed to mark as sold.");
-                return;
-            }
-            setItem(prev => ({ ...prev, status: 'sold' }));
-            setShowOwnerSoldModal(false);
-            if (window.Telegram?.WebApp?.showPopup) {
-                window.Telegram.WebApp.showPopup({ message: "Marked as sold. It's no longer visible in search." });
-            }
-        } catch (err) {
-            setOwnerSoldError("Network error. Please try again.");
-        } finally {
-            setOwnerSoldLoading(false);
+            setLoading(false);
         }
     };
 
@@ -167,6 +141,32 @@ const ProductPage = () => {
             setReportError("Network error. Please try again.");
         } finally {
             setReportLoading(false);
+        }
+    };
+
+    // Owner one-tap "Mark as Sold" from the modal
+    const handleOwnerMarkSold = async () => {
+        setOwnerSoldLoading(true);
+        setOwnerSoldError(null);
+        try {
+            const res = await fetch(`${API_BASE_URL}/items/${id}/sold?init_data=${encodeURIComponent(getInitData())}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setOwnerSoldError(data.detail || "Failed to mark as sold.");
+                return;
+            }
+            setItem(prev => ({ ...prev, status: 'sold' }));
+            setShowOwnerSoldModal(false);
+            if (window.Telegram?.WebApp?.showPopup) {
+                window.Telegram.WebApp.showPopup({ message: "Marked as sold. It's no longer visible in search." });
+            }
+        } catch (err) {
+            setOwnerSoldError("Network error. Please try again.");
+        } finally {
+            setOwnerSoldLoading(false);
         }
     };
 
