@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, MessageCircle, Phone, Sparkles, AlertCircle, Star, User, Bell, AlertTriangle, Flag, RefreshCw, Clock } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, MessageCircle, Phone, Sparkles, AlertCircle, Star, User, Bell, AlertTriangle, Flag, RefreshCw, Clock, Loader2, CheckCircle } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import ItemCard from '../components/ItemCard';
 import ReviewModal from '../components/ReviewModal';
@@ -35,6 +35,11 @@ const ProductPage = () => {
     const [reportError, setReportError] = useState(null);
     const [reportCount, setReportCount] = useState(null);
     const [currentUserId, setCurrentUserId] = useState(null);
+
+    // Owner "can't report own product" modal — offers one-tap Mark as Sold
+    const [showOwnerSoldModal, setShowOwnerSoldModal] = useState(false);
+    const [ownerSoldLoading, setOwnerSoldLoading] = useState(false);
+    const [ownerSoldError, setOwnerSoldError] = useState(null);
 
     // TECH-22: Get initData from Telegram WebApp (or dummy for dev)
     const getInitData = () => {
@@ -87,12 +92,38 @@ const ProductPage = () => {
                     }
                 }
 
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
+        } catch (err) {
+            setReportError("Network error. Please try again.");
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
+    // Owner one-tap "Mark as Sold" from the modal
+    const handleOwnerMarkSold = async () => {
+        setOwnerSoldLoading(true);
+        setOwnerSoldError(null);
+        try {
+            const res = await fetch(`${API_BASE_URL}/items/${id}/sold?init_data=${encodeURIComponent(getInitData())}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setOwnerSoldError(data.detail || "Failed to mark as sold.");
+                return;
             }
-        };
+            setItem(prev => ({ ...prev, status: 'sold' }));
+            setShowOwnerSoldModal(false);
+            if (window.Telegram?.WebApp?.showPopup) {
+                window.Telegram.WebApp.showPopup({ message: "Marked as sold. It's no longer visible in search." });
+            }
+        } catch (err) {
+            setOwnerSoldError("Network error. Please try again.");
+        } finally {
+            setOwnerSoldLoading(false);
+        }
+    };
 
         if (id) fetchProductData();
         window.scrollTo(0, 0); 
@@ -118,7 +149,7 @@ const ProductPage = () => {
                 if (res.status === 409) {
                     setReportError("You already reported this as sold.");
                 } else if (res.status === 403) {
-                    setReportError("Cannot report your own product. You can mark it as sold from Stores → Manage → Edit.");
+                    setShowOwnerSoldModal(true);
                 } else {
                     setReportError(data.detail || "Failed to report item.");
                 }
@@ -530,6 +561,42 @@ const ProductPage = () => {
                 initialQuery={item.title}
                 currentPrice={item.price}
             />
+
+            {/* OWNER CAN'T REPORT — modal with one-tap Mark as Sold */}
+            {showOwnerSoldModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl">
+                        <div className="flex items-center gap-2 mb-3 text-amber-600">
+                            <AlertTriangle size={22} />
+                            <h3 className="text-lg font-bold text-gray-900">This is your product</h3>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2">
+                            You can't report your own listing as sold. If it's no longer available,
+                            mark it as sold to remove it from search.
+                        </p>
+                        <p className="text-xs text-gray-400 mb-5">
+                            You can also manage it anytime from Stores → Manage → Edit.
+                        </p>
+                        {ownerSoldError && (
+                            <p className="text-red-500 text-xs text-center mb-3 bg-red-50 p-2 rounded-lg">{ownerSoldError}</p>
+                        )}
+                        <button
+                            onClick={handleOwnerMarkSold}
+                            disabled={ownerSoldLoading || item.status === 'sold'}
+                            className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-xl font-medium hover:bg-green-700 transition-colors disabled:opacity-50 mb-2"
+                        >
+                            {ownerSoldLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                            {item.status === 'sold' ? 'Already Marked as Sold' : 'Mark as Sold'}
+                        </button>
+                        <button
+                            onClick={() => setShowOwnerSoldModal(false)}
+                            className="w-full py-3 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
