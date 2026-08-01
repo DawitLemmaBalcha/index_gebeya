@@ -143,6 +143,49 @@ def startup_event():
     except Exception as e:
         logger.warning(f"⚠️ TECH-23 schema migration failed: {e}")
 
+    try:
+        with engine.begin() as conn:
+            # TECH-25: Alert/notification retention lifecycle
+            #   1. Add deleted_at soft-delete marker to alerts (nullable, no
+            #      DEFAULT — NULL means "never user-deleted"; the purge
+            #      predicate branches on NULL explicitly).
+            #   2. Swap notifications_alert_id_fkey from the default RESTRICT
+            #      to ON DELETE CASCADE so an alert purge removes its
+            #      notifications at the database level.
+            # Idempotency: PostgreSQL has no ADD CONSTRAINT IF NOT EXISTS, so
+            # the drop is guarded on pg_constraint existence — the repo-
+            # consistent extension of the IF NOT EXISTS idiom. Safe on all
+            # three states: legacy DB (RESTRICT → dropped, re-added CASCADE),
+            # prior TECH-25 run (CASCADE → dropped, re-added identical — a
+            # no-op churn), fresh DB (create_all already made CASCADE → no-op
+            # churn). No error path on any repeat.
+            conn.execute(text(
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"
+            ))
+            conn.execute(text(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'notifications_alert_id_fkey'
+                          AND conrelid = 'notifications'::regclass
+                    ) THEN
+                        ALTER TABLE notifications DROP CONSTRAINT notifications_alert_id_fkey;
+                    END IF;
+                END $$;
+                """
+            ))
+            conn.execute(text(
+                """
+                ALTER TABLE notifications ADD CONSTRAINT notifications_alert_id_fkey
+                FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE
+                """
+            ))
+            logger.info("✅ TECH-25 schema migration verified (alerts.deleted_at, notifications FK cascade)")
+    except Exception as e:
+        logger.warning(f"⚠️ TECH-25 schema migration failed: {e}")
+
     # ===================================================================
     # Phase 4 — Create indexes (SINGLE SOURCE OF TRUTH)
     # ===================================================================

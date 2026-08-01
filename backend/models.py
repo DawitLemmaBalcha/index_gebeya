@@ -70,6 +70,7 @@ class Alert(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=True) # 👈 NEW: Expiry Date
     last_triggered_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True) # 👈 TECH-25: Soft-delete marker (user-deleted); NULL = never user-deleted
     
     # The High Water Mark
     best_opportunity_score = Column(Float, default=0.0)
@@ -89,7 +90,7 @@ class Notification(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=True)
-    alert_id = Column(Integer, ForeignKey("alerts.id"), nullable=True)
+    alert_id = Column(Integer, ForeignKey("alerts.id", ondelete="CASCADE"), nullable=True) # TECH-25: alert purge cascades its notifications at the DB level
     
     # Payload Data
     match_tier = Column(String, nullable=False) # "bullseye" or "ring"

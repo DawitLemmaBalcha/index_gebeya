@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request,
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from typing import List, Optional
+from datetime import datetime, timezone
 
 from database import get_db
 from models import Alert, Notification, Item
@@ -94,6 +95,7 @@ def delete_alert(
         raise HTTPException(status_code=404, detail="Alert not found")
     
     alert.is_active = False
+    alert.deleted_at = datetime.now(timezone.utc)  # TECH-25: retention lifecycle soft-delete marker
     db.commit()
 
     # --- ANALYTICS LOGGING ---
