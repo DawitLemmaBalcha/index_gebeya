@@ -71,12 +71,14 @@ An **Alert** is a buyer's standing search — "notify me when you find this kind
 | Best Opportunity Score | The highest match score ever achieved for this alert (the "high water mark") |
 | Expiry | Alerts automatically expire 14 days after creation |
 | Status | Active or Inactive (soft-deleted) |
+| Deleted At | Timestamp set when the buyer hard-deletes the alert — starts the retention purge clock |
 
 **Key Rules:**
 - An alert's query text is converted into a vector embedding at creation time for similarity matching.
 - Alerts do not match against items that exceed their max price (if one is set).
 - An alert's "high water mark" prevents notification fatigue — ring-tier matches below the best-ever score are suppressed.
 - Alerts expire 14 days after creation to prevent stale searches.
+- **Retention Lifecycle (TECH-25):** alerts are self-purged by the daily cleanup service once they are dead — either N days after the buyer deleted them (`deleted_at`, default 30) or N days after expiry (`expires_at`). Paused alerts are never purged (they have a future `expires_at` and no `deleted_at`). Notifications are retained 90 days (PENDING mail is never purged). Soft deletes are the mechanism; retention is the lifecycle.
 
 ### 2.5 Notification (Alert Dispatch)
 
@@ -257,3 +259,4 @@ Telegram Channels ──→ Listener (Bot) ──→ Worker Queue ──→ Back
 5. **Trust scores are pure averages.** No Bayesian weighting or review age decay (current state).
 6. **Fail-open on LLM Judge unavailability.** Prefer noisy notifications over missed opportunities.
 7. **Visual taxonomy hints are pre-computed at startup.** Avoids per-request latency during ingestion.
+8. **Soft delete is the mechanism; retention is the lifecycle (TECH-25 / ADR-0001).** Dead alerts and stale notifications self-purge on a timer (alert purge N days after delete/expiry; notification retention 90 days; PENDING never purged; paused alerts protected). This bounds vector storage and the per-ingestion alert scan without sacrificing match history or dedup suppression.
