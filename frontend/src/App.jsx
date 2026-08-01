@@ -54,6 +54,17 @@ function MainLayout({ initialSearchQuery = '' }) {
 }
 
 const App = () => {
+  // Capture Telegram user identity once — enables owner checks (report sold, re-list, inventory)
+  try {
+    const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    if (tgUser?.id) {
+      const stored = localStorage.getItem('index_user_id');
+      if (stored !== String(tgUser.id)) {
+        localStorage.setItem('index_user_id', String(tgUser.id));
+      }
+    }
+  } catch {}
+
   // Onboarding gate state — only relevant inside Telegram WebView
   const [showOnboarding, setShowOnboarding] = useState(() => {
     if (!isTelegramWebView()) return false; // Open web never shows onboarding

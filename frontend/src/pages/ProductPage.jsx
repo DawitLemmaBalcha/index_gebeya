@@ -372,8 +372,8 @@ const ProductPage = () => {
                             </div>
                         )}
 
-                        {/* TECH-22: Report as Sold button (buyer only, active items) */}
-                        {item.status === 'active' && currentUserId && item.channel?.registered_by && currentUserId !== item.channel.registered_by && (
+                        {/* TECH-22: Report as Sold button (any authenticated buyer, active items, not the owner) */}
+                        {item.status === 'active' && currentUserId && currentUserId !== item.channel?.registered_by && (
                             <div className="mb-3">
                                 <button
                                     onClick={handleReportSold}
