@@ -32,7 +32,6 @@ services:
     depends_on:
       - db
     volumes:
-      - ./backend:/app
       - index_media_data:/app/media
     networks:
       - default
