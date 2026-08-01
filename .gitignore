@@ -61,3 +61,5 @@ desktop.ini
 *.sqlite3
 .opencode
 /AGENTS.md
+# Graphify AST cache (regenerated locally)
+graphify-out/
