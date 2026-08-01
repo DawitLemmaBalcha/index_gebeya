@@ -74,3 +74,46 @@ async def handle_addchannel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Once added, post a product — it'll appear in the marketplace within a minute or two."
     )
     await update.message.reply_text(instruction_text, parse_mode="Markdown")
+
+async def handle_sold_report_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handles owner DM buttons for sold reports:
+      sold_report_clear_{item_id} — "It's not sold" → clear reports
+      sold_report_mark_{item_id}  — "It is sold" → mark sold
+    Acts on behalf of the channel owner via the internal listener bypass.
+    """
+    from client import clear_item_reports_api, mark_item_sold_api
+
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+    data = query.data
+
+    try:
+        action, item_id_str = data.rsplit("_", 1)
+        item_id = int(item_id_str)
+    except (ValueError, AttributeError):
+        await query.edit_message_text("Invalid action. Please try again from the Stores tab.")
+        return
+
+    if action == "sold_report_clear":
+        success = await clear_item_reports_api(user_id, item_id)
+        if success:
+            await query.edit_message_text(
+                f"✅ Reports cleared. The product is back to active listing.\n"
+                f"(Item #{item_id})"
+            )
+        else:
+            await query.edit_message_text("❌ Could not clear reports. Please try again from the Stores tab.")
+    elif action == "sold_report_mark":
+        success = await mark_item_sold_api(user_id, item_id)
+        if success:
+            await query.edit_message_text(
+                f"✅ Marked as sold. The product is no longer visible in search.\n"
+                f"(Item #{item_id})"
+            )
+        else:
+            await query.edit_message_text("❌ Could not mark as sold. Please try again from the Stores tab.")
+    else:
+        await query.edit_message_text("Unknown action.")

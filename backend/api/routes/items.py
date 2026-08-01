@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func as sql_func
 
@@ -147,11 +147,13 @@ async def relist_item(
     item_id: int,
     body: SoldReportCreate,
     db: Session = Depends(get_db),
+    x_internal_service: Optional[str] = Header(None, alias="X-Internal-Service"),
 ):
     """
     Owner clears all SoldReports and resets status to 'active'.
+    Supports the internal listener bypass (DM buttons).
     """
-    user = authenticate(body.init_data, db)
+    user = authenticate(body.init_data, db, x_internal_service)
     return item_relist(db, item_id, user)
 
 
@@ -182,9 +184,10 @@ def mark_item_sold(
     item_id: int,
     init_data: str,
     db: Session = Depends(get_db),
+    x_internal_service: Optional[str] = Header(None, alias="X-Internal-Service"),
 ):
     """Owner-authoritative mark as sold. No confirmation needed, but reversible."""
-    user = authenticate(init_data, db)
+    user = authenticate(init_data, db, x_internal_service)
     return mark_sold(db, item_id, user)
 
 
@@ -196,7 +199,8 @@ def clear_item_reports(
     item_id: int,
     init_data: str,
     db: Session = Depends(get_db),
+    x_internal_service: Optional[str] = Header(None, alias="X-Internal-Service"),
 ):
     """Delete all SoldReport records for this item without changing status."""
-    user = authenticate(init_data, db)
+    user = authenticate(init_data, db, x_internal_service)
     return clear_reports(db, item_id, user)

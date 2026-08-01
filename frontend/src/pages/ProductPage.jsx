@@ -372,6 +372,14 @@ const ProductPage = () => {
                             </div>
                         )}
 
+                        {/* Live report count — visible as soon as any buyer reports, before threshold */}
+                        {item.status === 'active' && reportCount > 0 && (
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium mb-3 bg-amber-50 text-amber-700 border border-amber-200">
+                                <AlertTriangle size={16} />
+                                <span>{reportCount} {reportCount === 1 ? 'buyer reported' : 'buyers reported'} this as sold</span>
+                            </div>
+                        )}
+
                         {/* TECH-22: Report as Sold button (any authenticated buyer, active items, not the owner) */}
                         {item.status === 'active' && currentUserId && currentUserId !== item.channel?.registered_by && (
                             <div className="mb-3">

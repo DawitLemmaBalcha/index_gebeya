@@ -26,11 +26,12 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 logger = logging.getLogger("index_owner_dm")
 
 
-async def send_owner_dm(db: Session, channel_id: int, message: str) -> None:
+async def send_owner_dm(db: Session, channel_id: int, message: str, reply_markup: dict = None) -> None:
     """
     Send a DM to the channel owner via Telegram Bot API.
     Best-effort: logs warning on failure, never raises.
     (Async adapter for route handlers.)
+    reply_markup: optional Telegram InlineKeyboardMarkup JSON (buttons).
     """
     try:
         channel = db.get(Channel, channel_id)
@@ -41,10 +42,14 @@ async def send_owner_dm(db: Session, channel_id: int, message: str) -> None:
             logger.warning("BOT_TOKEN not set, cannot send owner DM")
             return
 
+        payload = {"chat_id": channel.registered_by, "text": message}
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                json={"chat_id": channel.registered_by, "text": message},
+                json=payload,
             )
             if resp.status_code != 200:
                 logger.warning(f"⚠️ DM send failed for channel {channel_id}: {resp.text[:200]}")
@@ -52,7 +57,7 @@ async def send_owner_dm(db: Session, channel_id: int, message: str) -> None:
         logger.warning(f"⚠️ DM notification exception for channel {channel_id}: {e}")
 
 
-def send_owner_dm_sync(channel_id: int, message: str) -> None:
+def send_owner_dm_sync(channel_id: int, message: str, reply_markup: dict = None) -> None:
     """
     Send a DM to the channel owner via Telegram Bot API.
     Best-effort: logs warning on failure, never raises.
@@ -70,9 +75,13 @@ def send_owner_dm_sync(channel_id: int, message: str) -> None:
             logger.warning("BOT_TOKEN not set, cannot send owner DM")
             return
 
+        payload = {"chat_id": channel.registered_by, "text": message}
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+
         resp = httpx.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json={"chat_id": channel.registered_by, "text": message},
+            json=payload,
             timeout=10.0,
         )
         if resp.status_code != 200:

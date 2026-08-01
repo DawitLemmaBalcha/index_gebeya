@@ -159,3 +159,43 @@ async def get_channel_info(username: str):
         except Exception as e:
             logger.warning(f"⚠️ get_channel_info exception for @{username}: {e}")
             return None
+
+
+async def clear_item_reports_api(user_id: int, item_id: int) -> bool:
+    """
+    Owner clears all sold reports on an item (DM button action).
+    Uses the internal listener bypass so plain integer IDs authenticate.
+    """
+    url = f"{API_BASE}/items/{item_id}/clear-reports?init_data={user_id}"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.post(url, headers=INTERNAL_HEADERS)
+            if response.status_code == 200:
+                logger.info(f"✅ Cleared sold reports for item {item_id} (owner {user_id})")
+                return True
+            else:
+                logger.error(f"❌ clear-reports failed ({response.status_code}): {response.text[:200]}")
+                return False
+        except Exception as e:
+            logger.error(f"💥 clear-reports exception: {e}")
+            return False
+
+
+async def mark_item_sold_api(user_id: int, item_id: int) -> bool:
+    """
+    Owner-authoritative mark item as sold (DM button action).
+    Uses the internal listener bypass so plain integer IDs authenticate.
+    """
+    url = f"{API_BASE}/items/{item_id}/sold?init_data={user_id}"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.post(url, headers=INTERNAL_HEADERS)
+            if response.status_code == 200:
+                logger.info(f"✅ Marked item {item_id} sold (owner {user_id})")
+                return True
+            else:
+                logger.error(f"❌ mark-sold failed ({response.status_code}): {response.text[:200]}")
+                return False
+        except Exception as e:
+            logger.error(f"💥 mark-sold exception: {e}")
+            return False

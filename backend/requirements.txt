@@ -12,4 +12,5 @@ fastembed==0.5.1
 Pillow
 httpx
 sqladmin
-itsdangerouspytest-asyncio
+itsdangerous
+pytest-asyncio

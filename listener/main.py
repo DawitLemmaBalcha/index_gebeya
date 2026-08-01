@@ -8,7 +8,7 @@ from config import TELEGRAM_TOKEN, logger
 from monitor import handle_channel_post
 from bot_ui import handle_start, handle_addchannel_callback
 from alert_conversation import alert_conv_handler
-from bot_commands import handle_my_alerts, handle_alert_callback, handle_addchannel # 👈 NEW IMPORTS
+from bot_commands import handle_my_alerts, handle_alert_callback, handle_addchannel, handle_sold_report_callback # 👈 NEW IMPORTS
 from chat_member_handler import handle_chat_member
 from worker import background_worker
 from notifications import notification_poller
@@ -46,6 +46,7 @@ if __name__ == '__main__':
     # C. Global Callbacks (Stop Alert Buttons + Add Channel)
     application.add_handler(CallbackQueryHandler(handle_alert_callback, pattern="^stop_")) # 👈 NEW HANDLER
     application.add_handler(CallbackQueryHandler(handle_addchannel_callback, pattern="^cmd_addchannel$"))
+    application.add_handler(CallbackQueryHandler(handle_sold_report_callback, pattern="^sold_report_"))
 
     # D. Channel Ingestion
     channel_handler = MessageHandler(filters.ChatType.CHANNEL, handle_channel_post)

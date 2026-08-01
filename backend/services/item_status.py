@@ -71,22 +71,43 @@ async def report_sold(db: Session, item_id: int, user: User) -> dict:
     report_count = db.scalar(
         select(func.count(SoldReport.id)).where(SoldReport.item_id == item_id)
     )
+    report_count = report_count or 0
+
+    # Build inline keyboard for the owner DM: clear reports / mark sold
+    markup = {
+        "inline_keyboard": [[
+            {"text": "✅ It's not sold", "callback_data": f"sold_report_clear_{item_id}"},
+            {"text": "❌ It is sold", "callback_data": f"sold_report_mark_{item_id}"},
+        ]]
+    }
+
+    # 5b. Notify owner on FIRST report — early warning with action buttons
+    channel_username = channel.username if channel else "unknown"
+    if report_count == 1:
+        msg = (
+            f"⚠️ Your listing '{item.title}' on @{channel_username} "
+            f"has been reported as sold by a buyer. Users can now see the report.\n\n"
+            f"If it reaches {CROWDSOURCE_SOLD_THRESHOLD} reports, "
+            f"the product will be taken down.\n\n"
+            f"Use the buttons below to confirm or clear this."
+        )
+        await send_owner_dm(db, item.channel_id, msg, reply_markup=markup)
 
     # 6. Check threshold
-    if report_count and report_count >= CROWDSOURCE_SOLD_THRESHOLD:
+    if report_count >= CROWDSOURCE_SOLD_THRESHOLD:
         if item.status == "active":
             item.status = "reported_sold"
             db.commit()
 
             # 7. Send owner DM
-            channel_username = channel.username if channel else "unknown"
             msg = (
                 f"⚠️ Your listing '{item.title}' on @{channel_username} "
                 f"has been reported as sold by {report_count} buyers. "
-                f"It has been hidden from search. "
-                f"If this is incorrect, re-list it from your Stores tab."
+                f"It has been hidden from search.\n\n"
+                f"Use the buttons below to confirm it is sold "
+                f"or clear the reports if this is incorrect."
             )
-            await send_owner_dm(db, item.channel_id, msg)
+            await send_owner_dm(db, item.channel_id, msg, reply_markup=markup)
 
     return {"status": "reported", "report_count": report_count}
 
