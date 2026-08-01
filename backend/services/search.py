@@ -9,7 +9,7 @@ import numpy as np
 # Absolute imports (Docker-friendly)
 from ai_engine.vector_client import vectorize_text
 from schemas import ItemResponse, ChannelResponse
-from ai_engine.matcher import SEMANTIC_WEIGHT, LEXICAL_WEIGHT, DEFAULT_RESULT_LIMIT
+from constants import SEMANTIC_WEIGHT, LEXICAL_WEIGHT, DEFAULT_RESULT_LIMIT
 
 def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: int, offset: int, exclude_unpriced: bool = False) -> List[ItemResponse]:
     """

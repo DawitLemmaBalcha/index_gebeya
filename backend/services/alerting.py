@@ -1,6 +1,5 @@
 import json
 import logging
-import re 
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
@@ -21,14 +20,6 @@ from constants import (
 )
 
 logger = logging.getLogger("index_alerts")
-
-def _normalize(s: str) -> str:
-    """
-    Local helper for strict identity checks.
-    Removes all non-alphanumeric chars and lowercases.
-    """
-    if not s: return ""
-    return re.sub(r'[^a-z0-9]', '', s.lower())
 
 def _create_system_notification(db: Session, user_id: int, alert_id: int, message: str, tier: str) -> None:
     """
@@ -75,38 +66,10 @@ def process_new_item(db: Session, item_id: int):
 
         for alert in alerts:
             # -----------------------------------------------------------
-            # PRE-CHECK: EXPIRY
+            # PRE-CHECK GATES (expiry + price filter)
             # -----------------------------------------------------------
-            if alert.expires_at:
-                expiry = alert.expires_at
-                if expiry.tzinfo is None:
-                    expiry = expiry.replace(tzinfo=timezone.utc)
-                if expiry < now_utc:
-                    alert.is_active = False
-                    _create_system_notification(
-                        db, alert.user_id, alert.id,
-                        f"⏰ Your alert for '{alert.query_text}' has expired. Create a new one anytime.",
-                        "system_expiry"
-                    )
-                    logger.info(f"⌛ Expired Alert {alert.id}, DM sent.")
-                    continue
-
-            # -----------------------------------------------------------
-            # PRE-CHECK: PRICE FILTER (GLOBAL)
-            # -----------------------------------------------------------
-            # Updated to Log EVERYTHING
-            if alert.max_price is not None and item.price is not None:
-                if item.price > alert.max_price:
-                    logger.info(f"💰 Price Mismatch: Alert {alert.id} Max({alert.max_price}) < Item({item.price}) | STOP")
-                    continue
-                else:
-                    logger.info(f"💰 Price Pass: Alert {alert.id} Max({alert.max_price}) >= Item({item.price})")
-            
-            elif alert.max_price is None:
-                logger.info(f"💰 Price Check Skipped: Alert {alert.id} is set to 'Any Price'.")
-            
-            elif item.price is None:
-                logger.info(f"💰 Price Check Skipped: Item {item.id} has no price listed.")
+            if _precheck_gates(db, alert, item, now_utc):
+                continue
 
             # Prepare Alert Vector
             if hasattr(alert.query_vector, "tolist"):
@@ -115,57 +78,29 @@ def process_new_item(db: Session, item_id: int):
                 alert_vec = list(alert.query_vector)
 
             # -----------------------------------------------------------
-            # STAGE 1: IDENTITY CHECK ("Speed Pass")
+            # SINGLE MATCHING COMPUTATION (Speed Pass + Hybrid)
             # -----------------------------------------------------------
-            norm_query = _normalize(alert.query_text)
-            norm_title = _normalize(item.title)
+            result = evaluate_match(
+                item_vector=item_vec,
+                alert_vector=alert_vec,
+                item_price=item.price,
+                alert_max_price=alert.max_price,
+                item_title=item.title,
+                alert_query_text=alert.query_text 
+            )
             
-            # Ensure query is substantial (>3 chars)
-            is_identity_match = (len(norm_query) > 3) and (norm_query == norm_title)
-
-            should_notify = False
-            result = None
-
-            if is_identity_match:
-                logger.info(f"⚡ Identity Match: '{norm_query}' == '{norm_title}' | SPEED PASS GRANTED")
-                
-                # Mock a result for consistency
-                result = evaluate_match(
-                    item_vector=item_vec,
-                    alert_vector=alert_vec,
-                    item_price=item.price,
-                    alert_max_price=alert.max_price,
-                    item_title=item.title,
-                    alert_query_text=alert.query_text 
-                )
-                
-                should_notify = True
-                is_verified = True
-            
+            if result.tier == MatchTier.MISS:
+                logger.info(f"👋 Hybrid Miss: Alert {alert.id} Score {result.score:.3f} too low. Stopping.")
+                continue
             else:
-                logger.info(f"🔍 Identity Mismatch: '{norm_query}' != '{norm_title}' | Proceeding to Hybrid Matcher")
+                logger.info(f"📊 Hybrid Candidate: Alert {alert.id} -> Tier: {result.tier.value} | Score: {result.score:.3f}")
 
-                # -------------------------------------------------------
-                # STAGE 2: CANDIDATE GENERATION (Vectors/Trigrams)
-                # -------------------------------------------------------
-                result = evaluate_match(
-                    item_vector=item_vec,
-                    alert_vector=alert_vec,
-                    item_price=item.price,
-                    alert_max_price=alert.max_price,
-                    item_title=item.title,
-                    alert_query_text=alert.query_text 
-                )
-                
-                if result.tier == MatchTier.MISS:
-                    logger.info(f"👋 Hybrid Miss: Alert {alert.id} Score {result.score:.3f} too low. Stopping.")
-                    continue
-                else:
-                    logger.info(f"📊 Hybrid Candidate: Alert {alert.id} -> Tier: {result.tier.value} | Score: {result.score:.3f}")
-
-                # -------------------------------------------------------
-                # STAGE 3: THE JUDGE (Universal LLM Verification)
-                # -------------------------------------------------------
+            # -----------------------------------------------------------
+            # CONDITIONAL LLM JUDGE
+            # Deterministic speed passes (containment) skip Stage 2/3 entirely
+            # (behavior doc Rule 3.1 — "Consequence of Speed Pass").
+            # -----------------------------------------------------------
+            if not result.speed_pass:
                 preferences = json.loads(alert.preferences) if alert.preferences else {}
                 
                 logger.info(f"⚖️ Invoking LLM Judge for Alert {alert.id}...")
@@ -177,96 +112,28 @@ def process_new_item(db: Session, item_id: int):
                 else:
                     logger.info(f"✅ LLM Approved: '{alert.query_text}' vs '{item.title}'")
 
-                # Determine notification eligibility
-                if result.tier == MatchTier.BULLSEYE:
-                    should_notify = True
-                    if result.score > alert.best_opportunity_score:
-                        alert.best_opportunity_score = result.score
-                
-                elif result.tier == MatchTier.RING:
-                    tolerance = RING_TOLERANCE
-                    if result.score >= (alert.best_opportunity_score - tolerance):
-                        should_notify = True
-                    else:
-                        logger.info(f"📉 Ring Match Suppressed: Score {result.score:.3f} < High Water Mark {alert.best_opportunity_score:.3f}")
+            # -----------------------------------------------------------
+            # DISPATCH DECISION
+            # -----------------------------------------------------------
+            should_notify = _dispatch_decision(result, alert)
 
             # -----------------------------------------------------------
-            # FINAL: DISPATCH with Guardrails (TECH-20)
+            # GUARDRAILS (throttle + duplicate suppression)
             # -----------------------------------------------------------
-            if should_notify:
-                tier_value = result.tier.value if result else 'SPEED_PASS'
+            should_notify = _apply_guardrails(db, alert, item, result, now_utc, should_notify)
 
-                # --- Throttle Check (Ring only; Bullseye bypasses) ---
-                if result and result.tier == MatchTier.RING and NOTIFICATION_THROTTLE_SECONDS > 0:
-                    if alert.last_triggered_at is not None:
-                        elapsed = (now_utc - alert.last_triggered_at).total_seconds()
-                        if elapsed < NOTIFICATION_THROTTLE_SECONDS:
-                            logger.info(f"⏱️ Throttled: Alert {alert.id} within cooldown window.")
-                            should_notify = False
-
-            if should_notify:
-                # --- Duplicate Suppression ---
-                if item.is_dedup:
-                    # For dedup replacements: suppress if alert already fired for ANY item
-                    # from this channel within the last hour. First repost (after original
-                    # aged out) notifies; rapid subsequent reposts don't.
-                    from models import Notification as Notif, Item as Itm
-                    one_hour_ago = now_utc - timedelta(hours=1)
-                    existing_from_channel = db.scalar(
-                        select(Notif.id).join(Itm, Notif.item_id == Itm.id).where(
-                            Notif.alert_id == alert.id,
-                            Itm.channel_id == item.channel_id,
-                            Notif.created_at >= one_hour_ago,
-                            Notif.item_id != item.id
-                        ).limit(1)
-                    )
-                    if existing_from_channel is not None:
-                        logger.info(f"🔁 Dedup suppressed: Alert {alert.id} already notified from channel {item.channel_id}.")
-                        should_notify = False
-                else:
-                    # Normal items: suppress if same alert+item already notified
-                    existing = db.scalar(
-                        select(Notification).where(
-                            Notification.alert_id == alert.id,
-                            Notification.item_id == item.id
-                        ).limit(1)
-                    )
-                    if existing is not None:
-                        logger.info(f"🔁 Duplicate suppressed: Alert {alert.id} already notified for Item {item.id}.")
-                        should_notify = False
-
+            # -----------------------------------------------------------
+            # FINAL DISPATCH + COUNTERS + AUTO-PAUSE
+            # -----------------------------------------------------------
             if should_notify:
                 matches_found += 1
-                tier_value = result.tier.value if result else 'SPEED_PASS'
+                tier_value = result.tier.value
                 logger.info(f"🎯 MATCH CONFIRMED! Alert {alert.id} | Tier: {tier_value}")
                 
                 alert.last_triggered_at = now_utc
                 _dispatch_notification(db, alert.user_id, alert.id, item, result)
 
-                # --- Match Counter — skip for dedup replacements ---
-                if not item.is_dedup:
-                    alert.total_matches += 1
-                    if result and result.tier == MatchTier.BULLSEYE:
-                        alert.bullseye_matches += 1
-
-                # --- Auto-Pause Check ---
-                # Bullseye limit takes priority
-                if MAX_BULLSEYE_BEFORE_PAUSE > 0 and alert.bullseye_matches >= MAX_BULLSEYE_BEFORE_PAUSE:
-                    alert.is_active = False
-                    _create_system_notification(
-                        db, alert.user_id, alert.id,
-                        f"🎯 Your alert for '{alert.query_text}' found {MAX_BULLSEYE_BEFORE_PAUSE} exact matches and has been paused. You probably already found what you need.",
-                        "system_pause"
-                    )
-                    logger.info(f"⏸️ Auto-paused Alert {alert.id} after {MAX_BULLSEYE_BEFORE_PAUSE} bullseye matches.")
-                elif MAX_MATCHES_BEFORE_PAUSE > 0 and alert.total_matches >= MAX_MATCHES_BEFORE_PAUSE:
-                    alert.is_active = False
-                    _create_system_notification(
-                        db, alert.user_id, alert.id,
-                        f"🔕 Your alert for '{alert.query_text}' has been paused after {MAX_MATCHES_BEFORE_PAUSE} matches. Resume it anytime in the Alerts tab.",
-                        "system_pause"
-                    )
-                    logger.info(f"⏸️ Auto-paused Alert {alert.id} after {MAX_MATCHES_BEFORE_PAUSE} total matches.")
+                _apply_auto_pause(db, alert, item, result)
         
         db.commit()
         logger.info(f"🏁 Item Processing Complete. Total Matches: {matches_found}")
@@ -274,7 +141,147 @@ def process_new_item(db: Session, item_id: int):
     except Exception as e:
         logger.error(f"❌ Alert Orchestrator Failed: {str(e)}")
 
-# ... (rest of file: create_alert, _dispatch_notification)
+def _precheck_gates(db: Session, alert: Alert, item: Item, now_utc) -> bool:
+    """
+    Returns True when the alert must be skipped (expired or price-rejected),
+    False otherwise. Reproduces the expiry gate (deactivate + system DM + log)
+    and the price gate (logs; no-price passes) exactly.
+    """
+    # -----------------------------------------------------------
+    # PRE-CHECK: EXPIRY
+    # -----------------------------------------------------------
+    if alert.expires_at:
+        expiry = alert.expires_at
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry < now_utc:
+            alert.is_active = False
+            _create_system_notification(
+                db, alert.user_id, alert.id,
+                f"⏰ Your alert for '{alert.query_text}' has expired. Create a new one anytime.",
+                "system_expiry"
+            )
+            logger.info(f"⌛ Expired Alert {alert.id}, DM sent.")
+            return True
+
+    # -----------------------------------------------------------
+    # PRE-CHECK: PRICE FILTER (GLOBAL)
+    # -----------------------------------------------------------
+    # Updated to Log EVERYTHING
+    if alert.max_price is not None and item.price is not None:
+        if item.price > alert.max_price:
+            logger.info(f"💰 Price Mismatch: Alert {alert.id} Max({alert.max_price}) < Item({item.price}) | STOP")
+            return True
+        else:
+            logger.info(f"💰 Price Pass: Alert {alert.id} Max({alert.max_price}) >= Item({item.price})")
+    
+    elif alert.max_price is None:
+        logger.info(f"💰 Price Check Skipped: Alert {alert.id} is set to 'Any Price'.")
+    
+    elif item.price is None:
+        logger.info(f"💰 Price Check Skipped: Item {item.id} has no price listed.")
+
+    return False
+
+def _dispatch_decision(result, alert: Alert) -> bool:
+    """
+    Decides whether the match is worth notifying about:
+    BULLSEYE always dispatches (and raises the high water mark),
+    RING dispatches only within tolerance of the high water mark.
+    """
+    if result.tier == MatchTier.BULLSEYE:
+        if result.score > alert.best_opportunity_score:
+            alert.best_opportunity_score = result.score
+        return True
+    
+    elif result.tier == MatchTier.RING:
+        tolerance = RING_TOLERANCE
+        if result.score >= (alert.best_opportunity_score - tolerance):
+            return True
+        else:
+            logger.info(f"📉 Ring Match Suppressed: Score {result.score:.3f} < High Water Mark {alert.best_opportunity_score:.3f}")
+            return False
+
+    return False
+
+def _apply_guardrails(db: Session, alert: Alert, item: Item, result, now_utc, should_notify: bool) -> bool:
+    """
+    Applies the TECH-20 guardrails: ring-only throttle (bullseye bypasses)
+    then duplicate suppression. Returns the final decision.
+    """
+    # --- Throttle Check (Ring only; Bullseye bypasses) ---
+    if should_notify and result.tier == MatchTier.RING and NOTIFICATION_THROTTLE_SECONDS > 0:
+        if alert.last_triggered_at is not None:
+            elapsed = (now_utc - alert.last_triggered_at).total_seconds()
+            if elapsed < NOTIFICATION_THROTTLE_SECONDS:
+                logger.info(f"⏱️ Throttled: Alert {alert.id} within cooldown window.")
+                should_notify = False
+
+    if not should_notify:
+        return False
+
+    # --- Duplicate Suppression ---
+    if item.is_dedup:
+        # For dedup replacements: suppress if alert already fired for ANY item
+        # from this channel within the last hour. First repost (after original
+        # aged out) notifies; rapid subsequent reposts don't.
+        one_hour_ago = now_utc - timedelta(hours=1)
+        existing_from_channel = db.scalar(
+            select(Notification.id).join(Item, Notification.item_id == Item.id).where(
+                Notification.alert_id == alert.id,
+                Item.channel_id == item.channel_id,
+                Notification.created_at >= one_hour_ago,
+                Notification.item_id != item.id
+            ).limit(1)
+        )
+        if existing_from_channel is not None:
+            logger.info(f"🔁 Dedup suppressed: Alert {alert.id} already notified from channel {item.channel_id}.")
+            should_notify = False
+    else:
+        # Normal items: suppress if same alert+item already notified
+        existing = db.scalar(
+            select(Notification).where(
+                Notification.alert_id == alert.id,
+                Notification.item_id == item.id
+            ).limit(1)
+        )
+        if existing is not None:
+            logger.info(f"🔁 Duplicate suppressed: Alert {alert.id} already notified for Item {item.id}.")
+            should_notify = False
+
+    return should_notify
+
+def _apply_auto_pause(db: Session, alert: Alert, item: Item, result) -> None:
+    """
+    Updates match counters (skipped for dedup replacements) and applies the
+    auto-pause check: bullseye limit takes priority, then total limit.
+    Each pause emits its system_pause DM.
+    """
+    # --- Match Counter — skip for dedup replacements ---
+    if not item.is_dedup:
+        alert.total_matches += 1
+        if result.tier == MatchTier.BULLSEYE:
+            alert.bullseye_matches += 1
+
+    # --- Auto-Pause Check ---
+    # Bullseye limit takes priority
+    if MAX_BULLSEYE_BEFORE_PAUSE > 0 and alert.bullseye_matches >= MAX_BULLSEYE_BEFORE_PAUSE:
+        alert.is_active = False
+        _create_system_notification(
+            db, alert.user_id, alert.id,
+            f"🎯 Your alert for '{alert.query_text}' found {MAX_BULLSEYE_BEFORE_PAUSE} exact matches and has been paused. You probably already found what you need.",
+            "system_pause"
+        )
+        logger.info(f"⏸️ Auto-paused Alert {alert.id} after {MAX_BULLSEYE_BEFORE_PAUSE} bullseye matches.")
+    elif MAX_MATCHES_BEFORE_PAUSE > 0 and alert.total_matches >= MAX_MATCHES_BEFORE_PAUSE:
+        alert.is_active = False
+        _create_system_notification(
+            db, alert.user_id, alert.id,
+            f"🔕 Your alert for '{alert.query_text}' has been paused after {MAX_MATCHES_BEFORE_PAUSE} matches. Resume it anytime in the Alerts tab.",
+            "system_pause"
+        )
+        logger.info(f"⏸️ Auto-paused Alert {alert.id} after {MAX_MATCHES_BEFORE_PAUSE} total matches.")
+
 def create_alert(db: Session, user: User, query_text: str, max_price: Optional[float], preferences: Dict):
     # --- Max Alerts Per User Check ---
     if MAX_ALERTS_PER_USER > 0:

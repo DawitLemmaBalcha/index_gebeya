@@ -8,6 +8,7 @@ Consumed by:
   - backend/services/alerting.py
   - backend/api/routes/alerts.py
   - backend/ai_engine/matcher.py
+  - backend/services/search.py
 """
 
 import os
@@ -65,6 +66,11 @@ ALERT_LIFESPAN_DAYS: int = _get_config("ALERT_LIFESPAN_DAYS", 14, int)
 RING_TOLERANCE: float = _get_config("ALERT_RING_TOLERANCE", 0.05, float)
 TIER_1_THRESHOLD: float = _get_config("ALERT_BULLSEYE_THRESHOLD", 0.82, float)
 TIER_2_THRESHOLD: float = _get_config("ALERT_RING_THRESHOLD", 0.55, float)
+
+# --- Search ---
+SEMANTIC_WEIGHT: float = _get_config("SEARCH_SEMANTIC_WEIGHT", 0.6, float)
+LEXICAL_WEIGHT: float = _get_config("SEARCH_LEXICAL_WEIGHT", 0.4, float)
+DEFAULT_RESULT_LIMIT: int = _get_config("SEARCH_RESULT_LIMIT", 20, int)
 
 # --- Sold Reports & Cleanup (TECH-22) ---
 CROWDSOURCE_SOLD_THRESHOLD: int = _get_config("CROWDSOURCE_SOLD_THRESHOLD", 3, int)

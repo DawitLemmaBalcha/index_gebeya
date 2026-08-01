@@ -1,4 +1,3 @@
-import os
 import re
 import numpy as np
 from enum import Enum
@@ -7,25 +6,17 @@ from difflib import SequenceMatcher
 
 from constants import TIER_1_THRESHOLD, TIER_2_THRESHOLD
 
-# ==========================================
-# CONFIGURATION & WEIGHTS
-# ==========================================
-
-# ⚠️ RESTORED CONSTANTS (Required by search.py)
-SEMANTIC_WEIGHT = float(os.getenv("SEARCH_SEMANTIC_WEIGHT", "0.6"))
-LEXICAL_WEIGHT = float(os.getenv("SEARCH_LEXICAL_WEIGHT", "0.4"))
-DEFAULT_RESULT_LIMIT = int(os.getenv("SEARCH_RESULT_LIMIT", "20"))
-
 class MatchTier(Enum):
     BULLSEYE = "bullseye"
     RING = "ring"
     MISS = "miss"
 
 class MatchResult:
-    def __init__(self, tier: MatchTier, score: float, reason: str):
+    def __init__(self, tier: MatchTier, score: float, reason: str, speed_pass: bool = False):
         self.tier = tier
         self.score = score
         self.reason = reason
+        self.speed_pass = speed_pass
 
     def __repr__(self):
         return f"<MatchResult tier={self.tier.value} score={self.score:.4f} reason='{self.reason}'>"
@@ -74,7 +65,7 @@ def evaluate_match(
         # Exact Normalized Match (e.g. "iphone13pro" in "brandnewiphone13pro")
         # Ensure query is substantial (>3 chars) to avoid matching "usb" in "bus"
         if len(norm_query) > 3 and norm_query in norm_title:
-            return MatchResult(MatchTier.BULLSEYE, 1.0, "Speed Pass (Exact Normalized Match)")
+            return MatchResult(MatchTier.BULLSEYE, 1.0, "Speed Pass (Exact Normalized Match)", speed_pass=True)
 
     # 3. Hybrid Calculation
     semantic_sim = cosine_similarity(item_vector, alert_vector)
