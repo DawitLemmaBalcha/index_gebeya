@@ -118,7 +118,7 @@ const ProductPage = () => {
                 if (res.status === 409) {
                     setReportError("You already reported this as sold.");
                 } else if (res.status === 403) {
-                    setReportError("Cannot report your own product.");
+                    setReportError("Cannot report your own product. You can mark it as sold from Stores → Manage → Edit.");
                 } else {
                     setReportError(data.detail || "Failed to report item.");
                 }

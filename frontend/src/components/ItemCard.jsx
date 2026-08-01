@@ -2,7 +2,7 @@ import React from 'react';
 import { Phone, MessageCircle, Sparkles, Ban, AlertTriangle, Clock } from 'lucide-react';
 import { getAnalyticsHeaders } from '../utils/analytics'; // IMPORT (for URL param only if needed, otherwise use headers)
 
-const ItemCard = ({ item, onSelect, apiUrl, variant, onMarkSold, onEdit }) => {
+const ItemCard = ({ item, onSelect, apiUrl, variant, onMarkSold, onEdit, onRelist }) => {
   
   const formatPrice = (price, currency) => {
     if (!price) return 'Ask for Price';
@@ -144,12 +144,28 @@ const ItemCard = ({ item, onSelect, apiUrl, variant, onMarkSold, onEdit }) => {
         {/* Action Buttons */}
         {variant === 'inventory' ? (
           <div className="flex gap-2 mt-auto">
-            <button
-              onClick={(e) => { e.stopPropagation(); onMarkSold?.(item.id); }}
-              className="flex-1 flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-700 py-2 rounded-lg transition-colors border border-amber-200"
-            >
-              <span className="font-medium text-xs">Mark Sold</span>
-            </button>
+            {item.status === 'sold' ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRelist?.(item.id); }}
+                className="flex-1 flex items-center justify-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-lg transition-colors border border-blue-200"
+              >
+                <span className="font-medium text-xs">Relist</span>
+              </button>
+            ) : item.status === 'reported_sold' ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRelist?.(item.id); }}
+                className="flex-1 flex items-center justify-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-lg transition-colors border border-blue-200"
+              >
+                <span className="font-medium text-xs">Relist</span>
+              </button>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); onMarkSold?.(item.id); }}
+                className="flex-1 flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-700 py-2 rounded-lg transition-colors border border-amber-200"
+              >
+                <span className="font-medium text-xs">Mark Sold</span>
+              </button>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); onEdit?.(item); }}
               className="flex-1 flex items-center justify-center gap-1 bg-gray-50 hover:bg-gray-100 text-gray-700 py-2 rounded-lg transition-colors border border-slate-200"

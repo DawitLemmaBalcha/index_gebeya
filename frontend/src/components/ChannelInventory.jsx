@@ -94,6 +94,16 @@ const ChannelInventory = ({ channel, onClose }) => {
     }
   }, [channel.id, inventory, showToast]);
 
+  const handleDelete = useCallback(async (itemId) => {
+    try {
+      await inventory.deleteItem(channel.id, itemId);
+      showToast('Item deleted', 'success');
+      setSelectedProduct(null);
+    } catch (e) {
+      showToast(e.message || 'Failed to delete item', 'error');
+    }
+  }, [channel.id, inventory, showToast]);
+
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
       {/* Header bar */}
@@ -168,6 +178,7 @@ const ChannelInventory = ({ channel, onClose }) => {
             onMarkSold={handleMarkSold}
             onRelist={handleRelist}
             onClearReports={handleClearReports}
+            onDelete={handleDelete}
           />
         ) : activeTab === 'products' ? (
           <InventoryProductsTab
@@ -175,6 +186,7 @@ const ChannelInventory = ({ channel, onClose }) => {
             channel={channel}
             onSelectProduct={handleSelectProduct}
             onMarkSold={handleMarkSold}
+            onRelist={handleRelist}
             inventory={inventory}
           />
         ) : (

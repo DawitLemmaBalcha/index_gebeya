@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, delete, func
 from fastapi import HTTPException
 
-from models import Item, Channel, SoldReport, ItemEdit, User
+from models import Item, Channel, SoldReport, ItemEdit, ItemImage, Notification, User
 from services.alerting import process_new_item
 from services.owner_dm import send_owner_dm
 from constants import CROWDSOURCE_SOLD_THRESHOLD
@@ -284,3 +284,31 @@ def update_item(db: Session, item_id: int, user: User, payload: "ItemUpdateReque
             logger.warning(f"Alert re-processing failed for item {item_id}: {e}")
 
     return item
+
+
+def delete_item(db: Session, item_id: int, user: User) -> dict:
+    """
+    Owner-only. Permanently delete an item from the catalog.
+    Cleans up related records: SoldReports, ItemEdits, ItemImages, Notifications.
+    """
+    item = db.get(Item, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    channel = db.get(Channel, item.channel_id)
+    if not channel or channel.registered_by != user.telegram_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the channel owner can delete this item"
+        )
+
+    # Clean up dependent records
+    db.execute(delete(SoldReport).where(SoldReport.item_id == item_id))
+    db.execute(delete(ItemEdit).where(ItemEdit.item_id == item_id))
+    db.execute(delete(Notification).where(Notification.item_id == item_id))
+    db.execute(delete(ItemImage).where(ItemImage.item_id == item_id))
+
+    db.delete(item)
+    db.commit()
+
+    return {"status": "deleted", "item_id": item_id}

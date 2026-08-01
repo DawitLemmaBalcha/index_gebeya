@@ -4,6 +4,7 @@ import {
   AlertTriangle, RefreshCw, X, Plus, Trash2
 } from 'lucide-react';
 import { TAXONOMY } from '../constants/taxonomy';
+import { API_BASE_URL } from '../config';
 
 /**
  * TECH-23: Full-screen edit panel for a single product.
@@ -17,6 +18,7 @@ const ProductEditPanel = ({
   onMarkSold,
   onRelist,
   onClearReports,
+  onDelete,
 }) => {
   // Parse specs from item (handles both string and object formats)
   const parseSpecs = (rawSpecs) => {
@@ -146,6 +148,20 @@ const ProductEditPanel = ({
     }
   };
 
+  const handleDelete = async () => {
+    const confirmed = window.Telegram?.WebApp?.showConfirm
+      ? await new Promise(resolve => { window.Telegram.WebApp.showConfirm(
+          'Delete this item permanently? This cannot be undone.', resolve); })
+      : window.confirm('Delete this item permanently? This cannot be undone.');
+    if (!confirmed) return;
+    setActionLoading('delete');
+    try {
+      await onDelete(item.id);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   // Telegram post URL
   const telegramPostUrl = channel?.username && item?.telegram_message_id
     ? `https://t.me/${channel.username}/${item.telegram_message_id}`
@@ -181,12 +197,19 @@ const ProductEditPanel = ({
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Thumbnail image */}
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-          <img
-            src={item.image_path || (item.images && item.images[0]) || '/placeholder.png'}
-            alt={item.title || 'Product'}
-            className="w-full h-48 object-cover"
-            onError={(e) => { e.target.src = '/placeholder.png'; }}
-          />
+          {item.image_path || (item.images && item.images[0]) ? (
+            <img
+              src={`${API_BASE_URL}/media/${item.image_path || (item.images && item.images[0])}`}
+              alt={item.title || 'Product'}
+              className="w-full h-48 object-cover"
+              onError={(e) => { e.target.src = '/placeholder.png'; }}
+            />
+          ) : (
+            <div className="w-full h-48 flex flex-col items-center justify-center bg-gray-50 text-gray-400">
+              <AlertTriangle size={32} className="mb-2" />
+              <span className="text-sm">No Image Available</span>
+            </div>
+          )}
         </div>
 
         {/* Editable fields */}
@@ -305,35 +328,33 @@ const ProductEditPanel = ({
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
           <h3 className="text-xs font-semibold text-gray-500 mb-2">Status Controls</h3>
 
-          {/* Mark as Sold */}
+          {/* Mark as Sold — disabled if already sold */}
           <button
             onClick={handleMarkSold}
-            disabled={actionLoading !== null}
-            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
+            disabled={actionLoading !== null || item.status === 'sold'}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {actionLoading === 'sold' ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <CheckCircle size={16} />
             )}
-            Mark as Sold
+            {item.status === 'sold' ? 'Already Marked as Sold' : 'Mark as Sold'}
           </button>
 
-          {/* Re-list (only if not active) */}
-          {item.status !== 'active' && (
-            <button
-              onClick={handleRelist}
-              disabled={actionLoading !== null}
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
-            >
-              {actionLoading === 'relist' ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <RefreshCw size={16} />
-              )}
-              Re-list Item
-            </button>
-          )}
+          {/* Re-list — disabled if already active */}
+          <button
+            onClick={handleRelist}
+            disabled={actionLoading !== null || item.status === 'active' || !item.status}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {actionLoading === 'relist' ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <RefreshCw size={16} />
+            )}
+            {!item.status || item.status === 'active' ? 'Already Listed' : 'Re-list Item'}
+          </button>
 
           {/* Clear Reports (only if reported_sold) */}
           {item.status === 'reported_sold' && (
@@ -350,6 +371,20 @@ const ProductEditPanel = ({
               Clear Reports
             </button>
           )}
+
+          {/* Delete item — permanent, with confirmation */}
+          <button
+            onClick={handleDelete}
+            disabled={actionLoading === 'delete'}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+          >
+            {actionLoading === 'delete' ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Trash2 size={16} />
+            )}
+            Delete Item
+          </button>
         </div>
       </div>
 

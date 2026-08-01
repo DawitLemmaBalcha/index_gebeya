@@ -16,6 +16,7 @@ from services.item_status import (
     mark_sold,
     clear_reports,
     update_item as update_item_service,
+    delete_item,
 )
 
 router = APIRouter()
@@ -204,3 +205,18 @@ def clear_item_reports(
     """Delete all SoldReport records for this item without changing status."""
     user = authenticate(init_data, db, x_internal_service)
     return clear_reports(db, item_id, user)
+
+
+# =========================================================================
+# Owner-only: permanently delete an item from the catalog
+# =========================================================================
+@router.delete("/{item_id}")
+def delete_item_route(
+    item_id: int,
+    init_data: str,
+    db: Session = Depends(get_db),
+    x_internal_service: Optional[str] = Header(None, alias="X-Internal-Service"),
+):
+    """Permanently delete an item owned by the authenticated user's channel."""
+    user = authenticate(init_data, db, x_internal_service)
+    return delete_item(db, item_id, user)

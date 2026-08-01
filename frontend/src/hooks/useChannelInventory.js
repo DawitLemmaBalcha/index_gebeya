@@ -277,6 +277,30 @@ export function useChannelInventory() {
     return response.json();
   }, [fetchItems]);
 
+  const deleteItem = useCallback(async (channelId, itemId) => {
+    const initData = getInitData();
+    if (!initData) throw new Error('NOT_IN_TELEGRAM');
+
+    const analyticsHeaders = getAnalyticsHeaders();
+    const response = await fetch(
+      `${API_BASE_URL}/items/${itemId}?init_data=${encodeURIComponent(initData)}`,
+      {
+        method: 'DELETE',
+        headers: { ...analyticsHeaders },
+      }
+    );
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.detail || `Delete failed: ${response.status}`);
+    }
+
+    // Remove from local list immediately + refresh from backend
+    setItems(prev => prev.filter(item => item.id !== itemId));
+    await fetchItems(channelId, true);
+    return true;
+  }, [fetchItems]);
+
   return {
     items,
     loading,
@@ -296,5 +320,6 @@ export function useChannelInventory() {
     relist,
     clearReports,
     updateItem,
+    deleteItem,
   };
 }
