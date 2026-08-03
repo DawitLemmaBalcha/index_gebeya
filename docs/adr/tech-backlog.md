@@ -32,8 +32,11 @@
 
 ## TECH-25: Alert & Notification Retention Lifecycle
 
-**Status:** PENDING — ADR: `docs/adr/0001-alert-notification-retention.md`
+**Status:** IMPLEMENTED ✅ — commit `f774c2c` on `feat/tech-25-retention` branch
+**ADR:** `docs/adr/0001-alert-notification-retention.md`
+**Blueprint:** `docs/plans/tech-25-blueprint.md`
 **Date:** 2026-08-01
+**QA:** APPROVED (10/10 criteria)
 
 **The Friction (measured):**
 - `suq_main_db`: 464 alerts, 100% inactive — the largest table in the DB (2.7 MB, dominated by 512-dim `query_vector` rows). Zero cleanup logic touches alerts or notifications.
