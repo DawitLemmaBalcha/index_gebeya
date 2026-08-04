@@ -186,6 +186,65 @@ def startup_event():
     except Exception as e:
         logger.warning(f"⚠️ TECH-25 schema migration failed: {e}")
 
+    try:
+        with engine.begin() as conn:
+            # TECH-26 (NB-43..NB-47): monetization schema
+            #   1. alerts.lapsed — additive boolean; True = deactivated by
+            #      subscription lapse, distinct from user pause (lapsed=False).
+            #   2. boosts — paid/credit share one table; UNIQUE
+            #      telegram_payment_charge_id is the idempotency key (NULLs
+            #      distinct in Postgres, so credit boosts coexist).
+            #   3. subscriptions — one row per user; renewals update the same
+            #      row's period_end; UNIQUE charge id for idempotent replay.
+            conn.execute(text(
+                "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS lapsed BOOLEAN DEFAULT FALSE"
+            ))
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS boosts (
+                    id SERIAL PRIMARY KEY,
+                    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    channel_id INTEGER NOT NULL REFERENCES channels(id),
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    source VARCHAR NOT NULL DEFAULT 'paid',
+                    price_paid_stars INTEGER,
+                    telegram_payment_charge_id VARCHAR UNIQUE,
+                    starts_at TIMESTAMPTZ NOT NULL,
+                    ends_at TIMESTAMPTZ NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+                """
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_boosts_item_id ON boosts (item_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_boosts_ends_at ON boosts (ends_at)"
+            ))
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS subscriptions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    product VARCHAR NOT NULL,
+                    status VARCHAR NOT NULL DEFAULT 'active',
+                    telegram_payment_charge_id VARCHAR UNIQUE,
+                    invoice_payload VARCHAR NOT NULL,
+                    current_period_start TIMESTAMPTZ,
+                    current_period_end TIMESTAMPTZ,
+                    is_recurring BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+                """
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_subscriptions_user_id ON subscriptions (user_id)"
+            ))
+            logger.info("✅ TECH-26 schema migration verified (alerts.lapsed, boosts, subscriptions)")
+    except Exception as e:
+        logger.warning(f"⚠️ TECH-26 schema migration failed: {e}")
+
     # ===================================================================
     # Phase 4 — Create indexes (SINGLE SOURCE OF TRUTH)
     # ===================================================================

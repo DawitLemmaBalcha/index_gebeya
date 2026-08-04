@@ -71,6 +71,8 @@ class Alert(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True) # 👈 NEW: Expiry Date
     last_triggered_at = Column(DateTime(timezone=True), nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True) # 👈 TECH-25: Soft-delete marker (user-deleted); NULL = never user-deleted
+    # NB-46: True = deactivated by subscription lapse (distinct from user pause)
+    lapsed = Column(Boolean, default=False, nullable=False)
     
     # The High Water Mark
     best_opportunity_score = Column(Float, default=0.0)
@@ -257,3 +259,50 @@ class ItemEdit(Base):
     # Relationships
     item = relationship("Item")
     editor = relationship("User")
+
+
+# ----------------------------------------------------------------------
+# 4. MONETIZATION LAYER (NB-43..NB-47)
+# ----------------------------------------------------------------------
+class Boost(Base):
+    """NB-43/44: One-time 7-day top placement purchase, paid in Stars or
+    consumed from an all-in-one subscription's monthly credit.
+
+    One table for both sources — `source='paid'|'credit'`; placement queries
+    never filter on source (credit boosts are placement-indistinguishable).
+    `telegram_payment_charge_id` is the idempotency key: unique, NULL for
+    credit boosts (Postgres treats NULLs as distinct, so multiple credit
+    boosts coexist). No relationships — services query explicitly.
+    """
+    __tablename__ = "boosts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False, index=True)
+    channel_id = Column(Integer, ForeignKey("channels.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    source = Column(String, nullable=False, default="paid")
+    price_paid_stars = Column(Integer, nullable=True)  # NULL for credit boosts
+    telegram_payment_charge_id = Column(String, nullable=True, unique=True)
+    starts_at = Column(DateTime(timezone=True), nullable=False)
+    ends_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Subscription(Base):
+    """NB-46: Native 30-day auto-renewing Star subscription (alerts_only or
+    all_in_one). One row per user in v1; renewals update the same row's
+    period_end. `telegram_payment_charge_id` is the idempotency key (unique).
+    """
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    product = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="active")
+    telegram_payment_charge_id = Column(String, nullable=True, unique=True)
+    invoice_payload = Column(String, nullable=False)
+    current_period_start = Column(DateTime(timezone=True), nullable=True)
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
+    is_recurring = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -13,6 +13,7 @@ Consumed by:
 
 import os
 import logging
+import json
 from typing import Any, Union
 
 logger = logging.getLogger("index_alerts")
@@ -51,6 +52,32 @@ def _get_config(key: str, default: Union[int, float], cast: type) -> Union[int, 
     return val
 
 
+def _get_json_config(key: str, default: dict) -> dict:
+    """
+    Read a JSON object from an environment variable (blueprint D4).
+
+    The generic cast fallback of _get_config cannot parse dicts (its negative
+    clamp is meaningless for them), so monetization JSON config (BOOST_PRICE_STARS)
+    gets this dedicated helper: json.loads on success, warn-and-fallback to the
+    default on ValueError/TypeError/None. No clamp.
+    """
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+
+    try:
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            raise ValueError(f"{key} must decode to a JSON object")
+        return parsed
+    except (ValueError, TypeError):
+        logger.warning(
+            f"constants: Could not parse env var {key}={raw!r}, "
+            f"falling back to default {default}"
+        )
+        return default
+
+
 # --- Alert Rate Limits ---
 MAX_ALERTS_PER_USER: int = _get_config("ALERT_MAX_PER_USER", 20, int)
 MAX_MATCHES_BEFORE_PAUSE: int = _get_config("ALERT_MAX_MATCHES", 10, int)
@@ -81,3 +108,33 @@ STALE_ITEM_DAYS: int = _get_config("STALE_ITEM_DAYS", 14, int)
 # --- Retention (TECH-25) ---
 ALERT_RETENTION_DAYS: int = _get_config("ALERT_RETENTION_DAYS", 30, int)
 NOTIFICATION_RETENTION_DAYS: int = _get_config("NOTIFICATION_RETENTION_DAYS", 90, int)
+
+# --- Monetization (NB-43..NB-47) ---
+BOOST_DURATION_DAYS: int = _get_config("BOOST_DURATION_DAYS", 7, int)
+BOOST_ROTATION_MINUTES: int = _get_config("BOOST_ROTATION_MINUTES", 30, int)
+BOOST_PRICE_STARS: dict = _get_json_config("BOOST_PRICE_STARS", {
+    "Mobile Phones": 150,
+    "Laptops & Computers": 120,
+    "Tablets": 100,
+    "Electronics": 80,
+    "Vehicles": 200,
+    "Property": 250,
+    "Home, Appliances & Furniture": 50,
+    "Men's Fashion": 40,
+    "Women's Fashion": 40,
+    "Shoes": 40,
+    "Health & Beauty": 40,
+    "Commercial & Tools": 60,
+    "Sports, Arts & Outdoors": 40,
+    "Babies & Kids": 30,
+    "Animals & Pets": 30,
+    "Agriculture & Food": 40,
+    "Services": 30,
+    "Other": 25,
+})
+ALERTS_ONLY_PRICE_STARS: int = _get_config("ALERTS_ONLY_PRICE_STARS", 30, int)
+ALL_IN_ONE_PRICE_STARS: int = _get_config("ALL_IN_ONE_PRICE_STARS", 100, int)
+ALERTS_SUBSCRIPTION_EXTRA_ALERTS: int = _get_config("ALERTS_SUBSCRIPTION_EXTRA_ALERTS", 10, int)
+ALL_IN_ONE_MONTHLY_BOOST_CREDIT: int = _get_config("ALL_IN_ONE_MONTHLY_BOOST_CREDIT", 2, int)
+MONETIZATION_ENABLED: int = _get_config("MONETIZATION_ENABLED", 1, int)  # 0 = kill switch
+SUBSCRIPTION_PERIOD_SECONDS: int = 2592000  # HARD-LOCKED by Telegram (30d); NO env override
