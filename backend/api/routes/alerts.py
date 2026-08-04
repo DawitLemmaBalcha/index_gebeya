@@ -10,6 +10,7 @@ from schemas import AlertCreate, AlertResponse, MatchHistoryResponse
 from services.alerting import create_alert
 from services.analytics import AnalyticsService
 from services.auth import authenticate
+from services.subscriptions import get_effective_alert_cap, get_active_subscription  # NB-46 (D3)
 from constants import MAX_ALERTS_PER_USER
 
 router = APIRouter()
@@ -29,18 +30,19 @@ def create_new_alert(
     # Pass header manually to helper
     user = authenticate(payload.init_data, db, x_internal_service)
     
-    # --- Route-level max alerts guard ---
-    if MAX_ALERTS_PER_USER > 0:
+    # --- Route-level max alerts guard (NB-46 D3: effective cap = free + subscription extra) ---
+    cap = get_effective_alert_cap(db, user)
+    if cap > 0:
         active_count = db.scalar(
             select(func.count()).select_from(Alert).where(
                 Alert.user_id == user.id,
                 Alert.is_active == True
             )
         )
-        if active_count >= MAX_ALERTS_PER_USER:
+        if active_count >= cap:
             raise HTTPException(
                 status_code=400,
-                detail=f"You've reached the maximum of {MAX_ALERTS_PER_USER} active alerts. Pause or delete an existing alert to create a new one."
+                detail=f"You've reached the maximum of {cap} active alerts. Pause or delete an existing alert to create a new one."
             )
     
     alert = create_alert(
@@ -137,6 +139,16 @@ def toggle_alert_pause(
 
     # Capture state before toggle
     was_active = alert.is_active
+
+    # NB-46 lapsed-guard: resuming a lapse-deactivated alert requires an
+    # active subscription at that moment (blueprint §2.3). Pausing a lapsed
+    # alert stays allowed.
+    if was_active is False and alert.lapsed:
+        if not get_active_subscription(db, user):
+            raise HTTPException(
+                status_code=400,
+                detail="Subscription required to reactivate this alert",
+            )
 
     # Toggle
     alert.is_active = not alert.is_active

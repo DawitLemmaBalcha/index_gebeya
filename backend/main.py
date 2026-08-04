@@ -10,7 +10,7 @@ from ai_engine.vector_client import initialize_taxonomy_index
 from admin import setup_admin
 
 # 👇 IMPORT ROUTERS 👇
-from api.routes import ingestion, search, items, reviews, alerts, notifications, analytics, feed, channels, payments
+from api.routes import ingestion, search, items, reviews, alerts, notifications, analytics, feed, channels, payments, subscriptions
 
 # Initialize Logging
 logging.basicConfig(level=logging.INFO)
@@ -340,6 +340,7 @@ app.include_router(channels.router, prefix="/channels", tags=["Channels"])
 
 # NB-43..NB-47: Monetization routers (blueprint §3.4) — internal payments first
 app.include_router(payments.router)  # no prefix — internal paths are explicit
+app.include_router(subscriptions.router, prefix="/subscriptions", tags=["Subscriptions"])
 
 # SQLAdmin — full CRUD dashboard at /admin
 setup_admin(app)

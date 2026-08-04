@@ -18,6 +18,7 @@ from constants import (
     ALERT_LIFESPAN_DAYS,
     RING_TOLERANCE,
 )
+from services.subscriptions import get_effective_alert_cap  # NB-46 (D3): the single cap authority
 
 logger = logging.getLogger("index_alerts")
 
@@ -283,19 +284,20 @@ def _apply_auto_pause(db: Session, alert: Alert, item: Item, result) -> None:
         logger.info(f"⏸️ Auto-paused Alert {alert.id} after {MAX_MATCHES_BEFORE_PAUSE} total matches.")
 
 def create_alert(db: Session, user: User, query_text: str, max_price: Optional[float], preferences: Dict):
-    # --- Max Alerts Per User Check ---
-    if MAX_ALERTS_PER_USER > 0:
+    # --- Max Alerts Per User Check (NB-46 D3: effective cap = free + subscription extra) ---
+    cap = get_effective_alert_cap(db, user)
+    if cap > 0:
         active_count = db.scalar(
             select(func.count()).select_from(Alert).where(
                 Alert.user_id == user.id,
                 Alert.is_active == True
             )
         )
-        if active_count >= MAX_ALERTS_PER_USER:
+        if active_count >= cap:
             from fastapi import HTTPException
             raise HTTPException(
                 status_code=400,
-                detail=f"You've reached the maximum of {MAX_ALERTS_PER_USER} active alerts. Pause or delete an existing alert to create a new one."
+                detail=f"You've reached the maximum of {cap} active alerts. Pause or delete an existing alert to create a new one."
             )
 
     vector = vectorize_text(query_text)
