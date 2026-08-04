@@ -131,7 +131,7 @@ Channel owners have no insight into whether their listings work — no views, no
 - Gating: an owner without the subscription sees the Core block and a clear upgrade prompt for the Intelligence block; with it, everything renders from live data.
 - No fake or estimated numbers anywhere — every figure traces to real interaction/notification/catalog data.
 
-## NB-48: Monetization Hub & Entry Points (Discoverability)
+## NB-48: [IMPLEMENTED] Monetization Hub & Entry Points (Discoverability)
 
 **Priority:** MEDIUM
 **Affected Features:** Monetization, Stores, Alerts, Frontend
