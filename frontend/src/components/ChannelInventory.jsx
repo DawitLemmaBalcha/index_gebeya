@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Package, Settings, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Package, Settings, BarChart, X, CheckCircle, AlertCircle } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import InventoryProductsTab from './InventoryProductsTab';
 import InventorySettingsTab from './InventorySettingsTab';
 import ProductEditPanel from './ProductEditPanel';
+import SellerIntelligenceDashboard from './SellerIntelligenceDashboard';
 import { useChannelInventory } from '../hooks/useChannelInventory';
 import { useOwnerChannels } from '../hooks/useOwnerChannels';
 
 /**
  * TECH-23: Tab registry — add new tabs by pushing entries here.
+ * NB-47: Insights tab registered additively (inventory-management.md Rule 5.1).
  */
 const TAB_REGISTRY = [
   { id: 'products', label: 'Products', icon: Package },
+  { id: 'dashboard', label: 'Insights', icon: BarChart },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -200,6 +203,8 @@ const ChannelInventory = ({ channel, onClose, initialProduct = null }) => {
             onRelist={handleRelist}
             inventory={inventory}
           />
+        ) : activeTab === 'dashboard' ? (
+          <SellerIntelligenceDashboard channelId={channel.id} />
         ) : (
           <InventorySettingsTab
             channel={channel}

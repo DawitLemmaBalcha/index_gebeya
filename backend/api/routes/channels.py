@@ -13,7 +13,9 @@ from database import get_db
 from models import Channel, Item
 from schemas import ChannelResponse, ChannelUpsert, OwnerChannelResponse
 from schemas import ChannelInfoResponse, ChannelPauseRequest, ChannelActionResponse, ItemResponse
+from schemas import ChannelStatsResponse
 from services.auth import authenticate
+from services.stats import get_channel_dashboard  # NB-47 seller intelligence
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 router = APIRouter()
@@ -397,3 +399,31 @@ def get_channel_items(
 
     items = db.scalars(stmt).all()
     return items
+
+
+# ----------------------------------------------------------------------
+# NB-47: GET /channels/{channel_id}/stats — seller intelligence dashboard
+# ----------------------------------------------------------------------
+@router.get("/{channel_id}/stats", response_model=ChannelStatsResponse)
+def get_channel_stats(
+    channel_id: int,
+    init_data: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Seller intelligence dashboard (blueprint §2.4). Owner-only, ownership
+    check identical to get_channel_items. Core block free; the Pro block is
+    gated by an active all_in_one subscription inside the service.
+    """
+    user = authenticate(init_data, db)
+
+    channel = db.scalar(
+        select(Channel).where(
+            Channel.id == channel_id,
+            Channel.registered_by == user.telegram_id,
+        )
+    )
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    return get_channel_dashboard(db, channel_id, user)
