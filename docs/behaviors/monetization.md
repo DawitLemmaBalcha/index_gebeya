@@ -1,6 +1,6 @@
 # Monetization — Boost, Subscriptions & Seller Intelligence
 
-> **Status:** ⚠️ NOT YET IMPLEMENTED (locked design, 2026-08-01 — see pending-behaviors.md NB-43..NB-47)
+> **Status:** ✅ IMPLEMENTED (2026-08-04, commits 22c3ea1..cb68aab on feat/monetization, QA APPROVED)
 
 ---
 

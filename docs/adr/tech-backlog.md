@@ -56,7 +56,8 @@
 
 ## TECH-26..TECH-31: Monetization (NB-43..NB-47)
 
-**Status:** PENDING — blueprint: `docs/plans/monetization-blueprint.md` (verified + amended 2026-08-04)
+**Status:** IMPLEMENTED ✅ — commits `22c3ea1`..`cb68aab` on `feat/monetization` (QA APPROVED)
+**QA:** APPROVED (full audit: behavior-doc compliance 8/8, blueprint+seam correctness 7/7, module depth, tests, 11 deviations all accepted)
 **Behavior doc:** `docs/behaviors/monetization.md` (all 9 sections locked)
 **Date:** 2026-08-04
 

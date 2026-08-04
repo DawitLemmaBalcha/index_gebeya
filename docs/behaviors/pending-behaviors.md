@@ -32,7 +32,7 @@
 
 ---
 
-## NB-43: Boost — Purchase & Pinned Placement
+## NB-43: [IMPLEMENTED] Boost — Purchase & Pinned Placement
 
 **Priority:** HIGH
 **Affected Features:** Monetization, Search, Stores
@@ -56,7 +56,7 @@ Sellers have no way to pay for visibility. The platform gives all traffic away f
 
 ---
 
-## NB-44: Boost — Rotation & Item Lifecycle
+## NB-44: [IMPLEMENTED] Boost — Rotation & Item Lifecycle
 
 **Priority:** HIGH
 **Affected Features:** Monetization, Search
@@ -77,7 +77,7 @@ Without rules for many simultaneous boosters and item-status changes, the pinned
 
 ---
 
-## NB-45: Boost — Telegram DM Button
+## NB-45: [IMPLEMENTED] Boost — Telegram DM Button
 
 **Priority:** MEDIUM
 **Affected Features:** Listener, Monetization, Stores
@@ -95,7 +95,7 @@ The highest-conversion moment — the moment an item gets indexed and the owner 
 
 ---
 
-## NB-46: Subscriptions — Alerts-Only & All-in-One
+## NB-46: [IMPLEMENTED] Subscriptions — Alerts-Only & All-in-One
 
 **Priority:** HIGH
 **Affected Features:** Monetization, Alerts, Stores
@@ -115,7 +115,7 @@ Sellers who flip products need more alerts than the free cap, and power sellers 
 
 ---
 
-## NB-47: Seller Intelligence Dashboard
+## NB-47: [IMPLEMENTED] Seller Intelligence Dashboard
 
 **Priority:** MEDIUM
 **Affected Features:** Stores, Monetization
