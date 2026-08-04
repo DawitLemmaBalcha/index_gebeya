@@ -1,102 +1,12 @@
 # Pending Behaviors — Gap Ledger
 
 > **Purpose:** This document maps every known behavioral gap, missing rule, or unhandled edge case in the system. Each entry is a uniquely identified ticket with a concrete user-acceptance criterion.
+>
+> **Cleanup note (2026-08-01):** All previously-implemented tickets (NB-33..NB-42) have been moved to the **Archive** section at the bottom. Only genuinely-pending tickets live in the active list below.
 
 ---
 
-## NB-33: Landing Page — Full API Integration (Real Data) [IMPLEMENTED]
-
-**Priority:** HIGH
-**Affected Features:** Frontend, Search
-**File(s):** `frontend/src/pages/LandingPage.jsx`, `frontend/src/components/ItemCard.jsx`
-
-**The Gap:**
-The landing page uses 6 hardcoded fake products with Unsplash images. The search bar filters these fakes locally instead of hitting the real `/search/` endpoint. There is no image search. Stats (products indexed, channels monitored) are made-up numbers. The category grid is hardcoded. The phone mockup is purely decorative.
-
-**User Acceptance Criteria:**
-- The hero search bar queries the real `/search/` endpoint and renders results using the real `ItemCard` component.
-- The camera button triggers real image search via `/search/by-image`.
-- The stats bar fetches live counts from a backend endpoint (`SELECT COUNT(*) FROM items`, `SELECT COUNT(*) FROM channels`).
-- The category grid is generated dynamically from the taxonomy and shows real item counts per category.
-- Every product card uses the existing `ItemCard` component — no fake products, no placeholder data.
-- Stats gracefully degrade to "--" if the API is down.
-
----
-
-## NB-34: Landing Page as Telegram Mini App Onboarding [IMPLEMENTED]
-
-**Priority:** HIGH
-**Affected Features:** Frontend
-**File(s):** `frontend/src/App.jsx`, `frontend/src/pages/LandingPage.jsx`
-
-**The Gap:**
-There is no onboarding experience inside the Telegram Mini App. Users open the bot and go straight to an empty feed with no context about what the platform does, how it works, or why they should use it. The landing page content exists but is only shown on the open web.
-
-**User Acceptance Criteria:**
-- First-time Telegram Mini App users (no `onboarding_seen` in localStorage) see the full landing page content — hero, problem/solution, how-it-works, categories, FAQ.
-- All "Open in Telegram" CTAs are replaced with a single "Get Started" button in the Telegram version.
-- Tapping "Get Started" sets `onboarding_seen = true` and transitions to the marketplace with infinite scroll, search, and bottom navbar.
-- Returning users (with `onboarding_seen`) skip the landing page entirely and go straight to the marketplace.
-- The open web version always shows the landing page — no access to the full webapp from a browser.
-
----
-
-## NB-35: Design System — Landing Page UI Adopted Across Webapp [IMPLEMENTED]
-
-**Priority:** HIGH
-**Affected Features:** Frontend
-**File(s):** `frontend/src/index.css`, multiple components
-
-**The Gap:**
-The landing page and the webapp have two completely different visual identities. The landing page uses a warm editorial design (paper backgrounds, bold typography, amber accents, Inter + Noto Sans Ethiopic fonts). The webapp uses generic Tailwind grays, a different font (Outfit), a different color scheme, and no visual connection to the landing page. They look like two different products.
-
-**User Acceptance Criteria:**
-- The webapp adopts the landing page's color palette: warm paper backgrounds (`#FAF6F0`), amber/gold primary, Ethiopian green accent, dark sections.
-- The webapp uses Inter as the primary font and Noto Sans Ethiopic for Amharic text. Outfit is removed.
-- The navigation header in the webapp matches the landing page header in height, logo treatment, and style.
-- Product cards, category chips, search bar, and all UI elements adopt the warm editorial aesthetic.
-- The transition from onboarding landing page to webapp feels like a natural continuation of the same product — not a jarring switch to a different app.
-
----
-
-## NB-36: Bottom Navigation Bar — Explore, Alerts, Stores [IMPLEMENTED]
-
-**Priority:** HIGH
-**Affected Features:** Frontend
-**File(s):** New `BottomNav` component, `frontend/src/App.jsx`, `frontend/src/pages/Home.jsx`
-
-**The Gap:**
-The webapp has no persistent navigation. The feed is the only accessible view. Alerts can only be created from product detail pages and managed via bot commands. Channel owners have no interface at all for managing their stores. The experience is flat — one page, no structure.
-
-**User Acceptance Criteria:**
-- A bottom navigation bar with three tabs is always visible: Explore, Alerts, Stores.
-- **Explore tab:** The current home page experience — infinite scroll feed, search bar, category browsing. This is the default tab.
-- **Alerts tab:** List of user's active alerts with pause/delete actions. "Create Alert" button opens the same flow as the current product page alert modal. Match history shows recent notifications with links to products.
-- **Stores tab:** Channel owners see their listed channels with stats (product count, views, clicks), pause/resume, and remove actions. Non-owners see a prompt explaining how to list their channel.
-- Tab state is preserved when switching — feed scroll position and search state are not lost.
-- Each tab loads its content only on first activation (lazy loading).
-- The bottom navbar hides when navigating to a product detail page and restores on back.
-
----
-
-## NB-37: Stores — Channel Owner Dashboard [IMPLEMENTED]
-
-**Priority:** MEDIUM
-**Affected Features:** Frontend, Backend
-**File(s):** New backend endpoint for store stats, frontend Stores tab
-
-**The Gap:**
-Channel owners who add the bot have no way to see their channels' performance or manage their listings. They add the bot and hope it works. There is no pause/resume, no stats, no management interface.
-
-**User Acceptance Criteria:**
-- Channel owners see each of their channels as a card with: @username, title, status (Active/Paused), product count, view count, Telegram click-through count.
-- **Pause/Resume:** Tapping pauses indexing for that channel (products stay, new posts are ignored). Tapping again resumes.
-- **Remove:** Disconnects the channel. Products stay in catalog, future posts are not ingested.
-- **Add another:** A persistent card at the bottom with instructions for adding the bot to additional channels.
-- Stats are fetched from a backend endpoint that aggregates data per channel. View counts and click-through counts require tracking — this may start as "coming soon" and ship incrementally.
-- Non-owners see an educational prompt, not an empty dashboard.
-
----
+# ACTIVE TICKETS
 
 ## NB-17: Product Gallery Inconsistency in API Responses (existing, low priority)
 
@@ -122,99 +32,118 @@ Channel owners who add the bot have no way to see their channels' performance or
 
 ---
 
+## NB-43: Boost — Purchase & Pinned Placement
+
+**Priority:** HIGH
+**Affected Features:** Monetization, Search, Stores
+**File(s):** `backend/constants.py` (prices/duration table), `backend/services/boost.py` (new), `backend/api/routes/items.py` (boost endpoints), `frontend/src/components/ProductEditPanel.jsx` (Boost action), `frontend/src/components/ItemCard.jsx` (Boosted badge)
+**Behavior doc:** `docs/behaviors/monetization.md` §§1–3
+
+**The Gap:**
+Sellers have no way to pay for visibility. The platform gives all traffic away free, with no revenue stream.
+
+**User Acceptance Criteria:**
+- A channel owner can purchase a **Boost** for any item in their channel for a fixed price in **Telegram Stars**.
+- A boost has exactly **one duration: 7 days** — no tiered durations exist anywhere in the UI or backend.
+- The price varies by the item's **top-level category**, defined in a single configuration table (`BOOST_PRICE_STARS`); "Other/Uncategorized" is the floor price. Prices are flat — no ladder, no auction, no bidding.
+- The seller sees the price **only on the specific item they are boosting** ("Boost this item for 7 days — 150 Stars"); no global price list or rate card is ever shown.
+- Only the channel owner (`registered_by`) can boost items in their channel. Buyers see no boost UI.
+- A boosted item appears **pinned at the top** of (a) its own category browse view and (b) search results whose query matches its title or category.
+- A boosted item **never** appears in the For You feed.
+- Every boosted card carries a visible **"Boosted" badge**; the boosted item is excluded from the organic list below so it never appears twice on one page.
+- The search relevance algorithm itself is unchanged — boosting is a pinned layer applied on top of results, not a score modification.
+- Failed or cancelled Stars payment leaves the item unboosted and charges nothing.
+
+---
+
+## NB-44: Boost — Rotation & Item Lifecycle
+
+**Priority:** HIGH
+**Affected Features:** Monetization, Search
+**File(s):** `backend/services/boost.py`, `backend/constants.py` (`BOOST_ROTATION_MINUTES`), `backend/services/item_status.py` (sold/relist hooks), `backend/api/routes/ingestion.py` (dedup hook)
+**Behavior doc:** `docs/behaviors/monetization.md` §§4, 6
+
+**The Gap:**
+Without rules for many simultaneous boosters and item-status changes, the pinned block becomes unfair or broken.
+
+**User Acceptance Criteria:**
+- **No slot cap:** every boosted item in a category shows in the pinned block, regardless of how many sellers boost simultaneously.
+- The **order within** the pinned block rotates on a fixed cadence (`BOOST_ROTATION_MINUTES`, default 30) computed from the clock at page-load — no background jobs, no mutable state. No booster permanently owns position #1.
+- A boost's 7 days run in wall-clock time; rotation position never pauses or extends them.
+- If a boosted item is marked `sold` or `reported_sold`, the boost **ends immediately** and the item leaves the pinned block. No refund.
+- If a boosted item is **dedup-replaced** (TECH-21), the remaining boost time **transfers to the replacement item**.
+- Editing a boosted item's title/price/specs does not interrupt the boost.
+- When the 7 days elapse, the item returns to its organic position silently.
+
+---
+
+## NB-45: Boost — Telegram DM Button
+
+**Priority:** MEDIUM
+**Affected Features:** Listener, Monetization, Stores
+**File(s):** `listener/worker.py` (processing DM), `listener/bot_ui.py` or `listener/client.py` (button + deep link), `frontend/src/App.jsx` (deep-link routing), `frontend/src/components/ChannelInventory.jsx` (land on exact product)
+**Behavior doc:** `docs/behaviors/monetization.md` §5
+
+**The Gap:**
+The highest-conversion moment — the moment an item gets indexed and the owner is reading the success DM — has no monetization entry point.
+
+**User Acceptance Criteria:**
+- Every item-result DM to a channel owner carries a **"🚀 Boost this product"** button: both the "✅ Indexed" processing DM and the "✅ Updated: ... replaced your previous listing" dedup DM.
+- Tapping the button opens the Mini App at the seller's Stores tab → that channel's inventory → the product edit panel for the **exact item**, with the Boost action visible (price shown in context, never a rate card).
+- The button text is generic; the price appears only inside the boost UI.
+- The deep link carries the item identity so the app lands on the right product even if the seller has many channels.
+
+---
+
+## NB-46: Subscriptions — Alerts-Only & All-in-One
+
+**Priority:** HIGH
+**Affected Features:** Monetization, Alerts, Stores
+**File(s):** `backend/models.py` (subscription record), `backend/services/subscriptions.py` (new), `backend/api/routes/alerts.py` (cap check), `backend/constants.py` (prices, allowances), `listener/` (payment update handlers), `frontend/src/pages/StoresPage.jsx` (purchase UI)
+**Behavior doc:** `docs/behaviors/monetization.md` §7
+
+**The Gap:**
+Sellers who flip products need more alerts than the free cap, and power sellers need an all-in-one paid tier. No subscription product exists.
+
+**User Acceptance Criteria:**
+- Two subscription products, both paid in Stars via **Telegram's native Star Subscriptions** (`createInvoiceLink` + `subscription_period`) — **auto-renewing 30-day periods** (Telegram hard-locks the period to 30 days; there is no 28-day option and no trial parameter). Each charge arrives as `successful_payment` with `is_first_recurring`/`is_recurring`/`subscription_expiration_date`; cancellations arrive as `subscription` updates (`canceled | active | failed`); operator-side cancellation via `editUserStarSubscription`.
+- **Alerts-Only:** raises the seller's active-alert cap by `ALERTS_SUBSCRIPTION_EXTRA_ALERTS` (default +10).
+- **All-in-One:** includes the Seller Intelligence block (NB-47), `ALL_IN_ONE_MONTHLY_BOOST_CREDIT` boosts per period (default 2, usable on any of the seller's items in any category), and the same extra-alert cap as Alerts-Only (superset).
+- Unused monthly boost credit **expires** at the end of the 30-day period — no rollover.
+- Subscription credit and standalone paid boosts are separate: a seller can buy paid boosts while credit remains; credit and paid boosts are indistinguishable in placement/rotation.
+- When a subscription lapses, benefits stop; extra active alerts beyond the free cap are **paused, not deleted** — they survive and reactivate on renewal. Lapse-deactivation must be distinguishable from user-initiated pause in the data model.
+
+---
+
+## NB-47: Seller Intelligence Dashboard
+
+**Priority:** MEDIUM
+**Affected Features:** Stores, Monetization
+**File(s):** `backend/services/stats.py` or `backend/api/routes/channels.py` (aggregation endpoints), `frontend/src/components/InventorySettingsTab.jsx` or new dashboard tab
+**Behavior doc:** `docs/behaviors/monetization.md` §8
+
+**The Gap:**
+Channel owners have no insight into whether their listings work — no views, no match awareness, no price context — and the All-in-One subscription has nothing to gate.
+
+**User Acceptance Criteria:**
+- **Core block (free, all owners):** per-item view counts with 7-day sparkline (real interaction data); "X buyers have active alerts matching your items" with matching items listed; "your item was sent to Y buyers" with bullseye/ring breakdown.
+- **Intelligence block (All-in-One only):** price positioning ("your price is X% above/below the median for [category] this week"); category pulse (new items/week with week-over-week comparison); top performers ranked by views.
+- Gating: an owner without the subscription sees the Core block and a clear upgrade prompt for the Intelligence block; with it, everything renders from live data.
+- No fake or estimated numbers anywhere — every figure traces to real interaction/notification/catalog data.
+
+---
+
+# ARCHIVE — Implemented Tickets
+
+> Cleanup note (2026-08-01): these tickets are fully implemented and shipped. They remain here for history only.
+
+## NB-33: Landing Page — Full API Integration (Real Data) [IMPLEMENTED]
+## NB-34: Landing Page as Telegram Mini App Onboarding [IMPLEMENTED]
+## NB-35: Design System — Landing Page UI Adopted Across Webapp [IMPLEMENTED]
+## NB-36: Bottom Navigation Bar — Explore, Alerts, Stores [IMPLEMENTED]
+## NB-37: Stores — Channel Owner Dashboard [IMPLEMENTED]
 ## NB-38: Processing Notifications & Store Management (Pause/Remove) [IMPLEMENTED]
-
-**Priority:** HIGH
-**Affected Features:** Listener, Stores, Ingestion
-**File(s):** `listener/worker.py`, `listener/client.py`, `backend/models.py`, `frontend/src/pages/StoresPage.jsx`
-
-**The Gap:**
-Channel owners have no visibility into whether their posts are being processed. Stores tab has non-functional Pause/Remove buttons. No confirmation modals. No auto-leave on remove.
-
-**User Acceptance Criteria:**
-- Processing DM: When a post from a registered channel is ingested, the owner gets one DM that starts as "⏳ Processing..." and is edited to "✅ Indexed: [Title] — [Price] ETB" on completion.
-- Pause: Confirmation modal → sets `indexing_paused` on channel → bot DMs owner → ingestion skips paused channels.
-- Resume: No confirmation needed. Clears flag → bot DMs owner.
-- Remove: Confirmation modal → `getChat` + `leaveChat` → mark removed → bot DMs owner.
-- DMs only sent to channels with `registered_by` set.
-
----
-
 ## NB-39: Alert Guardrails — Configurable Limits, Auto-Pause, Throttle, Dedup [IMPLEMENTED]
-
-**Priority:** HIGH
-*(Implemented — see above)*
-
----
-
 ## NB-40: Dedup Redesign — Soft-Delete + Recreate + Alert Filter Badges [IMPLEMENTED]
-
-**Priority:** HIGH
-**Affected Features:** Ingestion, Alerts
-**File(s):** `backend/api/routes/ingestion.py`, `listener/worker.py`, `frontend/src/pages/AlertsPage.jsx`
-
-**The Gap:**
-The current dedup system edits the existing item in place when a repost is detected. This keeps the same `item_id`, which means alert duplicate suppression (NB-39) permanently blocks re-notifications for price changes. The seller has no idea their listing was replaced. Alert cards in the Alerts tab don't show active smart filters.
-
-**User Acceptance Criteria:**
-- On repost detection: soft-delete old item (`is_active=False`), create new item with new `item_id`. Alert matching fires fresh.
-- Processing DM edited to: "✅ Updated: [Title] — [Price] ETB. ⚠️ This replaced your previous listing. Use different images for different products."
-- Old edit-in-place code in `ingestion.py` is removed.
-- Alert cards in the Alerts tab show smart filter badges: "Strict Brand" and/or "Strict Model" when active.
-- `parse_mode="Markdown"` handling in processing DMs fixed.
-
-**Priority:** HIGH
-**Affected Features:** Alerts
-**File(s):** `backend/constants.py` (new), `backend/services/alerting.py`, `backend/api/routes/alerts.py`
-
-**The Gap:**
-Alerts have no guardrails. Users can create unlimited alerts. Matches generate unlimited notifications with no throttle. The same item can notify the same alert repeatedly. Limits are hardcoded in business logic. A buyer searching for "iPhone" could get 50+ DMs in an hour from a single channel post batch.
-
-**User Acceptance Criteria:**
-- All alert limits are in `backend/constants.py` with env var overrides, not hardcoded.
-- Max 20 active alerts per user (configurable, 0 = unlimited).
-- Alert auto-pauses after 10 total matches or 3 bullseye matches, with DM notification.
-- Notification throttle: max 1 Ring notification per alert per hour. Bullseye bypasses throttle.
-- Duplicate suppression: same alert+item combination never generates more than one notification.
-- Match counters reset on alert resume.
-- Alert lifespan is configurable (default 14 days).
-
----
-
 ## NB-41: Crowdsourced Sold Reports & Product Status Lifecycle [IMPLEMENTED]
-
-**Priority:** HIGH
-**Affected Features:** Items, Notifications
-**File(s):** `backend/models.py`, `backend/constants.py`, `backend/services/cleanup.py` (new), `frontend/src/pages/ProductPage.jsx`
-
-**The Gap:**
-Stale/sold products clutter the marketplace. No mechanism for buyers to report sold items. No automated cleanup. Channel owners have no visibility into status changes.
-
-**User Acceptance Criteria:**
-- Any buyer can report an item as sold. One report per buyer per item.
-- When reports reach `CROWDSOURCE_SOLD_THRESHOLD` (default 3), item becomes `reported_sold` and is excluded from search/feed.
-- Channel owner gets DM for every status transition (sold, reported_sold, auto-deleted).
-- Owner can re-list to clear all reports and reset to `active`.
-- `SOFT_DELETED_RETENTION_DAYS`, `STALE_ITEM_DAYS`, `CROWDSOURCE_SOLD_THRESHOLD`, `REPORTED_SOLD_RETENTION_DAYS` all configurable in `constants.py`.
-- Background cleanup task runs daily for expired items.
-
----
-
 ## NB-42: Inventory Management — Store Owner Product Control [IMPLEMENTED]
-
-**Priority:** HIGH
-**Affected Features:** Stores, Items
-**File(s):** `frontend/src/pages/StoresPage.jsx`, new inventory modal component, `backend/api/routes/channels.py`
-
-**The Gap:**
-Store owners see a flat list of channels with no product-level management. They cannot view, edit, or manage their indexed products. No inventory interface exists.
-
-**User Acceptance Criteria:**
-- Tapping a channel in Stores opens a full-page inventory modal with Products and Settings tabs.
-- Products tab shows all items from that channel in a filterable, sortable infinite-scroll grid with status badges.
-- Tapping a product opens an edit panel: editable title, description, price, category, subcategory, specs.
-- Status controls: Mark as Sold (owner), Re-list, Clear Reports.
-- Edit panel saves trigger alert re-matching if price/specs changed.
-- "View original Telegram post" link always visible.
-- Settings tab preserves current pause/resume/remove functionality.
-- Modal uses tab registry pattern for forward extensibility.

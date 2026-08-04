@@ -58,29 +58,15 @@
 
 ---
 
-## UF-5: Telegram Stars for Monetization
+## UF-5: Telegram Stars for Monetization — ✅ RESOLVED
 
-**Source:** Vision session — "Telegram stars for payment needs (like boosting a post)"
-
-**Current State:** No payment integration exists. Telegram Stars is a relatively new payment feature in the Telegram ecosystem.
-
-**Open Questions:**
-- What specific actions would cost Stars? Boosting a post? Pinning a category? Accessing seller analytics?
-- Is Stars sufficient for all monetization, or do we need traditional payment gateways for larger transactions (e.g., subscription tiers)?
-- What's the minimum viable monetization: a single "Boost Post" button that costs X Stars?
+**Status:** Locked into `docs/behaviors/monetization.md` (2026-08-01). Telegram Stars is the **only** payment rail, for all monetized actions (boost + subscriptions). One-way flow (seller → platform); Stars are a collection rail, never a payout rail.
 
 ---
 
-## UF-6: Monetization Tiers (Seller Dashboard, Targeted Ads, Post Boosting)
+## UF-6: Monetization Tiers (Seller Dashboard, Targeted Ads, Post Boosting) — ✅ PARTIALLY RESOLVED
 
-**Source:** Vision session — "Seller Intelligence Dashboard," "Targeted Advertising Engine," "Post Boosting & Category Pinning"
-
-**Current State:** None implemented. These are future monetization features.
-
-**Open Questions:**
-- Which one ships first? Post Boosting is the simplest (a flag on items + search result priority).
-- Seller Dashboard requires data aggregation — how much search/alert data do we need before insights are statistically meaningful?
-- Targeted Ads require user segmentation vectors — do we have enough user interaction data yet?
+**Status:** Locked into `docs/behaviors/monetization.md` (2026-08-01). Adopted: **Post Boosting** (flat 7-day pinned placement, price by category) and **Seller Dashboard** (free Core block + Pro Intelligence block). **Not adopted:** Targeted Advertising Engine (user-segmentation ads) and Category Pinning — deliberately deferred; the boost's pinned placement covers the visibility need without a separate ad engine. See NB-43..NB-47 for execution tickets.
 
 ---
 

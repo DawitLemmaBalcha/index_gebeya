@@ -1,6 +1,6 @@
 # Index Gebeya — Context & Domain Model
 
-> **Living Document** — Last updated: Phase 3 (Alert Engine + Recommendation Feed)
+> **Living Document** — Last updated: Monetization design lock-in (Boost + Subscriptions + Seller Intelligence, 2026-08-01)
 
 ---
 
@@ -260,3 +260,4 @@ Telegram Channels ──→ Listener (Bot) ──→ Worker Queue ──→ Back
 6. **Fail-open on LLM Judge unavailability.** Prefer noisy notifications over missed opportunities.
 7. **Visual taxonomy hints are pre-computed at startup.** Avoids per-request latency during ingestion.
 8. **Soft delete is the mechanism; retention is the lifecycle (TECH-25 / ADR-0001).** Dead alerts and stale notifications self-purge on a timer (alert purge N days after delete/expiry; notification retention 90 days; PENDING never purged; paused alerts protected). This bounds vector storage and the per-ingestion alert scan without sacrificing match history or dedup suppression.
+9. **Monetization: attention, not access (locked 2026-08-01).** Three revenue products, all paid in Telegram Stars: (1) **Boost** — flat 7-day pinned placement, priced per top-level category, relevance-gated to category browse + matching search, never in the For You feed, no slot cap with time-sliced order rotation, price regulated manually per category (no ladder/auction); (2) **Alerts-Only subscription** — extra active alerts beyond the free cap; (3) **All-in-One subscription** — Seller Intelligence dashboard + monthly boost credit + extra alerts. The free marketplace is never gated. Full rules in `docs/behaviors/monetization.md`; tickets NB-43..NB-47.

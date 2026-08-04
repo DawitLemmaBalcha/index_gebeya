@@ -51,3 +51,20 @@
 - Cleanup Phase 5 — notification retention: purge `status IN ('SENT','FAILED','REPLACED')` older than `NOTIFICATION_RETENTION_DAYS` (default 90); **PENDING never purged**.
 - No backfill of legacy dead rows (can't distinguish legacy paused vs deleted); one-time SQL cleanup documented for current test data.
 - Tests: purge skips active + paused, purges deleted/expired, cascade removes notifications, PENDING survives, retention disabled at 0, full suite regression green. Atomic commit on QA approval.
+
+---
+
+## TECH-26..TECH-31: Monetization (NB-43..NB-47)
+
+**Status:** PENDING — blueprint: `docs/plans/monetization-blueprint.md` (verified + amended 2026-08-04)
+**Behavior doc:** `docs/behaviors/monetization.md` (all 9 sections locked)
+**Date:** 2026-08-04
+
+Six phases, each with its own QA gate + atomic commit on `feat/monetization`:
+
+- **TECH-26 (Phase 1):** monetization constants (`BOOST_PRICE_STARS` via new `_get_json_config`, durations, prices, `MONETIZATION_ENABLED` kill switch), models (`Alert.lapsed`, `Boost`, `Subscription`), idempotent migrations, `services/telegram_payments.py` (StarPaymentsAdapter port + httpx adapter), `services/boost.py` core (quote/order/fulfill/rotation/lifecycle), partial `services/subscriptions.py` (cap math, credit stub), `tests/test_boost.py` + `FakeStarPaymentsAdapter`.
+- **TECH-27 (Phase 2):** Stars payment seam — `GET /items/{id}/boost-quote`, `POST /items/{id}/boost-order`, `POST /items/{id}/boost-credit`, internal `api/routes/payments.py` (fulfill-boost with `total_amount`), search pin layer (`exclude_item_ids` additive + rotation order + `is_boosted`), listener `payments.py` + client additions + handler registration order, DM boost button (path-param deep link), frontend `useBoost.js` + ProductEditPanel boost section + ItemCard badge + App.jsx `/stores/:channelId/:itemId` route.
+- **TECH-28 (Phase 3):** subscriptions — `create_subscription_order` (native 30-day XTR, `subscription_period=2592000` hard-locked), `fulfill_subscription_payment` (idempotent, renewals update same row), `handle_subscription_state_update` (PTB 22.8 api_kwargs seam), lapse mechanism (`Alert.lapsed` distinct from user pause), alert-cap unification (both call sites → `get_effective_alert_cap`), lapsed-resume guard.
+- **TECH-29 (Phase 4):** seller intelligence — `services/stats.py` (views/alert-matches/dispatched core; price-positioning/category-pulse/top-performers pro), `GET /channels/{id}/stats`, `SellerIntelligenceDashboard.jsx` + ChannelInventory tab.
+- **TECH-30 (Phase 5):** frontend subscriptions UI — `useSubscription.js`, StoresPage subscription card + upgrade entry, credit-boost button, end-to-end manual pass (quote → invoice → paid → badge; subscription → cap raised; cancel → extras paused `lapsed=True`; renewal → reactivated).
+- **TECH-31 (Phase 6):** reconciliation (`getStarTransactions` replay, daily timer, `MONETIZATION_ENABLED` guard), full regression (baseline 116 passed / 2 pre-existing failures / 18-22 skipped), frontend build.
