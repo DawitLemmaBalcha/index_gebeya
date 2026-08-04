@@ -309,3 +309,39 @@ def get_boost_status(db: Session, item_id: int) -> dict | None:
         "ends_at": boost.ends_at.isoformat(),
         "source": boost.source,
     }
+
+
+def list_active_channel_boosts(db: Session, channel_id: int) -> list[dict]:
+    """NB-48 (§2.3): active boosts for a channel, for the Stores boost card.
+
+    Active-only: ends_at > now AND the item is still live (status=='active'
+    AND is_active — sold/reported/soft-deleted items drop out per Rule 6.1).
+    Defensive dedupe per item (latest id wins, mirroring get_boost_status);
+    sorted ends_at ascending (soonest-expiring first for the "time remaining"
+    card). Returns [{item_id, title, ends_at, source}].
+    """
+    now = _now_utc()
+    rows = db.execute(
+        select(Boost, Item)
+        .join(Item, Boost.item_id == Item.id)
+        .where(
+            Boost.channel_id == channel_id,
+            Boost.ends_at > now,
+            Item.status == "active",
+            Item.is_active == True,
+        )
+        .order_by(Boost.id.asc())
+    ).all()
+    by_item: dict[int, tuple] = {}
+    for boost, item in rows:
+        by_item[item.id] = (boost, item)  # later id overwrites -> latest wins
+    summaries = [
+        {
+            "item_id": item.id,
+            "title": item.title,
+            "ends_at": boost.ends_at,
+            "source": boost.source,
+        }
+        for boost, item in by_item.values()
+    ]
+    return sorted(summaries, key=lambda s: s["ends_at"])

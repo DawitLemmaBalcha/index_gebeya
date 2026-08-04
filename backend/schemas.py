@@ -338,6 +338,14 @@ class BoostCreditResponse(BaseModel):
     boost: BoostStatusResponse
 
 
+class BoostSummaryResponse(BaseModel):
+    """NB-48: one row of GET /channels/{channel_id}/boosts (blueprint §2.3)."""
+    item_id: int
+    title: Optional[str] = None
+    ends_at: datetime
+    source: str
+
+
 class FulfillBoostRequest(BaseModel):
     # init_data is read from the QUERY string by the route (listener wire
     # format, blueprint §2.6); kept here as optional for schema conformance.
@@ -381,6 +389,16 @@ class SubscriptionStatusResponse(BaseModel):
     extra_alerts: int = 0
     credit_remaining: int = 0
     credit_total: int = 0
+    # NB-48 (§2.2): the status payload is the hub's data endpoint — caps,
+    # banner threshold and prices. Zero-defaulted, additive — existing
+    # consumers are untouched.
+    free_cap: int = 0
+    effective_cap: int = 0
+    cap_banner_threshold: int = 0
+    alerts_only_price_stars: int = 0
+    all_in_one_price_stars: int = 0
+    boost_floor_price_stars: int = 0
+    boost_duration_days: int = 0
 
 
 class ChannelStatsItem(BaseModel):

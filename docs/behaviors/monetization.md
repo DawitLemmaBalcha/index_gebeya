@@ -39,10 +39,11 @@ The free marketplace experience (browsing, searching, buying, alerts at the free
 **Rule 2.5 — Eligibility.** Only the channel owner (the user who registered the channel via `registered_by`) can boost items belonging to their channels. Buyers cannot boost.
 
 **Rule 2.6 — Purchase Entry Points.** A boost can be purchased from:
-- The product edit panel in the seller's dashboard (Stores tab → channel inventory → product), showing the price for that item's category.
+- The product edit panel in the seller's dashboard (Stores tab → channel inventory → product), showing the price for that item's category. (The boost section sits at the TOP of the panel, with one line of explanatory copy — see Section 10.)
 - The "🚀 Boost this product" button on the Indexed/Updated Telegram DM (see Section 5), which deep-links into that exact product's panel.
+- The Monetization Hub's Boost tab (see Section 10), which either shows the exact price of a preselected item or guides the seller to pick an item first.
 
-**Rule 2.7 — Payment Flow.** Tap "Boost with Stars" → Stars invoice → on success, the item is boosted immediately and the seller sees confirmation. Failure/cancellation leaves the item unboosted and charges nothing.
+**Rule 2.7 — Payment Flow.** Tap "Boost with Stars" → Stars invoice → on success, the item is boosted immediately and the seller sees confirmation. Failure/cancellation leaves the item unboosted and charges nothing. The invoice is only ever opened from the hub page (Section 10) or from an item's own boost section — never as a bare redirect from a banner or list without explanation.
 
 ---
 
@@ -143,6 +144,47 @@ The dashboard appears in the seller's Stores tab, channel-level and item-level. 
 
 **Rule 8.3.1 — Traffic source attribution** (search vs category vs feed) — not tracked yet.
 **Rule 8.3.2 — Click-through to Telegram conversation** — the future "proof metric" for boost renewal; explicitly the first follow-up build after launch.
+
+---
+
+## 10. Monetization Hub & Entry Points (Discoverability)
+
+### 10.1 The guiding principle
+
+**Rule 10.1.1 — Entry at the moment of need.** Every paid product's entry point lives where the seller *feels the limitation*, never in a generic "upgrades" corner. The entry point leads to the Monetization Hub (the explanation page) — never directly to the Stars invoice.
+
+| Entry point (where the need is felt) | What the seller sees | Opens |
+|---|---|---|
+| **Alerts tab** | Alert-cap awareness banner: "You're at 18 of 20 active alerts — get 10 more." Visible when the seller is at or near the free cap (within N alerts of it, N configurable). | Hub → **Alerts tab** |
+| **Alerts tab** (cap reached) | When the cap is hit and an alert creation is rejected, the error message includes the upgrade path to the Alerts tab of the hub. | Hub → **Alerts tab** |
+| **Stores tab** | **Boost management card** (replaces the old "Alerts-Only upgrade" card — that card made no sense in Stores): shows active boosts (item, time remaining), "Boost a product" action, and the All-in-One upsell. | Hub → **Boost tab** |
+| **Stores tab** | All-in-One subscription card (the seller bundle — insights + credits + alerts; this stays in Stores as its natural home). | Hub → **All-in-One tab** |
+| **Product edit panel** | The boost section at the TOP of the panel: compact, one explanatory line ("Appears at the top of its category and matching searches for 7 days"), price in Stars, action button. Hidden when item not boostable (sold/inactive) or when `MONETIZATION_ENABLED=0`. | Hub → **Boost tab** (preselecting the item) |
+| **Insights (locked Pro block)** | The intelligence rows are hidden behind an upgrade prompt for non-subscribers: "Unlock price positioning, category pulse & top performers." | Hub → **All-in-One tab** |
+| **Indexed/Updated DM** | "🚀 Boost this product" button (Section 5). | Product edit panel boost section (→ hub as needed) |
+
+### 10.2 The Monetization Hub page
+
+**Rule 10.2.1 — One hub, three tabs.** A single full page with three tabs: **Boost / Alerts / All-in-One**. It is deep-linkable per tab (the entry point selects the default tab via the link). The All-in-One tab is the superset story — it lists everything included (intelligence block + boost credit + extra alerts) so the cross-sell is visible from any tab.
+
+**Rule 10.2.2 — Context-aware default tab.** The hub opens on the tab matching where the seller came from (Alerts entry → Alerts tab; Stores boost card → Boost tab; locked Insights → All-in-One tab). A seller can switch tabs freely.
+
+**Rule 10.2.3 — Each tab has its own tailored pitch.** The tabs are NOT forced into a shared template:
+- **Boost tab:** visibility story — "Your item pinned at the top of its category and matching searches for 7 days, labeled Boosted." Shows "from X Stars" as the entry price; if arrived with a preselected item, shows that item's exact category price and a direct "Boost this item" action.
+- **Alerts tab:** shows the seller's *own* usage ("You're at 18 of 20 active alerts"), the extra-alert allowance (+10, configurable), price, and the buy action.
+- **All-in-One tab:** the toolkit story — everything in Alerts **plus** the Seller Intelligence block (price positioning, category pulse, top performers) **plus** monthly boost credit (2/period, configurable), price, buy action.
+
+**Rule 10.2.4 — No boost rate card.** The Boost tab never displays a table of per-category prices (Rule 2.4). Only "from X Stars" (floor) or the exact price of a preselected item.
+
+**Rule 10.2.5 — Shared "How Stars work" explainer.** The hub carries one trust-building explainer (collapsible): what Stars are, how to buy them (Telegram's own flow), that subscriptions are 30-day auto-renewing and can be cancelled anytime, and that boosts are one-time purchases. Built once, shown on all tabs.
+
+**Rule 10.2.6 — Payment only from the hub.** The Stars invoice (`openInvoice`) opens only after the seller taps the buy action on the hub (or on an item's boost section). No entry point or banner ever jumps straight to payment.
+
+**Rule 10.2.7 — Cross-sell.** Each tab carries a one-line cross-sell to the next tier (e.g., Alerts tab → "Want insights too? All-in-One includes everything.").
+
+### 10.3 What the hub replaces
+
+**Rule 10.3.1 — The old Stores subscription card (with the Alerts-Only option) is removed.** The Alerts-Only subscription is no longer offered from the Stores tab; it is offered from the Alerts tab (where the cap is felt) and via the hub. The Stores tab keeps: All-in-One card, boost management card, and the existing channel management UI.
 
 ---
 

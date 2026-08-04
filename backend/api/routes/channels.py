@@ -13,13 +13,22 @@ from database import get_db
 from models import Channel, Item
 from schemas import ChannelResponse, ChannelUpsert, OwnerChannelResponse
 from schemas import ChannelInfoResponse, ChannelPauseRequest, ChannelActionResponse, ItemResponse
-from schemas import ChannelStatsResponse
+from schemas import ChannelStatsResponse, BoostSummaryResponse
 from services.auth import authenticate
 from services.stats import get_channel_dashboard  # NB-47 seller intelligence
+from services.boost import list_active_channel_boosts  # NB-48 stores boost card
+from constants import MONETIZATION_ENABLED  # NB-48 kill switch
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 router = APIRouter()
 logger = logging.getLogger("index_channels")
+
+
+def _monetization_enabled_or_503():
+    """Kill switch (blueprint §6.1): MONETIZATION_ENABLED=0 -> 503 at router
+    level (mirrors api/routes/items.py)."""
+    if not MONETIZATION_ENABLED:
+        raise HTTPException(status_code=503, detail="Monetization is currently disabled")
 
 
 class ChannelUpdate(BaseModel):
@@ -427,3 +436,37 @@ def get_channel_stats(
         raise HTTPException(status_code=404, detail="Channel not found")
 
     return get_channel_dashboard(db, channel_id, user)
+
+
+# ----------------------------------------------------------------------
+# NB-48: GET /channels/{channel_id}/boosts — active boosts for the Stores
+# boost management card (blueprint §2.3).
+# ----------------------------------------------------------------------
+@router.get("/{channel_id}/boosts", response_model=List[BoostSummaryResponse])
+def get_channel_boosts(
+    channel_id: int,
+    init_data: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Active boosts for a channel, soonest-expiring first. Owner-only (403 —
+    boost-domain convention from items.py, deliberately NOT the 404 the
+    stats route uses: boost data is owner-sensitive in the boost domain).
+    Kill switch: 503 when monetization is disabled.
+    """
+    _monetization_enabled_or_503()
+    user = authenticate(init_data, db)
+
+    channel = db.scalar(
+        select(Channel).where(
+            Channel.id == channel_id,
+            Channel.registered_by == user.telegram_id,
+        )
+    )
+    if not channel:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the channel owner can view boosts",
+        )
+
+    return list_active_channel_boosts(db, channel_id)

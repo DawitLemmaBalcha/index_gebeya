@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import AlertsPage from '../pages/AlertsPage'
 
 // Mock dependencies
@@ -42,6 +42,22 @@ vi.mock('../hooks/useAlerts', () => ({
   }),
 }))
 
+// NB-48: subscription status for the cap-awareness banner
+const mockGetStatus = vi.fn()
+let mockSubStatus = null
+let mockSubLoading = false
+
+vi.mock('../hooks/useSubscription', () => ({
+  useSubscription: () => ({
+    status: mockSubStatus,
+    loading: mockSubLoading,
+    error: null,
+    getStatus: mockGetStatus,
+    openInvoice: vi.fn(),
+    applyCreditBoost: vi.fn(),
+  }),
+}))
+
 const renderAlertsPage = () => {
   return render(
     <MemoryRouter>
@@ -56,6 +72,8 @@ beforeEach(() => {
   mockLoading = false
   mockError = null
   mockHasBeenFetched = false
+  mockSubStatus = null
+  mockSubLoading = false
   vi.clearAllMocks()
 })
 
@@ -188,5 +206,84 @@ describe('AlertsPage - Smart Filter Badges (TECH-21)', () => {
     expect(screen.getByText('Strict Brand')).toBeInTheDocument()
     expect(screen.queryByText(/some_other_key/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/another/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('AlertsPage - cap awareness banner (NB-48 §2.4.1)', () => {
+  const makeAlerts = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: i + 1,
+      query_text: `Alert ${i + 1}`,
+      max_price: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+      preferences: '{}',
+    }))
+
+  const capStatus = (overrides = {}) => ({
+    product: null,
+    status: null,
+    effective_cap: 20,
+    cap_banner_threshold: 2,
+    extra_alerts: 0,
+    alerts_only_price_stars: 30,
+    ...overrides,
+  })
+
+  it('shows the banner at 18 of 20 (within threshold 2)', () => {
+    mockAlerts = makeAlerts(18)
+    mockSubStatus = capStatus()
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(screen.getByText(/You're at 18 of 20 active alerts/i)).toBeInTheDocument()
+  })
+
+  it('hides the banner at 17 of 20 (3 above the threshold)', () => {
+    mockAlerts = makeAlerts(17)
+    mockSubStatus = capStatus()
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(screen.queryByText(/You're at 17 of 20 active alerts/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the banner at the cap (20 of 20)', () => {
+    mockAlerts = makeAlerts(20)
+    mockSubStatus = capStatus()
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(screen.getByText(/You're at 20 of 20 active alerts/i)).toBeInTheDocument()
+  })
+
+  it('hides the banner while the status is loading', () => {
+    mockAlerts = makeAlerts(18)
+    mockSubStatus = capStatus()
+    mockSubLoading = true
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(screen.queryByText(/You're at 18 of 20 active alerts/i)).not.toBeInTheDocument()
+  })
+
+  it('hides the banner when status is null (monetization disabled)', () => {
+    mockAlerts = makeAlerts(20)
+    mockSubStatus = null
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(screen.queryByText(/active alerts/i)).not.toBeInTheDocument()
+  })
+
+  it('tapping the banner navigates to /hub/alerts', () => {
+    mockAlerts = makeAlerts(18)
+    mockSubStatus = capStatus()
+    mockHasBeenFetched = true
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<AlertsPage />} />
+          <Route path="/hub/alerts" element={<div data-testid="hub-alerts" />} />
+        </Routes>
+      </MemoryRouter>
+    )
+    fireEvent.click(screen.getByText(/You're at 18 of 20 active alerts/i))
+    expect(screen.getByTestId('hub-alerts')).toBeInTheDocument()
   })
 })

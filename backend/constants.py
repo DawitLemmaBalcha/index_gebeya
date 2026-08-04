@@ -137,4 +137,7 @@ ALL_IN_ONE_PRICE_STARS: int = _get_config("ALL_IN_ONE_PRICE_STARS", 100, int)
 ALERTS_SUBSCRIPTION_EXTRA_ALERTS: int = _get_config("ALERTS_SUBSCRIPTION_EXTRA_ALERTS", 10, int)
 ALL_IN_ONE_MONTHLY_BOOST_CREDIT: int = _get_config("ALL_IN_ONE_MONTHLY_BOOST_CREDIT", 2, int)
 MONETIZATION_ENABLED: int = _get_config("MONETIZATION_ENABLED", 1, int)  # 0 = kill switch
+# NB-48: cap-awareness banner shows when the seller is within this many
+# active alerts of the effective cap (frontend display threshold).
+ALERT_CAP_BANNER_THRESHOLD: int = _get_config("ALERT_CAP_BANNER_THRESHOLD", 2, int)
 SUBSCRIPTION_PERIOD_SECONDS: int = 2592000  # HARD-LOCKED by Telegram (30d); NO env override

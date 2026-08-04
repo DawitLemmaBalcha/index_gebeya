@@ -16,6 +16,11 @@ from constants import (
     MAX_ALERTS_PER_USER,
     ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
     ALL_IN_ONE_MONTHLY_BOOST_CREDIT,
+    ALERT_CAP_BANNER_THRESHOLD,
+    ALERTS_ONLY_PRICE_STARS,
+    ALL_IN_ONE_PRICE_STARS,
+    BOOST_DURATION_DAYS,
+    BOOST_PRICE_STARS,
 )
 from models import User, Subscription, Alert, Boost
 from services.subscriptions import (
@@ -597,3 +602,47 @@ class TestGetSubscriptionStatus:
         assert status["extra_alerts"] == ALERTS_SUBSCRIPTION_EXTRA_ALERTS
         assert status["credit_remaining"] == ALL_IN_ONE_MONTHLY_BOOST_CREDIT
         assert status["credit_total"] == ALL_IN_ONE_MONTHLY_BOOST_CREDIT
+
+    # ------------------------------------------------------------------
+    # NB-48: the status payload is the hub's data endpoint — caps,
+    # banner threshold and prices on BOTH branches (blueprint §2.2).
+    # ------------------------------------------------------------------
+
+    def test_status_without_subscription_exposes_caps_and_prices(self, db_session):
+        user = _make_user(db_session)
+        status = get_subscription_status(db_session, user)
+        assert status["free_cap"] == MAX_ALERTS_PER_USER
+        assert status["effective_cap"] == MAX_ALERTS_PER_USER
+        assert status["cap_banner_threshold"] == ALERT_CAP_BANNER_THRESHOLD
+        assert status["alerts_only_price_stars"] == ALERTS_ONLY_PRICE_STARS
+        assert status["all_in_one_price_stars"] == ALL_IN_ONE_PRICE_STARS
+        assert status["boost_floor_price_stars"] == BOOST_PRICE_STARS.get(
+            "Other", min(BOOST_PRICE_STARS.values())
+        )
+        assert status["boost_duration_days"] == BOOST_DURATION_DAYS
+
+    def test_status_with_all_in_one_exposes_effective_cap_and_prices(self, db_session):
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="all_in_one", charge_id="chg_stat_2")
+        status = get_subscription_status(db_session, user)
+        assert status["free_cap"] == MAX_ALERTS_PER_USER
+        assert status["effective_cap"] == (
+            MAX_ALERTS_PER_USER + ALERTS_SUBSCRIPTION_EXTRA_ALERTS
+        )
+        assert status["cap_banner_threshold"] == ALERT_CAP_BANNER_THRESHOLD
+        assert status["alerts_only_price_stars"] == ALERTS_ONLY_PRICE_STARS
+        assert status["all_in_one_price_stars"] == ALL_IN_ONE_PRICE_STARS
+        assert status["boost_floor_price_stars"] == BOOST_PRICE_STARS.get(
+            "Other", min(BOOST_PRICE_STARS.values())
+        )
+        assert status["boost_duration_days"] == BOOST_DURATION_DAYS
+
+    def test_status_with_alerts_only_exposes_effective_cap(self, db_session):
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="alerts_only", charge_id="chg_stat_3")
+        status = get_subscription_status(db_session, user)
+        assert status["product"] == "alerts_only"
+        assert status["effective_cap"] == (
+            MAX_ALERTS_PER_USER + ALERTS_SUBSCRIPTION_EXTRA_ALERTS
+        )
+        assert status["credit_total"] == 0

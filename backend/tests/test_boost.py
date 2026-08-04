@@ -13,11 +13,13 @@ from fastapi import HTTPException
 from sqlalchemy import select, func
 
 from constants import (
+    _get_config,
     _get_json_config,
     BOOST_PRICE_STARS,
     BOOST_DURATION_DAYS,
     SUBSCRIPTION_PERIOD_SECONDS,
     MAX_ALERTS_PER_USER,
+    ALERT_CAP_BANNER_THRESHOLD,
 )
 from models import User, Channel, Item, Boost, Subscription
 from services import boost as boost_service
@@ -118,6 +120,22 @@ class TestMonetizationConstants:
         # Telegram hard-locks Star subscriptions to 2592000s. Plain constant,
         # NO env override.
         assert SUBSCRIPTION_PERIOD_SECONDS == 2592000
+
+    # ------------------------------------------------------------------
+    # NB-48: cap-banner threshold (frontend display threshold; the
+    # backend contract is constants-loading + status-payload coverage).
+    # ------------------------------------------------------------------
+
+    def test_alert_cap_banner_threshold_defaults_to_2(self):
+        assert ALERT_CAP_BANNER_THRESHOLD == 2
+
+    def test_alert_cap_banner_threshold_env_override(self, monkeypatch):
+        monkeypatch.setenv("ALERT_CAP_BANNER_THRESHOLD", "5")
+        assert _get_config("ALERT_CAP_BANNER_THRESHOLD", 2, int) == 5
+
+    def test_alert_cap_banner_threshold_negative_env_clamps_to_0(self, monkeypatch):
+        monkeypatch.setenv("ALERT_CAP_BANNER_THRESHOLD", "-3")
+        assert _get_config("ALERT_CAP_BANNER_THRESHOLD", 2, int) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -657,3 +675,118 @@ class TestBoostQuoteRoute:
         _, _, item = _make_seller_item(db_session, telegram_id=111)
         resp = self._quote(db_session, item.id, telegram_id=222)
         assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# NB-48: GET /channels/{channel_id}/boosts — owner-scoped active-boost summary
+# (blueprint §2.3). Router include pattern mirrors TestBoostQuoteRoute.
+# ---------------------------------------------------------------------------
+
+class TestChannelBoostsRoute:
+    """GET /channels/{channel_id}/boosts — active boosts for the Stores card."""
+
+    def _client(self, db_session):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from database import get_db
+        from api.routes import channels as channels_router
+
+        app = FastAPI()
+        app.include_router(channels_router.router, prefix="/channels", tags=["Channels"])
+
+        def _override_db():
+            yield db_session
+
+        app.dependency_overrides[get_db] = _override_db
+        return TestClient(app)
+
+    def _init_data(self, telegram_id):
+        return f'user={json.dumps({"id": telegram_id, "username": f"u{telegram_id}"})}'
+
+    def _boosts(self, db_session, channel_id, telegram_id=111):
+        return self._client(db_session).get(
+            f"/channels/{channel_id}/boosts",
+            params={"init_data": self._init_data(telegram_id)},
+        )
+
+    def _active_boost_row(self, db, item, user, *, ends_in_days=3, source="paid",
+                          charge_id=None):
+        now = datetime.now(timezone.utc)
+        boost = Boost(
+            item_id=item.id, channel_id=item.channel_id, user_id=user.id,
+            source=source, price_paid_stars=10,
+            telegram_payment_charge_id=charge_id or f"chg_boost_{item.id}",
+            starts_at=now, ends_at=now + timedelta(days=ends_in_days),
+        )
+        db.add(boost)
+        db.commit()
+        db.refresh(boost)
+        return boost
+
+    def test_owner_sees_active_boost_summary_shape(self, db_session):
+        user, channel, item = _make_seller_item(db_session)
+        self._active_boost_row(db_session, item, user)
+        resp = self._boosts(db_session, channel.id)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert len(data) == 1
+        row = data[0]
+        assert set(row.keys()) == {"item_id", "title", "ends_at", "source"}
+        assert row["item_id"] == item.id
+        assert row["title"] == item.title
+        assert row["source"] == "paid"
+        assert row["ends_at"] is not None
+
+    def test_expired_boost_excluded(self, db_session):
+        user, channel, item = _make_seller_item(db_session)
+        self._active_boost_row(db_session, item, user, ends_in_days=-1)
+        resp = self._boosts(db_session, channel.id)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_sold_item_boost_excluded(self, db_session):
+        user, channel, item = _make_seller_item(db_session)
+        self._active_boost_row(db_session, item, user)
+        end_boost_for_item(db_session, item.id)  # Rule 6.1: sold -> boost ends
+        resp = self._boosts(db_session, channel.id)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_sorted_ends_at_ascending(self, db_session):
+        user, channel, item_a = _make_seller_item(db_session, title="Item A")
+        item_b = Item(
+            channel_id=channel.id, title="Item B", category="Mobile Phones",
+            price=50.0, status="active", is_active=True, image_path="b.jpg",
+        )
+        db_session.add(item_b)
+        db_session.commit()
+        db_session.refresh(item_b)
+        self._active_boost_row(db_session, item_a, user, ends_in_days=5, charge_id="chg_a")
+        self._active_boost_row(db_session, item_b, user, ends_in_days=1, charge_id="chg_b")
+        resp = self._boosts(db_session, channel.id)
+        assert resp.status_code == 200, resp.text
+        assert [r["item_id"] for r in resp.json()] == [item_b.id, item_a.id]
+
+    def test_dedupes_per_item_latest_boost_wins(self, db_session):
+        user, channel, item = _make_seller_item(db_session)
+        self._active_boost_row(db_session, item, user, ends_in_days=1, charge_id="chg_old")
+        self._active_boost_row(db_session, item, user, ends_in_days=3, charge_id="chg_new")
+        resp = self._boosts(db_session, channel.id)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["item_id"] == item.id
+        assert data[0]["ends_at"] is not None
+
+    def test_non_owner_forbidden(self, db_session):
+        user, channel, item = _make_seller_item(db_session, telegram_id=111)
+        self._active_boost_row(db_session, item, user)
+        resp = self._boosts(db_session, channel.id, telegram_id=222)
+        assert resp.status_code == 403
+
+    def test_kill_switch_returns_503(self, db_session, monkeypatch):
+        user, channel, item = _make_seller_item(db_session)
+        self._active_boost_row(db_session, item, user)
+        monkeypatch.setattr("api.routes.channels.MONETIZATION_ENABLED", 0)
+        resp = self._boosts(db_session, channel.id)
+        assert resp.status_code == 503

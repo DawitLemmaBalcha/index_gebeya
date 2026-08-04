@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Plus, Pause, Play, Trash2, History, AlertCircle, Loader2, RefreshCw, X } from 'lucide-react';
+import { Bell, Plus, Pause, Play, Trash2, History, AlertCircle, Loader2, RefreshCw, X, ChevronRight } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { getAnalyticsHeaders } from '../utils/analytics';
 import AlertModal from '../components/AlertModal';
 import { useAlerts } from '../hooks/useAlerts';
+import { useSubscription } from '../hooks/useSubscription';
 
 const AlertsPage = () => {
   const navigate = useNavigate();
@@ -22,6 +23,15 @@ const AlertsPage = () => {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [submittingActionId, setSubmittingActionId] = useState(null);
+
+  // NB-48: cap-awareness banner — subscription context (effective cap,
+  // threshold) fetched once on mount; banner hidden while loading or when
+  // monetization is disabled (getStatus 503s → status stays null).
+  const { status: subStatus, loading: subLoading, getStatus } = useSubscription();
+
+  useEffect(() => {
+    getStatus();
+  }, [getStatus]);
 
   // Lazy load: fetch only on first activation
   useEffect(() => {
@@ -140,6 +150,26 @@ const AlertsPage = () => {
           <span>New Alert</span>
         </button>
       </div>
+
+      {/* NB-48 §2.4.1: cap-awareness banner — shown when the seller is at or
+          near the effective cap (within cap_banner_threshold). Tap → hub
+          Alerts tab. Hidden while loading or when status is null (503 kill
+          switch). */}
+      {subStatus && !subLoading &&
+        (subStatus.effective_cap - alerts.length) <= subStatus.cap_banner_threshold && (
+        <button
+          onClick={() => navigate('/hub/alerts')}
+          className="w-full mb-4 flex items-center justify-between gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-left hover:bg-amber-100 transition-colors"
+        >
+          <div>
+            <p className="text-xs font-bold text-amber-800">
+              You're at {alerts.length} of {subStatus.effective_cap} active alerts
+            </p>
+            <p className="text-[11px] text-amber-700">More alert space is one tap away</p>
+          </div>
+          <ChevronRight size={16} className="text-amber-500 shrink-0" />
+        </button>
+      )}
 
       {/* Active Alerts Section */}
       {alerts.length > 0 ? (

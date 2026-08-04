@@ -5,6 +5,7 @@ import ProductPage from './pages/ProductPage';
 import AlertsPage from './pages/AlertsPage';
 import StoresPage from './pages/StoresPage';
 import LandingPage from './pages/LandingPage';
+import MonetizationHub from './pages/MonetizationHub';
 import BottomNav from './components/BottomNav';
 
 const isTelegramWebView = () => {
@@ -15,14 +16,15 @@ const isTelegramWebView = () => {
   }
 };
 
-function MainLayout({ initialSearchQuery = '' }) {
+function MainLayout({ initialSearchQuery = '', initialTab }) {
   const location = useLocation();
   const params = useParams();
   // NB-45: deep link from the DM boost button — /stores/:channelId/:itemId
   const deepLink = (params.channelId && params.itemId)
     ? { channelId: params.channelId, itemId: params.itemId }
     : null;
-  const [activeTab, setActiveTab] = useState(deepLink ? 'stores' : 'explore');
+  // NB-48: /stores route lands the seller on the Stores tab
+  const [activeTab, setActiveTab] = useState(initialTab || (deepLink ? 'stores' : 'explore'));
   const isProductPage = location.pathname.startsWith('/item/');
 
   return (
@@ -111,6 +113,10 @@ const App = () => {
     <Router>
       <Routes>
         <Route path="/welcome" element={<LandingPage isTelegram={true} compact={true} onGetStarted={handleGetStarted} />} />
+        {/* NB-48: Monetization Hub (renders outside MainLayout) + /stores
+            pick-an-item target — registered BEFORE the /* catch-all */}
+        <Route path="/hub/:tab?" element={<MonetizationHub />} />
+        <Route path="/stores" element={<MainLayout initialTab="stores" />} />
         {/* NB-45: deep link target for the DM boost button (§2.8) */}
         <Route path="/stores/:channelId/:itemId" element={<MainLayout />} />
         <Route path="/*" element={<MainLayout />} />

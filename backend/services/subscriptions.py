@@ -27,6 +27,13 @@ from constants import (
     ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
     MAX_ALERTS_PER_USER,
     SUBSCRIPTION_PERIOD_SECONDS,
+    # NB-48 (§2.2): hub payload fields. ALERT_CAP_BANNER_THRESHOLD is the
+    # banner display threshold; BOOST_* feed the hub's "from X Stars" floor
+    # and duration copy. NO import of services/boost here (cycle rule —
+    # boost.py imports subscriptions.py, never the reverse).
+    ALERT_CAP_BANNER_THRESHOLD,
+    BOOST_DURATION_DAYS,
+    BOOST_PRICE_STARS,
 )
 from models import Alert, Boost, Subscription, User
 from services.telegram_payments import star_payments
@@ -267,8 +274,16 @@ def handle_subscription_state_update(
 
 
 def get_subscription_status(db: Session, user: User) -> dict:
-    """For the frontend subscription card (blueprint §2.3)."""
+    """For the frontend subscription card (blueprint §2.3) and the NB-48
+    hub (blueprint §2.2): the single "seller monetization context" payload
+    (caps + banner threshold + prices + boost floor/duration)."""
     sub = get_active_subscription(db, user)
+    # NB-48: the floor mirrors services.boost.get_boost_price's Other-bucket
+    # fallback (boost._OTHER_FLOOR). Deliberate mirror: subscriptions.py must
+    # NEVER import boost.py (cycle rule), so the floor is computed from the
+    # constants directly. "Other" is the designated floor bucket (Rule 2.2);
+    # min() guards a malformed config missing the key.
+    boost_floor = BOOST_PRICE_STARS.get("Other", min(BOOST_PRICE_STARS.values()))
     if not sub:
         return {
             "product": None,
@@ -277,6 +292,13 @@ def get_subscription_status(db: Session, user: User) -> dict:
             "extra_alerts": 0,
             "credit_remaining": 0,
             "credit_total": 0,
+            "free_cap": MAX_ALERTS_PER_USER,
+            "effective_cap": get_effective_alert_cap(db, user),
+            "cap_banner_threshold": ALERT_CAP_BANNER_THRESHOLD,
+            "alerts_only_price_stars": ALERTS_ONLY_PRICE_STARS,
+            "all_in_one_price_stars": ALL_IN_ONE_PRICE_STARS,
+            "boost_floor_price_stars": boost_floor,
+            "boost_duration_days": BOOST_DURATION_DAYS,
         }
     return {
         "product": sub.product,
@@ -287,4 +309,11 @@ def get_subscription_status(db: Session, user: User) -> dict:
         "credit_total": (
             ALL_IN_ONE_MONTHLY_BOOST_CREDIT if sub.product == "all_in_one" else 0
         ),
+        "free_cap": MAX_ALERTS_PER_USER,
+        "effective_cap": get_effective_alert_cap(db, user),
+        "cap_banner_threshold": ALERT_CAP_BANNER_THRESHOLD,
+        "alerts_only_price_stars": ALERTS_ONLY_PRICE_STARS,
+        "all_in_one_price_stars": ALL_IN_ONE_PRICE_STARS,
+        "boost_floor_price_stars": boost_floor,
+        "boost_duration_days": BOOST_DURATION_DAYS,
     }

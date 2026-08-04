@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, Bell, Send, TrendingUp, BarChart3, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { getAnalyticsHeaders } from '../utils/analytics';
@@ -6,9 +7,11 @@ import { getAnalyticsHeaders } from '../utils/analytics';
 /**
  * NB-47: Seller Intelligence dashboard (blueprint §2.8).
  * Core block renders for every channel owner; the Intelligence block only
- * when is_pro (active all-in-one subscription) — else an upgrade prompt.
+ * when is_pro (active all-in-one subscription) — else an upgrade prompt
+ * with an NB-48 unlock CTA that opens the Monetization Hub's All-in-One tab.
  */
 const SellerIntelligenceDashboard = ({ channelId }) => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -208,10 +211,18 @@ const SellerIntelligenceDashboard = ({ channelId }) => {
             <TrendingUp size={20} className="text-amber-600 shrink-0 mt-0.5" />
             <div>
               <h3 className="text-sm font-bold text-gray-900 mb-1">Unlock Seller Intelligence</h3>
-              <p className="text-xs text-gray-600 leading-relaxed">
+              <p className="text-xs text-gray-600 leading-relaxed mb-3">
                 Price positioning vs your category's median, weekly category pulse, and
                 top-performer insights — included with the All-in-One subscription.
               </p>
+              {/* NB-48 §2.4.3: the locked prompt leads to the hub FIRST
+                  (Rule 10.1.1 — never a bare redirect to payment). */}
+              <button
+                onClick={() => navigate('/hub/all-in-one')}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+              >
+                Unlock Seller Intelligence
+              </button>
             </div>
           </div>
         </div>

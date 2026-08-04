@@ -152,7 +152,10 @@ class TestRouteCallSite:
 
         resp = self._post_alert(client, 111)
         assert resp.status_code == 400
-        assert f"{MAX_ALERTS_PER_USER}" in resp.json()["detail"]
+        detail = resp.json()["detail"]
+        assert f"{MAX_ALERTS_PER_USER}" in detail
+        # NB-48 (§2.4.5): the cap-rejection message carries the hub upgrade path
+        assert "Need more? Open the Alerts tab in the hub." in detail
 
     def test_route_accepts_with_subscription_up_to_raised_cap(self, db_session):
         user = _make_user(db_session)

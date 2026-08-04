@@ -42,7 +42,7 @@ def create_new_alert(
         if active_count >= cap:
             raise HTTPException(
                 status_code=400,
-                detail=f"You've reached the maximum of {cap} active alerts. Pause or delete an existing alert to create a new one."
+                detail=f"You've reached the maximum of {cap} active alerts. Pause or delete an existing alert to create a new one. Need more? Open the Alerts tab in the hub."
             )
     
     alert = create_alert(

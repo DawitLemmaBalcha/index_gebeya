@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, PlusCircle, Loader2, RefreshCw, AlertCircle, X, Sparkles, Star } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, PlusCircle, Loader2, RefreshCw, AlertCircle, X, Sparkles, Star, Rocket } from 'lucide-react';
 import { useOwnerChannels } from '../hooks/useOwnerChannels';
 import { useSubscription } from '../hooks/useSubscription';
+import { useBoosts } from '../hooks/useBoosts';
 import { API_BASE_URL } from '../config';
 import { getAnalyticsHeaders } from '../utils/analytics';
 import ChannelInventory from '../components/ChannelInventory';
 
 const StoresPage = ({ deepLink }) => {
+  const navigate = useNavigate();
   const { channels, loading, error, fetchChannels, hasBeenFetched, togglePause, removeChannel } = useOwnerChannels();
-  const { status: subStatus, loading: subLoading, error: subError, getStatus, openInvoice } = useSubscription();
+  const { status: subStatus, loading: subLoading, error: subError, getStatus } = useSubscription();
+  // NB-48: active boosts across the owner's channels (Stores boost card)
+  const { boosts, error: boostsError, hasBeenFetched: boostsFetched, fetchBoosts } = useBoosts();
   const [howToExpanded, setHowToExpanded] = useState(false);
   const [modalState, setModalState] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -28,6 +33,13 @@ const StoresPage = ({ deepLink }) => {
       getStatus();
     }
   }, [hasBeenFetched, getStatus]);
+
+  // NB-48: active boosts for the boost management card — fan out per channel
+  useEffect(() => {
+    if (hasBeenFetched && channels.length > 0) {
+      fetchBoosts(channels);
+    }
+  }, [hasBeenFetched, channels, fetchBoosts]);
 
   // NB-45: deep link handling — auto-open ChannelInventory for the channel,
   // then auto-open ProductEditPanel for the exact item (§2.8).
@@ -62,6 +74,16 @@ const StoresPage = ({ deepLink }) => {
   const formatNumber = (num) => {
     if (num == null) return '—';
     return new Intl.NumberFormat('en-ET').format(num);
+  };
+
+  // NB-48: "time remaining" for the boost card (soonest-expiring first)
+  const timeLeft = (endsAt) => {
+    const diff = new Date(endsAt) - Date.now();
+    if (diff <= 0) return 'Expiring now';
+    const days = Math.ceil(diff / 86400000);
+    if (days > 1) return `${days} days left`;
+    if (days === 1) return '1 day left';
+    return 'Less than a day left';
   };
 
   const handleAction = async () => {
@@ -177,29 +199,73 @@ const StoresPage = ({ deepLink }) => {
                   Boost your selling power
                 </h3>
                 <p className="text-xs text-gray-600 mb-3">
-                  More active alerts, monthly boost credits, and seller intelligence.
+                  Seller intelligence, monthly boost credits, and extra alert space — everything in one subscription.
                 </p>
                 {subError && subError !== 'NOT_IN_TELEGRAM' && (
                   <p className="text-xs text-red-600 mb-2">{subError}</p>
                 )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openInvoice('alerts_only')}
-                    disabled={subLoading}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
-                  >
-                    {subLoading ? 'Opening invoice...' : 'Upgrade to Alerts Only'}
-                  </button>
-                  <button
-                    onClick={() => openInvoice('all_in_one')}
-                    disabled={subLoading}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
-                  >
-                    All-in-One
-                  </button>
-                </div>
+                {/* NB-48 Rule 10.2.6: never a bare invoice — the hub explains
+                    first, then sells. */}
+                <button
+                  onClick={() => navigate('/hub/all-in-one')}
+                  disabled={subLoading}
+                  className="w-full py-2 rounded-xl text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+                >
+                  {subLoading ? 'Loading...' : 'All-in-One'}
+                </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* NB-48 §2.3: boost management card — active boosts across the
+            owner's channels (item + time remaining), "Boost a product",
+            All-in-One upsell. Renders whenever the boosts fetch succeeds
+            (empty state included); hides on 503/failure. */}
+        {boostsFetched && !boostsError && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Rocket size={16} className="text-amber-500" />
+              <h3 className="text-sm font-bold text-gray-900">Active Boosts</h3>
+            </div>
+
+            {boosts.length === 0 ? (
+              <p className="text-xs text-gray-500 mb-3">No active boosts</p>
+            ) : (
+              <div className="space-y-2 mb-3">
+                {boosts.map((boost) => (
+                  <div
+                    key={boost.item_id}
+                    className="flex items-center justify-between gap-2 bg-gray-50 rounded-xl px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-900 truncate">
+                        {boost.title || `Item #${boost.item_id}`}
+                      </p>
+                      <p className="text-[10px] text-gray-500">{timeLeft(boost.ends_at)}</p>
+                    </div>
+                    <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                      BOOSTED
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate('/hub/boost')}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+              >
+                Boost a product
+              </button>
+              <button
+                onClick={() => navigate('/hub/all-in-one')}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-white text-brand-700 border border-brand-200 hover:bg-brand-50 transition-colors"
+              >
+                All-in-One includes free boosts
+              </button>
+            </div>
           </div>
         )}
 

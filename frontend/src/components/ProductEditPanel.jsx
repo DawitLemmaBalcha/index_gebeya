@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ExternalLink, Loader2, DollarSign, CheckCircle,
   AlertTriangle, RefreshCw, X, Plus, Trash2, Rocket, Star
@@ -23,6 +24,9 @@ const ProductEditPanel = ({
   onDelete,
   onBoosted,
 }) => {
+  // NB-48: hub link from the boost section (Rule 10.1.1 — explain before pay)
+  const navigate = useNavigate();
+
   // Parse specs from item (handles both string and object formats)
   const parseSpecs = (rawSpecs) => {
     if (!rawSpecs) return [];
@@ -272,6 +276,17 @@ const ProductEditPanel = ({
                     {quote.price_stars} Stars
                   </button>
                 </div>
+
+                {/* NB-48 §2.4.4: one small hub link under the explanatory
+                    copy — leads to the Boost tab with this item preselected.
+                    Direct buy + credit buttons stay (Rule 10.2.6 allows
+                    payment from an item's own boost section). */}
+                <button
+                  onClick={() => navigate(`/hub/boost?item=${item.id}`)}
+                  className="mt-1.5 text-[11px] font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2"
+                >
+                  Learn more
+                </button>
 
                 {/* NB-46 Rule 7.3: subscription credit — only when credit remains */}
                 {(subStatus?.credit_remaining || 0) > 0 && (

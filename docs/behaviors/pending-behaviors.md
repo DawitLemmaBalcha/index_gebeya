@@ -131,6 +131,27 @@ Channel owners have no insight into whether their listings work — no views, no
 - Gating: an owner without the subscription sees the Core block and a clear upgrade prompt for the Intelligence block; with it, everything renders from live data.
 - No fake or estimated numbers anywhere — every figure traces to real interaction/notification/catalog data.
 
+## NB-48: Monetization Hub & Entry Points (Discoverability)
+
+**Priority:** MEDIUM
+**Affected Features:** Monetization, Stores, Alerts, Frontend
+**File(s):** `frontend/src/pages/MonetizationHub.jsx` (new), `frontend/src/pages/AlertsPage.jsx` (cap banner), `frontend/src/pages/StoresPage.jsx` (boost management card replaces old subscription card), `frontend/src/components/SellerIntelligenceDashboard.jsx` (locked-block upgrade prompt), `frontend/src/components/ProductEditPanel.jsx` (boost section already at top — hub link), `frontend/src/hooks/useSubscription.js` / `useBoost.js`, `frontend/src/App.jsx` (hub route), `backend/constants.py` (cap-banner threshold)
+**Behavior doc:** `docs/behaviors/monetization.md` §10
+
+**The Gap:**
+The three paid products are undiscoverable. The Alerts-Only subscription was offered from the Stores tab where it makes no sense; the Alerts tab gives no hint that alerts are limited; and every entry point jumped straight to the Stars invoice with no value explanation. The user explicitly directed: entry at the moment of need, an explanatory page before payment, never a bare redirect to payment.
+
+**User Acceptance Criteria:**
+- **Alerts tab:** a cap-awareness banner appears when the seller is at or near the free alert cap ("You're at 18 of 20 active alerts — get 10 more"; threshold configurable in constants). When alert creation is rejected at the cap, the error includes the upgrade path.
+- **Stores tab:** the old "Alerts-Only upgrade" subscription card is REMOVED (it made no sense in Stores). Replaced by a boost management card showing active boosts (item + time remaining), a "Boost a product" action, and the All-in-One upsell. The All-in-One card stays in Stores.
+- **Monetization Hub (new page):** one page, three tabs — Boost / Alerts / All-in-One. Deep-linkable per tab; opens on the tab matching the entry point. Boost tab shows "from X Stars" (floor) or the exact price of a preselected item — NEVER a category rate card (Rule 2.4). Alerts tab shows the seller's own usage count. All-in-One tab lists the full superset (intelligence + boost credit + extra alerts).
+- **Shared "How Stars work" explainer** on the hub: what Stars are, how to buy, 30-day auto-renew + cancel-anytime for subscriptions, one-time for boosts.
+- **No bare redirect to payment:** the Stars invoice opens only from the hub's buy action or an item's boost section. Every entry point (banner, card, prompt) leads to the hub first.
+- **Insights (locked Pro block):** non-subscribers see an upgrade prompt ("Unlock price positioning, category pulse & top performers") that opens the hub on the All-in-One tab.
+- **Cross-sell:** each hub tab carries a one-line upsell to the next tier.
+- Backend: `constants.py` gains the cap-banner threshold (e.g., `ALERT_CAP_BANNER_THRESHOLD`, default 2 alerts below cap); hub data (usage counts, active boosts, prices, subscription status) served via existing endpoints — no new payment logic.
+- Tests: frontend tests for banner visibility at threshold, hub tab routing/deep-link, no-rate-card rendering; backend test for the threshold constant behavior. Full regression green.
+
 ---
 
 # ARCHIVE — Implemented Tickets
