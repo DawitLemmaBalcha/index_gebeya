@@ -1,0 +1,54 @@
+# Versioned copy of the production Caddy config (host: /home/ubuntu/caddy/Caddyfile). Keep in sync when routing changes.
+indexgebeya.cfd {
+    # Security headers
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    header X-Content-Type-Options "nosniff"
+
+    # API routes → FastAPI backend
+    handle /search* {
+        reverse_proxy index_api:8000
+    }
+    handle /items* {
+        reverse_proxy index_api:8000
+    }
+    handle /reviews* {
+        reverse_proxy index_api:8000
+    }
+    handle /alerts* {
+        reverse_proxy index_api:8000
+    }
+    handle /notifications* {
+        reverse_proxy index_api:8000
+    }
+    handle /activity* {
+        reverse_proxy index_api:8000
+    }
+    handle /feed* {
+        reverse_proxy index_api:8000
+    }
+    handle /parse-telegram-post* {
+        reverse_proxy index_api:8000
+    }
+    handle /media* {
+        reverse_proxy index_api:8000
+    }
+    handle /admin* {
+        reverse_proxy index_api:8000
+    }
+    handle /channels* {
+        reverse_proxy index_api:8000
+    }
+    handle /subscriptions* {
+        reverse_proxy index_api:8000
+    }
+
+    # Everything else → React SPA
+    handle {
+        reverse_proxy index_frontend:5173
+    }
+}
+
+# WWW to non-WWW redirect
+www.indexgebeya.cfd {
+    redir https://indexgebeya.cfd{uri} permanent
+}
