@@ -289,3 +289,88 @@ class TestStatsRoute:
             params={"init_data": self._init_data(222)},  # not the owner
         )
         assert resp.status_code == 404
+
+
+class TestQueryBounding:
+    """UAT performance guard: stats for a channel with N items must use a
+    bounded number of queries (grouped aggregates), never N+1 per-item
+    loops. Instrumented with an SQLAlchemy cursor-count listener."""
+
+    def _count_queries(self, db_session, fn):
+        from sqlalchemy import event
+        count = {"n": 0}
+        engine = db_session.get_bind()
+
+        def _before(conn, cursor, statement, parameters, context, executemany):
+            count["n"] += 1
+
+        event.listen(engine, "before_cursor_execute", _before)
+        try:
+            fn()
+        finally:
+            event.remove(engine, "before_cursor_execute", _before)
+        return count["n"]
+
+    def test_core_query_count_bounded_with_many_items(self, db_session):
+        user, channel = _make_channel(db_session)
+        for i in range(25):
+            item = _make_item(db_session, channel, title=f"I{i}")
+            _make_interaction(db_session, item)
+
+        n = self._count_queries(
+            db_session, lambda: get_channel_dashboard(db_session, channel.id, user)
+        )
+        # 25 items with per-item loops would need >= 25 queries for views
+        # alone. Grouped aggregates keep the whole core block < 20.
+        assert n < 20, f"core stats issued {n} queries for a 25-item channel"
+
+    def test_pro_query_count_bounded_with_many_items(self, db_session):
+        user, channel = _make_channel(db_session)
+        for i in range(25):
+            _make_item(db_session, channel, title=f"I{i}", category="Mobile Phones")
+        _make_subscription(db_session, user, product="all_in_one")
+
+        n = self._count_queries(
+            db_session, lambda: get_channel_dashboard(db_session, channel.id, user)
+        )
+        # Medians/pulse are bounded by the number of distinct categories
+        # (1 here), not by item count.
+        assert n < 30, f"pro stats issued {n} queries for a 25-item channel"
+
+
+class TestAnalyticsOverflow:
+    """UAT fix: the x-user-id header carries the 64-bit TELEGRAM id, but
+    user_interactions.user_id is the INTEGER users.id PK. If the telegram id
+    is inserted raw it overflows INTEGER ("integer out of range" in the API
+    logs) and the view is never logged — silently undercounting the views
+    this dashboard displays."""
+
+    def test_log_interaction_resolves_telegram_id_to_user_pk(self, db_session):
+        from services.analytics import AnalyticsService
+        big_tg_id = 8010115796  # > 2^31 — overflows the INTEGER user_id column
+        user = User(telegram_id=big_tg_id, username="big")
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+
+        AnalyticsService.log_interaction(
+            user_id=big_tg_id, session_id="ovf_s1",
+            interaction_type="view_item", item_id=None,
+        )
+        row = db_session.scalar(
+            select(UserInteraction).where(UserInteraction.session_id == "ovf_s1")
+        )
+        assert row is not None
+        assert row.user_id == user.id  # users.id PK, not the raw telegram id
+
+    def test_log_interaction_unknown_telegram_id_logs_null_user(self, db_session):
+        from services.analytics import AnalyticsService
+        AnalyticsService.log_interaction(
+            user_id=999999999999, session_id="ovf_s2",
+            interaction_type="view_item", item_id=None,
+        )
+        row = db_session.scalar(
+            select(UserInteraction).where(UserInteraction.session_id == "ovf_s2")
+        )
+        assert row is not None
+        assert row.user_id is None

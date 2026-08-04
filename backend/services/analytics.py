@@ -1,8 +1,9 @@
 from typing import Optional, Dict, Any
 import json
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from database import SessionLocal  # Assumes SessionLocal is configured in database.py
-from models import UserInteraction
+from models import User, UserInteraction
 
 class AnalyticsService:
     """
@@ -22,6 +23,15 @@ class AnalyticsService:
         try:
             # Serialize metadata if provided
             meta_str = json.dumps(meta_data) if meta_data else None
+
+            # UAT fix: the x-user-id header carries the TELEGRAM id (64-bit),
+            # but user_interactions.user_id is the INTEGER users.id PK.
+            # Resolve before insert — otherwise large telegram ids overflow
+            # INTEGER ("integer out of range" spam) and the view is never
+            # logged, silently undercounting views in seller stats.
+            if user_id is not None:
+                resolved_pk = db.scalar(select(User.id).where(User.telegram_id == user_id))
+                user_id = resolved_pk if resolved_pk is not None else None
 
             interaction = UserInteraction(
                 user_id=user_id,

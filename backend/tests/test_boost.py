@@ -5,6 +5,7 @@ All tests run in-process against the isolated suq_test_db via the db_session
 fixture. Telegram is replaced by the FakeStarPaymentsAdapter — no network.
 """
 import asyncio
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -564,3 +565,95 @@ class TestBoostStatus:
     def test_status_none_without_boost(self, db_session):
         _, _, item = _make_seller_item(db_session)
         assert get_boost_status(db_session, item.id) is None
+
+
+# ---------------------------------------------------------------------------
+# Quote route boostability (UAT regression: the quote must expose boostable
+# + reason so the frontend can HIDE the boost section for non-active items
+# instead of showing a dead-end 400 "Only active items can be boosted").
+# ---------------------------------------------------------------------------
+
+class TestBoostQuoteRoute:
+    """GET /items/{item_id}/boost-quote — boostability surfaced to the UI."""
+
+    def _client(self, db_session):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from database import get_db
+        from api.routes import items as items_router
+
+        app = FastAPI()
+        app.include_router(items_router.router, prefix="/items", tags=["Items"])
+
+        def _override_db():
+            yield db_session
+
+        app.dependency_overrides[get_db] = _override_db
+        return TestClient(app)
+
+    def _init_data(self, telegram_id):
+        return f'user={json.dumps({"id": telegram_id, "username": f"u{telegram_id}"})}'
+
+    def _quote(self, db_session, item_id, telegram_id=111):
+        return self._client(db_session).get(
+            f"/items/{item_id}/boost-quote",
+            params={"init_data": self._init_data(telegram_id)},
+        )
+
+    def test_quote_active_item_is_boostable(self, db_session):
+        _, _, item = _make_seller_item(db_session)
+        resp = self._quote(db_session, item.id)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["boostable"] is True
+        assert data["reason"] is None
+        assert data["price_stars"] > 0
+        assert data["duration_days"] == BOOST_DURATION_DAYS
+        assert data["active_boost"] is None
+
+    def test_quote_sold_item_not_boostable(self, db_session):
+        _, _, item = _make_seller_item(db_session, status="sold")
+        resp = self._quote(db_session, item.id)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["boostable"] is False
+        assert data["reason"]  # non-empty human-readable reason
+
+    def test_quote_reported_sold_item_not_boostable(self, db_session):
+        _, _, item = _make_seller_item(db_session, status="reported_sold")
+        data = self._quote(db_session, item.id).json()
+        assert data["boostable"] is False
+        assert data["reason"]
+
+    def test_quote_soft_deleted_item_not_boostable(self, db_session):
+        _, _, item = _make_seller_item(db_session, is_active=False)
+        data = self._quote(db_session, item.id).json()
+        assert data["boostable"] is False
+        assert data["reason"]
+
+    def test_quote_item_with_active_boost_conflict(self, db_session):
+        user, _, item = _make_seller_item(db_session)
+        now = datetime.now(timezone.utc)
+        db_session.add(Boost(
+            item_id=item.id, channel_id=item.channel_id, user_id=user.id,
+            source="paid", price_paid_stars=10,
+            telegram_payment_charge_id="chg_quote_conflict",
+            starts_at=now, ends_at=now + timedelta(days=7),
+        ))
+        db_session.commit()
+        data = self._quote(db_session, item.id).json()
+        assert data["boostable"] is False
+        assert "boost" in data["reason"].lower()
+
+    def test_quote_price_still_returned_for_non_boostable_item(self, db_session):
+        # Additive contract: even a non-boostable item keeps its quote fields
+        # (price is contextual, Rule 2.4) so the UI can decide how to render.
+        _, _, item = _make_seller_item(db_session, status="sold")
+        data = self._quote(db_session, item.id).json()
+        assert data["price_stars"] > 0
+        assert data["category"] == "Mobile Phones"
+
+    def test_quote_non_owner_forbidden(self, db_session):
+        _, _, item = _make_seller_item(db_session, telegram_id=111)
+        resp = self._quote(db_session, item.id, telegram_id=222)
+        assert resp.status_code == 403

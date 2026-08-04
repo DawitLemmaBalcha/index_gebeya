@@ -321,6 +321,10 @@ class BoostQuoteResponse(BaseModel):
     duration_days: int
     category: Optional[str] = None
     active_boost: Optional[BoostStatusResponse] = None
+    # UAT (NB-43): additive boostability signal so the UI can hide the boost
+    # section for non-active items instead of showing a dead-end 400.
+    boostable: bool = True
+    reason: Optional[str] = None
 
 
 class BoostOrderResponse(BaseModel):

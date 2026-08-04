@@ -82,5 +82,16 @@ export function useBoost(itemId) {
     }
   }, [itemId, refreshQuote]);
 
-  return { quote, activeBoost, boosting, error, payWithStars, refreshQuote };
+  return {
+    quote,
+    activeBoost,
+    // NB-43 UAT: additive boostability signal from the quote endpoint —
+    // false for sold/inactive/soft-deleted items (and 503 kill switch when
+    // the quote never arrives). The UI hides the boost section on false.
+    boostable: quote?.boostable ?? false,
+    boosting,
+    error,
+    payWithStars,
+    refreshQuote,
+  };
 }

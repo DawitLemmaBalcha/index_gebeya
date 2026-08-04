@@ -74,7 +74,11 @@ const SellerIntelligenceDashboard = ({ channelId }) => {
   const fmt = (n) => (n == null ? '—' : new Intl.NumberFormat('en-ET').format(n));
 
   return (
-    <div className="px-4 py-4 pb-8 space-y-4">
+    // UAT fix: the modal's content area is `overflow-hidden`, so this tab
+    // must provide its own scroll container (h-full + overflow-y-auto,
+    // same pattern as InventorySettingsTab) or long dashboards are clipped
+    // with no way to scroll.
+    <div className="h-full overflow-y-auto px-4 py-4 pb-8 space-y-4">
       {/* ============ CORE BLOCK (free) ============ */}
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
         <h2 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">

@@ -57,6 +57,26 @@ def _active_boost_exists(db: Session, item_id: int) -> bool:
     ) is not None
 
 
+# Exact detail strings are part of the API contract (UAT regression: the
+# quote exposes them via `reason`, order/credit endpoints raise them).
+_STATUS_REASON = "Only active items can be boosted"
+_ACTIVE_BOOST_REASON = "This item already has an active boost"
+
+
+def get_boost_eligibility(db: Session, item: Item) -> tuple[bool, str | None]:
+    """Why this item can/cannot be boosted right now (non-ownership reasons).
+
+    Returns (True, None) when a boost can be purchased; otherwise the
+    (False, reason) pair with the same detail strings the order/credit
+    endpoints raise. Ownership is NOT checked here — routes enforce it.
+    """
+    if item.status != "active" or not item.is_active:
+        return False, _STATUS_REASON
+    if _active_boost_exists(db, item.id):
+        return False, _ACTIVE_BOOST_REASON
+    return True, None
+
+
 def _validate_boost_eligibility(db: Session, user: User, item: Item) -> Channel:
     """Shared ownership/eligibility validation (Rule 2.5). Raises 403/400/409."""
     channel = db.get(Channel, item.channel_id)
@@ -65,16 +85,12 @@ def _validate_boost_eligibility(db: Session, user: User, item: Item) -> Channel:
             status_code=403,
             detail="Only the channel owner can boost this item",
         )
-    if item.status != "active" or not item.is_active:
-        raise HTTPException(
-            status_code=400,
-            detail="Only active items can be boosted",
-        )
-    if _active_boost_exists(db, item.id):
-        raise HTTPException(
-            status_code=409,
-            detail="This item already has an active boost",
-        )
+    boostable, reason = get_boost_eligibility(db, item)
+    if not boostable:
+        # Status-code contract preserved: status problems -> 400,
+        # already-boosted conflict -> 409 (blueprint Rule 2.5).
+        status_code = 409 if reason == _ACTIVE_BOOST_REASON else 400
+        raise HTTPException(status_code=status_code, detail=reason)
     return channel
 
 

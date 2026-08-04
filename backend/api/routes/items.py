@@ -11,7 +11,13 @@ from schemas import BoostQuoteResponse, BoostOrderResponse, BoostCreditResponse,
 from services import search as search_service
 from services.analytics import AnalyticsService
 from services.auth import authenticate
-from services.boost import get_boost_price, get_boost_status, create_boost_order, fulfill_credit_boost
+from services.boost import (
+    get_boost_price,
+    get_boost_status,
+    get_boost_eligibility,
+    create_boost_order,
+    fulfill_credit_boost,
+)
 from constants import BOOST_DURATION_DAYS, MONETIZATION_ENABLED
 from services.item_status import (
     report_sold,
@@ -255,17 +261,21 @@ def get_item_boost_quote(
     init_data: str,
     db: Session = Depends(get_db),
 ):
-    """Owner-only quote: price for THIS item's category + active-boost status."""
+    """Owner-only quote: price for THIS item's category + active-boost status
+    + boostability so the UI can hide the section for non-active items."""
     _monetization_enabled_or_503()
     user = authenticate(init_data, db)
     item = _require_boost_owner(db, user, item_id)
     status = get_boost_status(db, item_id)
     active_boost = BoostStatusResponse(**status) if status else None
+    boostable, reason = get_boost_eligibility(db, item)
     return BoostQuoteResponse(
         price_stars=get_boost_price(db, item),
         duration_days=BOOST_DURATION_DAYS,
         category=item.category,
         active_boost=active_boost,
+        boostable=boostable,
+        reason=reason,
     )
 
 

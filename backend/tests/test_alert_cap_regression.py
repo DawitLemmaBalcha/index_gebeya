@@ -231,3 +231,77 @@ class TestLapsedResumeGuard:
         resp = self._toggle(client, alert.id, 111)
         assert resp.status_code == 200
         assert resp.json()["is_active"] is True
+
+
+class TestAlertInteractionUserAttribution:
+    """UAT regression: alert routes must pass the TELEGRAM id (not the
+    users.id PK) to AnalyticsService.log_interaction. The service resolves
+    user_id via `select(User.id).where(User.telegram_id == user_id)`, so a
+    PK passed here finds no telegram match and the interaction row is stored
+    with user_id = NULL — silently dropping alert event attribution.
+
+    These tests drive the REAL routes through TestClient (background tasks
+    run before the response returns), so they lock the call-site contract:
+    the stored user_interactions.user_id must be the resolved users.id PK.
+    Mirrors TestAnalyticsOverflow's db_session + row-assertion style."""
+
+    def _interaction_row(self, db_session, interaction_type):
+        from models import UserInteraction
+        return db_session.scalar(
+            select(UserInteraction).where(
+                UserInteraction.interaction_type == interaction_type
+            )
+        )
+
+    def test_create_alert_interaction_stores_resolved_user_pk(self, db_session):
+        user = _make_user(db_session)
+        client = _alerts_client(db_session)
+
+        resp = client.post(
+            "/alerts/",
+            json={
+                "query_text": "attribution check",
+                "max_price": None,
+                "init_data": str(user.telegram_id),  # internal bypass
+                "preferences": {},
+            },
+            headers={"X-Internal-Service": "index-listener"},
+        )
+        assert resp.status_code == 200, resp.text
+
+        row = self._interaction_row(db_session, "create_alert")
+        assert row is not None
+        assert row.user_id == user.id  # users.id PK — not NULL, not telegram_id
+
+    def test_delete_alert_interaction_stores_resolved_user_pk(self, db_session):
+        user = _make_user(db_session)
+        alert = _make_alert(db_session, user)
+        client = _alerts_client(db_session)
+
+        resp = client.delete(
+            f"/alerts/{alert.id}",
+            params={"init_data": str(user.telegram_id)},
+            headers={"X-Internal-Service": "index-listener"},
+        )
+        assert resp.status_code == 200, resp.text
+
+        row = self._interaction_row(db_session, "delete_alert")
+        assert row is not None
+        assert row.user_id == user.id  # users.id PK — not NULL, not telegram_id
+
+    def test_pause_alert_interaction_stores_resolved_user_pk(self, db_session):
+        user = _make_user(db_session)
+        alert = _make_alert(db_session, user, is_active=True, lapsed=False)
+        client = _alerts_client(db_session)
+
+        resp = client.patch(
+            f"/alerts/{alert.id}/pause",
+            params={"init_data": str(user.telegram_id)},
+            headers={"X-Internal-Service": "index-listener"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["is_active"] is False  # paused
+
+        row = self._interaction_row(db_session, "alert_paused")
+        assert row is not None
+        assert row.user_id == user.id  # users.id PK — not NULL, not telegram_id

@@ -233,6 +233,75 @@ const ProductEditPanel = ({
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* NB-43: Boost — at the VERY TOP of the panel (UAT directive).
+            Compact + explanatory. Hidden entirely when the item is not
+            boostable (sold/inactive/soft-deleted) or when monetization is
+            disabled (quote fetch 503s -> quote stays null). */}
+        {quote && (quote.boostable || activeBoost || boostPaid) && (
+          <div className="bg-gradient-to-br from-amber-50 to-brand-50 rounded-2xl p-3 border border-amber-200">
+            {activeBoost || boostPaid ? (
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+                <CheckCircle size={16} className="shrink-0" />
+                {boostPaid
+                  ? 'Your item is now boosted!'
+                  : `Boosted — active until ${activeBoost?.ends_at ? new Date(activeBoost.ends_at).toLocaleDateString() : ''}`}
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-gray-900 flex items-center gap-1.5 mb-0.5">
+                      <Rocket size={13} className="text-amber-600 shrink-0" />
+                      Boost this product
+                    </p>
+                    <p className="text-[11px] leading-snug text-gray-600">
+                      Appears at the top of its category and matching searches
+                      for {quote.duration_days} days.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleBoost}
+                    disabled={boosting}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  >
+                    {boosting ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Star size={14} />
+                    )}
+                    {quote.price_stars} Stars
+                  </button>
+                </div>
+
+                {/* NB-46 Rule 7.3: subscription credit — only when credit remains */}
+                {(subStatus?.credit_remaining || 0) > 0 && (
+                  <button
+                    onClick={handleCreditBoost}
+                    disabled={subLoading || creditBoosted}
+                    className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg text-[11px] font-semibold bg-white text-brand-700 border border-brand-200 hover:bg-brand-50 transition-colors disabled:opacity-50"
+                  >
+                    {subLoading ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Star size={12} />
+                    )}
+                    {creditBoosted
+                      ? 'Boosted with credit!'
+                      : `Use free credit (${subStatus.credit_remaining} left)`}
+                  </button>
+                )}
+
+                {((boostError && boostError !== 'NOT_IN_TELEGRAM') ||
+                  (subError && subError !== 'NOT_IN_TELEGRAM')) && (
+                  <p className="mt-1.5 text-[11px] text-red-600">
+                    {boostError || subError}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* Thumbnail image */}
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
           {item.image_path || (item.images && item.images[0]) ? (
@@ -423,67 +492,6 @@ const ProductEditPanel = ({
             )}
             Delete Item
           </button>
-        </div>
-
-        {/* NB-43: Boost section — price shown in context (Rule 2.4), never a rate card */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
-          <h3 className="text-xs font-semibold text-gray-500 mb-2">Boost</h3>
-
-          {boostPaid || activeBoost ? (
-            <div className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-amber-50 text-amber-700">
-              <CheckCircle size={16} />
-              {boostPaid
-                ? '🎉 Your item is now boosted!'
-                : `⚡ Boosted — active until ${activeBoost?.ends_at ? new Date(activeBoost.ends_at).toLocaleDateString() : ''}`}
-            </div>
-          ) : (
-            <>
-              {quote ? (
-                <p className="text-sm text-gray-600">
-                  Boost this item for 7 days — <strong>{quote.price_stars} Stars</strong>
-                </p>
-              ) : (
-                <p className="text-sm text-gray-400">Loading boost pricing...</p>
-              )}
-
-              <button
-                onClick={handleBoost}
-                disabled={boosting || !quote}
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {boosting ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Rocket size={16} />
-                )}
-                Boost with Stars
-              </button>
-
-              {/* NB-46 Rule 7.3: subscription credit — only when credit remains */}
-              {(subStatus?.credit_remaining || 0) > 0 && (
-                <button
-                  onClick={handleCreditBoost}
-                  disabled={subLoading || creditBoosted}
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-50"
-                >
-                  {subLoading ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Star size={16} />
-                  )}
-                  Use Subscription Credit ({subStatus.credit_remaining} left)
-                </button>
-              )}
-
-              {subError && subError !== 'NOT_IN_TELEGRAM' && (
-                <p className="text-xs text-red-600">{subError}</p>
-              )}
-
-              {boostError && boostError !== 'NOT_IN_TELEGRAM' && (
-                <p className="text-xs text-red-600">{boostError}</p>
-              )}
-            </>
-          )}
         </div>
       </div>
 

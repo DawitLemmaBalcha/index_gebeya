@@ -58,7 +58,7 @@ def create_new_alert(
 
     background_tasks.add_task(
         AnalyticsService.log_interaction,
-        user_id=user.id,
+        user_id=user.telegram_id,
         session_id=session_id,
         interaction_type="create_alert",
         item_id=None,
@@ -104,7 +104,7 @@ def delete_alert(
     session_id = request.headers.get("x-session-id")
     background_tasks.add_task(
         AnalyticsService.log_interaction,
-        user_id=user.id,
+        user_id=user.telegram_id,
         session_id=session_id,
         interaction_type="delete_alert",
         item_id=None,
@@ -169,7 +169,7 @@ def toggle_alert_pause(
     session_id = request.headers.get("x-session-id")
     background_tasks.add_task(
         AnalyticsService.log_interaction,
-        user_id=user.id,
+        user_id=user.telegram_id,
         session_id=session_id,
         interaction_type=f"alert_{new_status}",
         item_id=None,
