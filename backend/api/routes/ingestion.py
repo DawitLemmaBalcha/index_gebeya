@@ -14,6 +14,7 @@ from ai_engine import extract_product_info
 from ai_engine.vector_client import vectorize_image, get_visual_hints
 from ai_engine.matcher import cosine_similarity
 from services.alerting import process_new_item # IMPORT ORCHESTRATOR
+from services.boost import transfer_boost # NB-43 Rule 6.2: dedup replacement transfers boost
 
 router = APIRouter()
 logger = logging.getLogger("index_ingestion")
@@ -227,6 +228,16 @@ async def parse_telegram_post(
                 db.add(ItemImage(item_id=new_item.id, image_path=path))
         elif post.image_path:
             db.add(ItemImage(item_id=new_item.id, image_path=post.image_path))
+
+        # NB-43 Rule 6.2 (D13): dedup replacement transfers the remaining
+        # boost to the new item. Executed after the new-item flush, BEFORE the
+        # commit below — so it commits atomically with the replacement.
+        # The transfer is a trivial single UPDATE inside this transaction; on
+        # failure it must NOT be swallowed — the whole ingestion rolls back
+        # (the replacement never lands without its boost).
+        if was_replaced and best_match is not None:
+            transfer_boost(db, best_match.id, new_item.id)
+            logger.info(f"Boost transferred #{best_match.id} -> #{new_item.id} (dedup replacement)")
 
         db.commit()
         db.refresh(new_item)

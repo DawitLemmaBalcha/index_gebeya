@@ -1,6 +1,7 @@
 import asyncio
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from client import send_to_api, get_channel_info
-from config import logger, HEARTBEAT_INTERVAL, MAX_RETRIES_LIMIT
+from config import logger, HEARTBEAT_INTERVAL, MAX_RETRIES_LIMIT, WEB_APP_URL
 
 
 async def background_worker(queue: asyncio.Queue, bot):
@@ -95,7 +96,23 @@ async def background_worker(queue: asyncio.Queue, bot):
                     else:
                         edit_text = f"✅ Indexed: {title} — {formatted_price}"
 
-                    await dm_message.edit_text(edit_text)
+                    # NB-45 (Rule 5.1/5.2): every item-result DM carries the
+                    # boost deep-link button — path params matching the
+                    # App.jsx route /stores/:channelId/:itemId (§2.7/§2.8).
+                    # Generic button text; the price never appears in the DM.
+                    channel_id = channel_info.get('id') if channel_info else None
+                    reply_markup = None
+                    if channel_id and result.get('item_id'):
+                        reply_markup = InlineKeyboardMarkup([[
+                            InlineKeyboardButton(
+                                "🚀 Boost this product",
+                                web_app=WebAppInfo(
+                                    url=f"{WEB_APP_URL}/stores/{channel_id}/{result['item_id']}"
+                                ),
+                            )
+                        ]])
+
+                    await dm_message.edit_text(edit_text, reply_markup=reply_markup)
                     logger.info(f"📝 Edited DM with success for msg #{message_id} (replaced={is_replaced})")
                 else:
                     await dm_message.edit_text(

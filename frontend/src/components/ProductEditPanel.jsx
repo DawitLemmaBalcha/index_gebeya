@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ArrowLeft, ExternalLink, Loader2, DollarSign, CheckCircle,
-  AlertTriangle, RefreshCw, X, Plus, Trash2
+  AlertTriangle, RefreshCw, X, Plus, Trash2, Rocket
 } from 'lucide-react';
 import { TAXONOMY } from '../constants/taxonomy';
 import { API_BASE_URL } from '../config';
+import { useBoost } from '../hooks/useBoost';
 
 /**
  * TECH-23: Full-screen edit panel for a single product.
@@ -19,6 +20,7 @@ const ProductEditPanel = ({
   onRelist,
   onClearReports,
   onDelete,
+  onBoosted,
 }) => {
   // Parse specs from item (handles both string and object formats)
   const parseSpecs = (rawSpecs) => {
@@ -45,6 +47,22 @@ const ProductEditPanel = ({
   const [specsEntries, setSpecsEntries] = useState(() => parseSpecs(item.specs));
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(null); // 'sold' | 'relist' | 'reports'
+
+  // NB-43: Boost purchase (quote in context, Rule 2.4 — never a rate card)
+  const { quote, activeBoost, boosting, error: boostError, payWithStars, refreshQuote } = useBoost(item.id);
+  const [boostPaid, setBoostPaid] = useState(false);
+
+  useEffect(() => {
+    refreshQuote();
+  }, [refreshQuote]);
+
+  const handleBoost = async () => {
+    const paid = await payWithStars();
+    if (paid) {
+      setBoostPaid(true);
+      if (onBoosted) onBoosted();
+    }
+  };
 
   const categoryOptions = useMemo(() => Object.keys(TAXONOMY), []);
   const subcategoryOptions = useMemo(() => {
@@ -385,6 +403,47 @@ const ProductEditPanel = ({
             )}
             Delete Item
           </button>
+        </div>
+
+        {/* NB-43: Boost section — price shown in context (Rule 2.4), never a rate card */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
+          <h3 className="text-xs font-semibold text-gray-500 mb-2">Boost</h3>
+
+          {boostPaid || activeBoost ? (
+            <div className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-amber-50 text-amber-700">
+              <CheckCircle size={16} />
+              {boostPaid
+                ? '🎉 Your item is now boosted!'
+                : `⚡ Boosted — active until ${activeBoost?.ends_at ? new Date(activeBoost.ends_at).toLocaleDateString() : ''}`}
+            </div>
+          ) : (
+            <>
+              {quote ? (
+                <p className="text-sm text-gray-600">
+                  Boost this item for 7 days — <strong>{quote.price_stars} Stars</strong>
+                </p>
+              ) : (
+                <p className="text-sm text-gray-400">Loading boost pricing...</p>
+              )}
+
+              <button
+                onClick={handleBoost}
+                disabled={boosting || !quote}
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {boosting ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Rocket size={16} />
+                )}
+                Boost with Stars
+              </button>
+
+              {boostError && boostError !== 'NOT_IN_TELEGRAM' && (
+                <p className="text-xs text-red-600">{boostError}</p>
+              )}
+            </>
+          )}
         </div>
       </div>
 

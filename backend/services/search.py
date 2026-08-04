@@ -1,7 +1,7 @@
 import time
 import os
 import json
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 from sqlalchemy.orm import Session
 from typing import List, Optional, Any, Tuple
 import numpy as np
@@ -11,17 +11,25 @@ from ai_engine.vector_client import vectorize_text
 from schemas import ItemResponse, ChannelResponse
 from constants import SEMANTIC_WEIGHT, LEXICAL_WEIGHT, DEFAULT_RESULT_LIMIT
 
-def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: int, offset: int, exclude_unpriced: bool = False) -> List[ItemResponse]:
+def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: int, offset: int, exclude_unpriced: bool = False, exclude_item_ids: Optional[List[int]] = None) -> List[ItemResponse]:
     """
     Executes the Hybrid Search SQL using strict Top-K Ranking.
     
     CHANGE: Removed threshold filtering. 
     We now return the top 'limit' items sorted by score, regardless of how low the score is.
+
+    NB-43 (D8): additive `exclude_item_ids` — boosted items pinned above the
+    organic list must not appear twice on the same page (Rule 3.4). Emitted
+    only when non-empty; relevance math untouched.
     """
     
     unpriced_clause = ""
     if exclude_unpriced:
         unpriced_clause = "AND i.price IS NOT NULL AND i.price > 0"
+    
+    exclude_clause = ""
+    if exclude_item_ids:
+        exclude_clause = "AND i.id NOT IN :exclude_ids"
     
     sql = text(f"""
     WITH scored_items AS (
@@ -68,6 +76,7 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
             -- We keep this loose filter to avoid sorting the entire database for 0.0 score items.
             (i.image_vector IS NOT NULL OR (:q != '' AND similarity(coalesce(i.title, '') || ' ' || i.description, :q) > 0.01))
             {unpriced_clause}
+            {exclude_clause}
             -- TECH-22: Only return active items in search
             AND i.status = 'active'
     )
@@ -86,13 +95,19 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
     LIMIT :limit OFFSET :offset;
     """)
 
-    results = db.execute(sql, {
+    params: dict = {
         "q": query_text, 
         "w_sem": SEMANTIC_WEIGHT, 
         "w_lex": LEXICAL_WEIGHT,
         "limit": limit,
         "offset": offset
-    }).fetchall()
+    }
+    stmt = sql
+    if exclude_item_ids:
+        params["exclude_ids"] = exclude_item_ids
+        stmt = sql.bindparams(bindparam("exclude_ids", expanding=True))
+
+    results = db.execute(stmt, params).fetchall()
 
     # Serialize results into Pydantic Models
     items = []
@@ -140,10 +155,14 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
         
     return items
 
-def perform_hybrid_search(db: Session, query_text: str, limit: int = None, offset: int = 0, threshold: float = 0.2, min_price: float = None, max_price: float = None, category: str = None, exclude_unpriced: bool = False) -> Tuple[List[ItemResponse], int]:
+def perform_hybrid_search(db: Session, query_text: str, limit: int = None, offset: int = 0, threshold: float = 0.2, min_price: float = None, max_price: float = None, category: str = None, exclude_unpriced: bool = False, exclude_item_ids: Optional[List[int]] = None) -> Tuple[List[ItemResponse], int]:
     """
     Main Entry point for Text-triggered Hybrid Search.
     Returns: (List[ItemResponse], TotalCount)
+
+    NB-43 (D8): additive `exclude_item_ids` threaded into the SQL so boosted
+    items pinned by the /search/ route never appear twice (Rule 3.4).
+    All existing callers keep working (default None).
     """
     t0 = time.time()
     
@@ -169,7 +188,7 @@ def perform_hybrid_search(db: Session, query_text: str, limit: int = None, offse
     fetch_limit = limit + 10 
     
     # Note: 'threshold' argument is now ignored in favor of pure ranking
-    items = _execute_search_sql(db, vec_literal, query_text, fetch_limit, offset, exclude_unpriced=exclude_unpriced)
+    items = _execute_search_sql(db, vec_literal, query_text, fetch_limit, offset, exclude_unpriced=exclude_unpriced, exclude_item_ids=exclude_item_ids)
 
     # 4. Apply Post-SQL Filters
     filtered_items = []

@@ -7,9 +7,12 @@ from sqlalchemy import select, func as sql_func
 from database import get_db
 from models import Item, Channel, SoldReport
 from schemas import ItemResponse, SoldReportCreate, SoldReportResponse, ItemUpdateRequest, ItemStatusResponse
+from schemas import BoostQuoteResponse, BoostOrderResponse, BoostCreditResponse, BoostStatusResponse
 from services import search as search_service
 from services.analytics import AnalyticsService
 from services.auth import authenticate
+from services.boost import get_boost_price, get_boost_status, create_boost_order, fulfill_credit_boost
+from constants import BOOST_DURATION_DAYS, MONETIZATION_ENABLED
 from services.item_status import (
     report_sold,
     relist_item as item_relist,
@@ -20,6 +23,26 @@ from services.item_status import (
 )
 
 router = APIRouter()
+
+
+def _monetization_enabled_or_503():
+    """Kill switch (blueprint §6.1): MONETIZATION_ENABLED=0 -> 503 at router level."""
+    if not MONETIZATION_ENABLED:
+        raise HTTPException(status_code=503, detail="Monetization is currently disabled")
+
+
+def _require_boost_owner(db: Session, user, item_id: int) -> Item:
+    """Ownership gate for the boost endpoints (Rule 2.5)."""
+    item = db.get(Item, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    channel = db.get(Channel, item.channel_id)
+    if not channel or channel.registered_by != user.telegram_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the channel owner can boost this item",
+        )
+    return item
 
 
 @router.get("/stats")
@@ -220,3 +243,56 @@ def delete_item_route(
     """Permanently delete an item owned by the authenticated user's channel."""
     user = authenticate(init_data, db, x_internal_service)
     return delete_item(db, item_id, user)
+
+
+# =========================================================================
+# NB-43: Boost purchase endpoints (blueprint §2.5) — price shown in context
+# (Rule 2.4), never as a rate card.
+# =========================================================================
+@router.get("/{item_id}/boost-quote", response_model=BoostQuoteResponse)
+def get_item_boost_quote(
+    item_id: int,
+    init_data: str,
+    db: Session = Depends(get_db),
+):
+    """Owner-only quote: price for THIS item's category + active-boost status."""
+    _monetization_enabled_or_503()
+    user = authenticate(init_data, db)
+    item = _require_boost_owner(db, user, item_id)
+    status = get_boost_status(db, item_id)
+    active_boost = BoostStatusResponse(**status) if status else None
+    return BoostQuoteResponse(
+        price_stars=get_boost_price(db, item),
+        duration_days=BOOST_DURATION_DAYS,
+        category=item.category,
+        active_boost=active_boost,
+    )
+
+
+@router.post("/{item_id}/boost-order", response_model=BoostOrderResponse)
+async def create_item_boost_order(
+    item_id: int,
+    init_data: str,
+    db: Session = Depends(get_db),
+):
+    """Owner-only: create a Stars invoice to boost this item (Rule 2.7)."""
+    _monetization_enabled_or_503()
+    user = authenticate(init_data, db)
+    item = _require_boost_owner(db, user, item_id)
+    return await create_boost_order(db, user, item)
+
+
+@router.post("/{item_id}/boost-credit", response_model=BoostCreditResponse)
+def create_item_credit_boost(
+    item_id: int,
+    init_data: str,
+    db: Session = Depends(get_db),
+):
+    """Owner-only: consume one all-in-one monthly boost credit (Rule 7.3)."""
+    _monetization_enabled_or_503()
+    user = authenticate(init_data, db)
+    item = _require_boost_owner(db, user, item_id)
+    boost = fulfill_credit_boost(db, user, item)
+    return BoostCreditResponse(boost=BoostStatusResponse(
+        id=boost.id, active=True, ends_at=boost.ends_at, source=boost.source,
+    ))

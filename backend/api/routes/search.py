@@ -3,6 +3,7 @@ import uuid
 import shutil
 import time
 from typing import List
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,7 @@ from database import get_db
 from schemas import SearchQuery, SearchResponse, ItemResponse
 from services import search as search_service
 from services.analytics import AnalyticsService
+from services.boost import get_pinned_boosted_items
 from ai_engine.vector_client import vectorize_image
 
 router = APIRouter()
@@ -22,6 +24,20 @@ def search_items(
     db: Session = Depends(get_db)
 ):
     start_time = time.time()
+
+    # --- NB-43 PIN LAYER (D7: the ONE application point) ---
+    # Boosted items occupy the reserved top positions of the eligible
+    # surfaces (category browse == POST /search/ with body.category, and
+    # text searches matching title/category). Pinned items are excluded
+    # from the organic list below (Rule 3.4 — no duplicates on a page).
+    now = datetime.now(timezone.utc)
+    pinned = get_pinned_boosted_items(
+        db,
+        category=(None if query.category in (None, "All") else query.category),
+        query_text=query.query or None,
+        now=now,
+    )
+    pinned_ids = {i.id for i in pinned}
     
     # Perform Search
     results_raw = search_service.perform_hybrid_search(
@@ -32,6 +48,7 @@ def search_items(
         max_price=query.max_price,
         category=query.category,
         exclude_unpriced=query.exclude_unpriced,
+        exclude_item_ids=list(pinned_ids),
     )
     
     # Handle Tuple Return (items, count)
@@ -41,6 +58,16 @@ def search_items(
     else:
         items_list = results_raw
         total_count = len(items_list)
+
+    # Mark boosted flags on the serialized organic items, then compose the
+    # page: pinned (rotation order) followed by the organic slice.
+    for item in items_list:
+        item.is_boosted = item.id in pinned_ids
+
+    pinned_responses = [ItemResponse.model_validate(i) for i in pinned]
+    for item in pinned_responses:
+        item.is_boosted = True
+    page_items = pinned_responses + items_list
 
     execution_time = (time.time() - start_time) * 1000
     
@@ -60,7 +87,7 @@ def search_items(
     # -------------------------
     
     return SearchResponse(
-        items=items_list,
+        items=page_items,
         total=total_count,
         execution_time_ms=execution_time
     )

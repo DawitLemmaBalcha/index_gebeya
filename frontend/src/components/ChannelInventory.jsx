@@ -19,9 +19,9 @@ const TAB_REGISTRY = [
  * TECH-23: Full-page inventory modal with tab navigation.
  * Integrates product grid, edit panel, and settings tab.
  */
-const ChannelInventory = ({ channel, onClose }) => {
+const ChannelInventory = ({ channel, onClose, initialProduct = null }) => {
   const [activeTab, setActiveTab] = useState('products');
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(initialProduct || null);
   const [toast, setToast] = useState(null); // { message, type } | null
 
   // Inventory hook for products tab
@@ -104,6 +104,16 @@ const ChannelInventory = ({ channel, onClose }) => {
     }
   }, [channel.id, inventory, showToast]);
 
+  // NB-43: boost purchased — toast + refresh the inventory list
+  const handleBoosted = useCallback(async () => {
+    showToast('Item boosted — top placement for 7 days', 'success');
+    try {
+      await inventory.fetchItems(channel.id, true);
+    } catch {
+      // inventory refresh failure is non-fatal; quote state already refreshed
+    }
+  }, [channel.id, inventory, showToast]);
+
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
       {/* Header bar */}
@@ -179,6 +189,7 @@ const ChannelInventory = ({ channel, onClose }) => {
             onRelist={handleRelist}
             onClearReports={handleClearReports}
             onDelete={handleDelete}
+            onBoosted={handleBoosted}
           />
         ) : activeTab === 'products' ? (
           <InventoryProductsTab

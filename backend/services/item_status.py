@@ -26,6 +26,7 @@ from fastapi import HTTPException
 from models import Item, Channel, SoldReport, ItemEdit, ItemImage, Notification, User
 from services.alerting import process_new_item
 from services.owner_dm import send_owner_dm
+from services.boost import end_boost_for_item  # NB-43 Rule 6.1: sold -> boost ends
 from constants import CROWDSOURCE_SOLD_THRESHOLD
 
 logger = logging.getLogger("index_item_status")
@@ -99,6 +100,9 @@ async def report_sold(db: Session, item_id: int, user: User) -> dict:
             item.status = "reported_sold"
             db.commit()
 
+            # NB-43 Rule 6.1: reported_sold -> boost ends immediately, no refund.
+            end_boost_for_item(db, item.id)
+
             # 7. Send owner DM
             msg = (
                 f"⚠️ Your listing '{item.title}' on @{channel_username} "
@@ -164,6 +168,9 @@ def mark_sold(db: Session, item_id: int, user: User) -> dict:
 
     item.status = "sold"
     db.commit()
+
+    # NB-43 Rule 6.1: sold -> boost ends immediately, no refund.
+    end_boost_for_item(db, item_id)
 
     return {"status": "sold", "message": "Item marked as sold"}
 

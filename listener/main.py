@@ -1,7 +1,8 @@
 import asyncio
 import sys
 import logging
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, CallbackQueryHandler, ChatMemberHandler, filters
+from telegram import Update
+from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, CallbackQueryHandler, ChatMemberHandler, PreCheckoutQueryHandler, TypeHandler, filters
 from config import TELEGRAM_TOKEN, logger
 
 # NEW IMPORTS
@@ -13,6 +14,7 @@ from chat_member_handler import handle_chat_member
 from worker import background_worker
 from notifications import notification_poller
 from photo_refresher import channel_photo_refresher
+from payments import handle_pre_checkout, handle_successful_payment, handle_subscription_update  # NB-43..NB-46
 
 # --- SILENCE HTTPX LOGS (POLLING NOISE) ---
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -51,6 +53,14 @@ if __name__ == '__main__':
     # D. Channel Ingestion
     channel_handler = MessageHandler(filters.ChatType.CHANNEL, handle_channel_post)
     application.add_handler(channel_handler)
+
+    # E. Payments (NB-43..NB-46) — registration ORDER matters (blueprint §2.6):
+    # PreCheckoutQueryHandler, then SuccessfulPayment, then the catch-all
+    # TypeHandler LAST (PTB 22.8 has no Update.subscription — BotSubscription-
+    # Updated arrives via update.api_kwargs, D2). Nothing may follow it.
+    application.add_handler(PreCheckoutQueryHandler(handle_pre_checkout))
+    application.add_handler(MessageHandler(filters.SuccessfulPayment, handle_successful_payment))
+    application.add_handler(TypeHandler(Update, handle_subscription_update))  # MUST be last
 
     # 4. Start Background Workers
     async def post_init(app):

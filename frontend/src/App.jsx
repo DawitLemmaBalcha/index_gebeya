@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useParams } from 'react-router-dom';
 import Home from './pages/Home';
 import ProductPage from './pages/ProductPage';
 import AlertsPage from './pages/AlertsPage';
@@ -17,7 +17,12 @@ const isTelegramWebView = () => {
 
 function MainLayout({ initialSearchQuery = '' }) {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState('explore');
+  const params = useParams();
+  // NB-45: deep link from the DM boost button — /stores/:channelId/:itemId
+  const deepLink = (params.channelId && params.itemId)
+    ? { channelId: params.channelId, itemId: params.itemId }
+    : null;
+  const [activeTab, setActiveTab] = useState(deepLink ? 'stores' : 'explore');
   const isProductPage = location.pathname.startsWith('/item/');
 
   return (
@@ -36,7 +41,7 @@ function MainLayout({ initialSearchQuery = '' }) {
 
         {/* Stores Tab — always mounted */}
         <div style={{ display: (!isProductPage && activeTab === 'stores') ? 'block' : 'none' }}>
-          <StoresPage />
+          <StoresPage deepLink={deepLink} />
         </div>
 
         {/* Product Page Route */}
@@ -106,6 +111,8 @@ const App = () => {
     <Router>
       <Routes>
         <Route path="/welcome" element={<LandingPage isTelegram={true} compact={true} onGetStarted={handleGetStarted} />} />
+        {/* NB-45: deep link target for the DM boost button (§2.8) */}
+        <Route path="/stores/:channelId/:itemId" element={<MainLayout />} />
         <Route path="/*" element={<MainLayout />} />
       </Routes>
     </Router>

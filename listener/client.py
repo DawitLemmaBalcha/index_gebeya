@@ -199,3 +199,83 @@ async def mark_item_sold_api(user_id: int, item_id: int) -> bool:
         except Exception as e:
             logger.error(f"💥 mark-sold exception: {e}")
             return False
+
+
+async def fulfill_boost_api(user_id: int, charge_id: str, payload: str, total_amount: int) -> bool:
+    """
+    NB-43: Deliver a paid boost (successful_payment, 'b:' payload prefix).
+    Best-effort: failures are logged; the backend reconcile pass (§6) replays
+    missed payments. Internal bypass (D6): X-Internal-Service + digit init_data.
+    """
+    url = f"{API_BASE}/internal/payments/fulfill-boost?init_data={user_id}"
+    body = {
+        "telegram_payment_charge_id": charge_id,
+        "invoice_payload": payload,
+        "total_amount": total_amount,
+    }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.post(url, json=body, headers=INTERNAL_HEADERS)
+            if response.status_code == 200:
+                logger.info(f"✅ Boost fulfilled (charge {charge_id})")
+                return True
+            else:
+                logger.error(f"❌ fulfill-boost failed ({response.status_code}): {response.text[:200]}")
+                return False
+        except Exception as e:
+            logger.error(f"💥 fulfill-boost exception: {e}")
+            return False
+
+
+async def fulfill_subscription_api(user_id: int, charge_id: str, payload: str,
+                                   total_amount: int, subscription_expiration_date,
+                                   is_recurring: bool, is_first_recurring: bool) -> bool:
+    """
+    NB-46: Deliver a subscription charge (successful_payment, 's:' payload
+    prefix). Idempotent on charge id — replay is safe.
+    """
+    url = f"{API_BASE}/internal/payments/fulfill-subscription?init_data={user_id}"
+    body = {
+        "telegram_payment_charge_id": charge_id,
+        "invoice_payload": payload,
+        "total_amount": total_amount,
+        "subscription_expiration_date": (
+            subscription_expiration_date.isoformat()
+            if subscription_expiration_date else None
+        ),
+        "is_recurring": is_recurring,
+        "is_first_recurring": is_first_recurring,
+    }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.post(url, json=body, headers=INTERNAL_HEADERS)
+            if response.status_code == 200:
+                logger.info(f"✅ Subscription fulfilled (charge {charge_id})")
+                return True
+            else:
+                logger.error(f"❌ fulfill-subscription failed ({response.status_code}): {response.text[:200]}")
+                return False
+        except Exception as e:
+            logger.error(f"💥 fulfill-subscription exception: {e}")
+            return False
+
+
+async def subscription_state_api(user_id: int, payload: str, state: str) -> bool:
+    """
+    NB-46: User-side subscription state updates (canceled/active/failed) from
+    the PTB 22.8 api_kwargs seam (D2).
+    """
+    url = f"{API_BASE}/internal/payments/subscription-state?init_data={user_id}"
+    body = {"invoice_payload": payload, "state": state}
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.post(url, json=body, headers=INTERNAL_HEADERS)
+            if response.status_code == 200:
+                logger.info(f"✅ Subscription state {state} recorded for user {user_id}")
+                return True
+            else:
+                logger.error(f"❌ subscription-state failed ({response.status_code}): {response.text[:200]}")
+                return False
+        except Exception as e:
+            logger.error(f"💥 subscription-state exception: {e}")
+            return False

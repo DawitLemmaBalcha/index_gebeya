@@ -94,6 +94,9 @@ class ItemResponse(ItemBase):
     # TECH-22: Crowdsourced report count (injected by route, not in DB model)
     report_count: Optional[int] = None
 
+    # NB-43: Set by the /search/ route pin layer (pinned boosted placement)
+    is_boosted: bool = False
+
     @field_validator('images', mode='before')
     @classmethod
     def extract_image_paths(cls, v: Any) -> List[str]:
@@ -301,3 +304,123 @@ class ItemEditResponse(BaseModel):
 class ItemStatusResponse(BaseModel):
     status: str
     message: str
+
+
+# ----------------------------------------------------------------------
+# MONETIZATION SCHEMAS (NB-43..NB-47)
+# ----------------------------------------------------------------------
+class BoostStatusResponse(BaseModel):
+    id: Optional[int] = None
+    active: bool
+    ends_at: Optional[datetime] = None
+    source: Optional[str] = None
+
+
+class BoostQuoteResponse(BaseModel):
+    price_stars: int
+    duration_days: int
+    category: Optional[str] = None
+    active_boost: Optional[BoostStatusResponse] = None
+
+
+class BoostOrderResponse(BaseModel):
+    invoice_url: str
+    payload: str
+    price_stars: int
+    duration_days: int
+
+
+class BoostCreditResponse(BaseModel):
+    boost: BoostStatusResponse
+
+
+class FulfillBoostRequest(BaseModel):
+    # init_data is read from the QUERY string by the route (listener wire
+    # format, blueprint §2.6); kept here as optional for schema conformance.
+    init_data: Optional[str] = None
+    telegram_payment_charge_id: str
+    invoice_payload: str
+    total_amount: int
+
+
+class FulfillSubscriptionRequest(BaseModel):
+    # init_data travels in the QUERY string (listener wire format, §2.6)
+    init_data: Optional[str] = None
+    telegram_payment_charge_id: str
+    invoice_payload: str
+    total_amount: int
+    subscription_expiration_date: Optional[datetime] = None
+    is_recurring: bool = False
+    is_first_recurring: bool = False
+
+
+class SubscriptionStateRequest(BaseModel):
+    init_data: Optional[str] = None
+    invoice_payload: str
+    state: str
+
+
+class SubscriptionOrderRequest(BaseModel):
+    product: str
+
+
+class SubscriptionOrderResponse(BaseModel):
+    invoice_url: str
+    payload: str
+    price_stars: int
+
+
+class SubscriptionStatusResponse(BaseModel):
+    product: Optional[str] = None
+    status: Optional[str] = None
+    current_period_end: Optional[datetime] = None
+    extra_alerts: int = 0
+    credit_remaining: int = 0
+    credit_total: int = 0
+
+
+class ChannelStatsItem(BaseModel):
+    item_id: int
+    title: Optional[str] = None
+    image_path: Optional[str] = None
+    status: Optional[str] = None
+    views_total: int = 0
+    views_daily: List[dict] = []
+    alert_matches: int = 0
+    dispatched: dict = {}
+
+
+class ChannelStatsCore(BaseModel):
+    items: List[ChannelStatsItem] = []
+    matching_buyers: int = 0
+    total_dispatched: dict = {}
+
+
+class PricePositioningRow(BaseModel):
+    item_id: int
+    median_price: Optional[float] = None
+    pct_diff: Optional[float] = None
+
+
+class CategoryPulseRow(BaseModel):
+    category: Optional[str] = None
+    this_week: int = 0
+    last_week: int = 0
+
+
+class TopPerformerRow(BaseModel):
+    item_id: int
+    title: Optional[str] = None
+    views: int = 0
+
+
+class ChannelStatsPro(BaseModel):
+    price_positioning: List[PricePositioningRow] = []
+    category_pulse: List[CategoryPulseRow] = []
+    top_performers: List[TopPerformerRow] = []
+
+
+class ChannelStatsResponse(BaseModel):
+    is_pro: bool
+    core: ChannelStatsCore
+    pro: Optional[ChannelStatsPro] = None

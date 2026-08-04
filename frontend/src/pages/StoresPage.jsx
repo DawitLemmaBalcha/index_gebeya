@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, PlusCircle, Loader2, RefreshCw, AlertCircle, X } from 'lucide-react';
 import { useOwnerChannels } from '../hooks/useOwnerChannels';
+import { API_BASE_URL } from '../config';
+import { getAnalyticsHeaders } from '../utils/analytics';
 import ChannelInventory from '../components/ChannelInventory';
 
-const StoresPage = () => {
+const StoresPage = ({ deepLink }) => {
   const { channels, loading, error, fetchChannels, hasBeenFetched, togglePause, removeChannel } = useOwnerChannels();
   const [howToExpanded, setHowToExpanded] = useState(false);
   const [modalState, setModalState] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState(null);
+  const [deepLinkItem, setDeepLinkItem] = useState(null);
 
   // Lazy load: fetch only on first activation
   useEffect(() => {
@@ -16,6 +19,36 @@ const StoresPage = () => {
       fetchChannels();
     }
   }, [hasBeenFetched, fetchChannels]);
+
+  // NB-45: deep link handling — auto-open ChannelInventory for the channel,
+  // then auto-open ProductEditPanel for the exact item (§2.8).
+  useEffect(() => {
+    if (!deepLink) return;
+    let cancelled = false;
+
+    (async () => {
+      if (channels.length === 0 && !hasBeenFetched) {
+        try { await fetchChannels(); } catch { /* error surfaces via hook */ }
+      }
+      const channel = channels.find((c) => String(c.id) === String(deepLink.channelId));
+      if (!channel) return;
+      setSelectedChannel(channel);
+      try {
+        const res = await fetch(`${API_BASE_URL}/items/${deepLink.itemId}`, {
+          headers: { ...getAnalyticsHeaders() },
+        });
+        if (res.ok) {
+          const item = await res.json();
+          if (!cancelled) setDeepLinkItem(item);
+        }
+      } catch {
+        // The inventory opens regardless; the product panel needs the item
+        // fetch to succeed, which it will on retry from the grid.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [deepLink, channels, hasBeenFetched, fetchChannels]);
 
   const formatNumber = (num) => {
     if (num == null) return '—';
@@ -88,7 +121,8 @@ const StoresPage = () => {
       return (
         <ChannelInventory
           channel={selectedChannel}
-          onClose={() => setSelectedChannel(null)}
+          onClose={() => { setSelectedChannel(null); setDeepLinkItem(null); }}
+          initialProduct={deepLinkItem}
         />
       );
     }
@@ -96,6 +130,9 @@ const StoresPage = () => {
     return (
       <div className="px-4 pt-4 pb-24">
         <h1 className="text-xl font-bold text-gray-900 mb-4">My Stores</h1>
+
+        {/* NB-46: Subscription status card + upgrade entry added in
+            Phase 5 of the monetization build (useSubscription.js) */}
 
         {/* Error toast for action failures */}
         {error && error !== 'NOT_IN_TELEGRAM' && channels.length > 0 && (

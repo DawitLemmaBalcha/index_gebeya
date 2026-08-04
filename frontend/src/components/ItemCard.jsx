@@ -93,6 +93,13 @@ const ItemCard = ({ item, onSelect, apiUrl, variant, onMarkSold, onEdit, onRelis
       {getMatchBadge()}
       {getStatusBadge()}
 
+      {/* NB-43: Boosted badge — labeled pin (Rule 3.3), next to the match badge */}
+      {item.is_boosted && (
+        <div className="absolute top-2 left-16 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1 z-10">
+          ⚡ Boosted
+        </div>
+      )}
+
       {/* Image Area */}
       <div className="relative aspect-square bg-ethiopia-paper overflow-hidden">
         <img 
