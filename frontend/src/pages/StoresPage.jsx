@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, PlusCircle, Loader2, RefreshCw, AlertCircle, X } from 'lucide-react';
+import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, PlusCircle, Loader2, RefreshCw, AlertCircle, X, Sparkles, Star } from 'lucide-react';
 import { useOwnerChannels } from '../hooks/useOwnerChannels';
+import { useSubscription } from '../hooks/useSubscription';
 import { API_BASE_URL } from '../config';
 import { getAnalyticsHeaders } from '../utils/analytics';
 import ChannelInventory from '../components/ChannelInventory';
 
 const StoresPage = ({ deepLink }) => {
   const { channels, loading, error, fetchChannels, hasBeenFetched, togglePause, removeChannel } = useOwnerChannels();
+  const { status: subStatus, loading: subLoading, error: subError, getStatus, openInvoice } = useSubscription();
   const [howToExpanded, setHowToExpanded] = useState(false);
   const [modalState, setModalState] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -19,6 +21,13 @@ const StoresPage = ({ deepLink }) => {
       fetchChannels();
     }
   }, [hasBeenFetched, fetchChannels]);
+
+  // NB-46: subscription status for the card
+  useEffect(() => {
+    if (hasBeenFetched) {
+      getStatus();
+    }
+  }, [hasBeenFetched, getStatus]);
 
   // NB-45: deep link handling — auto-open ChannelInventory for the channel,
   // then auto-open ProductEditPanel for the exact item (§2.8).
@@ -131,8 +140,68 @@ const StoresPage = ({ deepLink }) => {
       <div className="px-4 pt-4 pb-24">
         <h1 className="text-xl font-bold text-gray-900 mb-4">My Stores</h1>
 
-        {/* NB-46: Subscription status card + upgrade entry added in
-            Phase 5 of the monetization build (useSubscription.js) */}
+        {/* NB-46: Subscription status card + upgrade entry (Rule 2.4 —
+            price shown in context, never a rate card). Gated on a
+            successful status fetch: when monetization is disabled the
+            backend returns 503 and getStatus leaves subStatus null — the
+            whole card (active status AND upgrade CTA) stays hidden. */}
+        {subStatus !== null && (
+          <div className="bg-gradient-to-br from-brand-50 to-amber-50 rounded-2xl p-4 border border-brand-100 mb-4">
+            {subStatus?.product ? (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles size={16} className="text-amber-500" />
+                  <h3 className="text-sm font-bold text-gray-900 capitalize">
+                    {subStatus.product === 'all_in_one' ? 'All-in-One' : 'Alerts Only'} Subscription
+                  </h3>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-gray-600 mb-2">
+                  <span>+{subStatus.extra_alerts} alerts</span>
+                  {subStatus.product === 'all_in_one' && (
+                    <span className="flex items-center gap-1">
+                      <Star size={12} className="text-amber-500" />
+                      {subStatus.credit_remaining}/{subStatus.credit_total} boost credits
+                    </span>
+                  )}
+                  {subStatus.current_period_end && (
+                    <span className="text-gray-400">
+                      renews {new Date(subStatus.current_period_end).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  <Sparkles size={16} className="text-amber-500" />
+                  Boost your selling power
+                </h3>
+                <p className="text-xs text-gray-600 mb-3">
+                  More active alerts, monthly boost credits, and seller intelligence.
+                </p>
+                {subError && subError !== 'NOT_IN_TELEGRAM' && (
+                  <p className="text-xs text-red-600 mb-2">{subError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openInvoice('alerts_only')}
+                    disabled={subLoading}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
+                  >
+                    {subLoading ? 'Opening invoice...' : 'Upgrade to Alerts Only'}
+                  </button>
+                  <button
+                    onClick={() => openInvoice('all_in_one')}
+                    disabled={subLoading}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+                  >
+                    All-in-One
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Error toast for action failures */}
         {error && error !== 'NOT_IN_TELEGRAM' && channels.length > 0 && (

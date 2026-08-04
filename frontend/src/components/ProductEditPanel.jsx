@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   ArrowLeft, ExternalLink, Loader2, DollarSign, CheckCircle,
-  AlertTriangle, RefreshCw, X, Plus, Trash2, Rocket
+  AlertTriangle, RefreshCw, X, Plus, Trash2, Rocket, Star
 } from 'lucide-react';
 import { TAXONOMY } from '../constants/taxonomy';
 import { API_BASE_URL } from '../config';
 import { useBoost } from '../hooks/useBoost';
+import { useSubscription } from '../hooks/useSubscription';
 
 /**
  * TECH-23: Full-screen edit panel for a single product.
@@ -52,14 +53,33 @@ const ProductEditPanel = ({
   const { quote, activeBoost, boosting, error: boostError, payWithStars, refreshQuote } = useBoost(item.id);
   const [boostPaid, setBoostPaid] = useState(false);
 
+  // NB-46: subscription credit for the credit-boost path (Rule 7.3)
+  const { status: subStatus, loading: subLoading, error: subError, getStatus, applyCreditBoost } = useSubscription();
+  const [creditBoosted, setCreditBoosted] = useState(false);
+
   useEffect(() => {
     refreshQuote();
   }, [refreshQuote]);
+
+  useEffect(() => {
+    if (subStatus == null) {
+      getStatus();
+    }
+  }, [subStatus, getStatus]);
 
   const handleBoost = async () => {
     const paid = await payWithStars();
     if (paid) {
       setBoostPaid(true);
+      if (onBoosted) onBoosted();
+    }
+  };
+
+  const handleCreditBoost = async () => {
+    const ok = await applyCreditBoost(item.id);
+    if (ok) {
+      setCreditBoosted(true);
+      refreshQuote();
       if (onBoosted) onBoosted();
     }
   };
@@ -438,6 +458,26 @@ const ProductEditPanel = ({
                 )}
                 Boost with Stars
               </button>
+
+              {/* NB-46 Rule 7.3: subscription credit — only when credit remains */}
+              {(subStatus?.credit_remaining || 0) > 0 && (
+                <button
+                  onClick={handleCreditBoost}
+                  disabled={subLoading || creditBoosted}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors disabled:opacity-50"
+                >
+                  {subLoading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Star size={16} />
+                  )}
+                  Use Subscription Credit ({subStatus.credit_remaining} left)
+                </button>
+              )}
+
+              {subError && subError !== 'NOT_IN_TELEGRAM' && (
+                <p className="text-xs text-red-600">{subError}</p>
+              )}
 
               {boostError && boostError !== 'NOT_IN_TELEGRAM' && (
                 <p className="text-xs text-red-600">{boostError}</p>
