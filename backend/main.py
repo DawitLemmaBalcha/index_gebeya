@@ -320,6 +320,38 @@ def startup_event():
     except Exception as e:
         logger.warning(f"⚠️ Cleanup scheduler setup failed: {e}")
 
+    # ===================================================================
+    # Phase 5.6 — TECH-31: Daily Star payments reconciliation
+    # ===================================================================
+    try:
+        import asyncio
+        import threading
+        from constants import MONETIZATION_ENABLED
+        from services.reconciliation import reconcile_star_payments
+
+        def _schedule_reconcile():
+            try:
+                if MONETIZATION_ENABLED:
+                    from database import SessionLocal
+                    db = SessionLocal()
+                    try:
+                        summary = asyncio.run(reconcile_star_payments(db))
+                        logger.info(f"✅ Star payments reconciliation: {summary}")
+                    finally:
+                        db.close()
+                else:
+                    logger.info("⏸️ Star reconciliation skipped (MONETIZATION_ENABLED=0)")
+            except Exception as e:
+                logger.warning(f"⚠️ Star reconcile task failed: {e}")
+            threading.Timer(86400, _schedule_reconcile).start()  # 24h
+
+        threading.Timer(3600, _schedule_reconcile).start()  # first run after 1h
+        logger.info("✅ TECH-31 daily star reconciliation scheduler registered")
+    except ImportError as e:
+        logger.warning(f"⚠️ Could not import reconciliation service: {e}")
+    except Exception as e:
+        logger.warning(f"⚠️ Star reconcile scheduler setup failed: {e}")
+
 @app.get("/")
 def read_root():
     return {"status": "online", "service": "Index Gebeya Alpha 0.6.0"}
