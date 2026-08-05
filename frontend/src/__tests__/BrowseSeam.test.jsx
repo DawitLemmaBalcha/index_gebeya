@@ -43,6 +43,15 @@ function Harness() {
       <button onClick={() => shop.setActiveCategory('Laptops & Computers')}>cat-laptops</button>
       <button onClick={() => shop.setActiveCategory('All')}>cat-all</button>
       <button onClick={() => shop.setActiveSubCategory('Cases')}>sub-cases</button>
+      {/* CategorySheet seam: handleSelectSubcategory batches category +
+          subcategory in one handler (useShop's own subcategory reset then
+          lands on "All"). */}
+      <button onClick={() => { shop.setActiveCategory('Mobile Phones'); shop.setActiveSubCategory('All'); }}>cat-phones-sheet</button>
+      <input
+        data-testid="search-input"
+        value={shop.searchQuery}
+        onChange={(e) => shop.setSearchQuery(e.target.value)}
+      />
       {shop.displayItems.map((i) => (
         <div key={i.id} data-testid="item">{i.title}</div>
       ))}
@@ -169,5 +178,44 @@ describe('BrowseSeam', () => {
     // Exactly ONE badge on screen: the boosted card's; the organic card's
     // is_boosted: false must NOT render a second one.
     expect(screen.getAllByText('⚡ Boosted')).toHaveLength(1)
+  })
+
+  it('REGRESSION: stale text search must not mask browse results (feed → search → browse user flow)', async () => {
+    // Real user session (api logs): /feed/foryou → POST /search/ → then
+    // /items/browse. The browse response updates `items`, but if a stale
+    // searchResults overrides displayItems, the screen keeps rendering the
+    // old search results — boosted item 952 never appears pinned/badged.
+    const boostedPhone = { ...browseItem, id: 952, title: 'BLU G 34', subcategory: 'Other', is_boosted: true }
+    const organicPhone = { ...organicItem, id: 953, title: 'Organic Phone', subcategory: 'Android Phones', is_boosted: false }
+    const searchOnlyItem = { ...organicItem, id: 900, title: 'Search-Only Item', is_boosted: false }
+
+    fetchMock.mockImplementation((url) => {
+      const u = String(url)
+      if (u.includes('/items/browse')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [boostedPhone, organicPhone], total: 2 }) })
+      }
+      if (u.includes('/search/')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [searchOnlyItem], total: 1 }) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+    })
+
+    render(<Harness />)
+
+    // 1. User performs a text search (debounced 600ms) — results render.
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'blu' } })
+    await waitFor(() => expect(screen.getByText('Search-Only Item')).toBeDefined(), { timeout: 3000 })
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/search/'), expect.anything())
+
+    // 2. User opens the CategorySheet and picks Mobile Phones (the sheet
+    //    batches category + subcategory in one handler — cat-phones-sheet).
+    fireEvent.click(screen.getByText('cat-phones-sheet'))
+
+    // 3. The browse page must take over the screen: boosted item FIRST,
+    //    stale search results GONE.
+    await waitFor(() => expect(screen.getByText('BLU G 34')).toBeDefined(), { timeout: 3000 })
+    const renderedTitles = screen.getAllByTestId('item').map((el) => el.textContent)
+    expect(renderedTitles[0]).toBe('BLU G 34')
+    expect(screen.queryByText('Search-Only Item')).toBeNull()
   })
 })

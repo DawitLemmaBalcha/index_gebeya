@@ -243,6 +243,12 @@ export const useShop = () => {
     setOffset(0);
     setHasMore(true);
     if (isRealCategory(activeCategory)) {
+      // Entering browse mode must drop stale transient search state: a text
+      // search performed before browsing keeps searchResults set, and
+      // displayItems would render those old results instead of the browse
+      // page (displayItems: searchResults/visualResults override `items`).
+      setSearchResults(null);
+      setVisualResults(null);
       fetchBrowseCategory(activeCategory, 0);
     } else {
       fetchItems(0);
