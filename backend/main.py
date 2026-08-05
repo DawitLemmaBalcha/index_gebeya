@@ -188,6 +188,59 @@ def startup_event():
 
     try:
         with engine.begin() as conn:
+            # USER-DELETION FK POLICY (side mission, TECH-25 class):
+            # sqladmin hard-delete of a users row used to fail with
+            # ForeignKeyViolation because 8 FKs referenced users.id with no
+            # ON DELETE action (RESTRICT default). Locked policy:
+            #   user_interactions.user_id → ON DELETE SET NULL
+            #   alerts/notifications/reviews/sold_reports/boosts/
+            #     subscriptions user_id + item_edits.edited_by →
+            #     ON DELETE CASCADE
+            # channels.registered_by is a plain BigInteger, NOT an FK —
+            # intentionally untouched (channels survive user deletion).
+            # Idempotency: PostgreSQL has no ADD CONSTRAINT IF NOT EXISTS, so
+            # each drop is guarded on pg_constraint existence — the repo-
+            # consistent extension of the IF NOT EXISTS idiom (TECH-25
+            # precedent). Safe on all three states: legacy DB (RESTRICT →
+            # dropped, re-added with action), prior run (action → dropped,
+            # re-added identical — a no-op churn), fresh DB (create_all made
+            # the action → no-op churn). No error path on any repeat.
+            fk_actions = [
+                # (table, column, constraint, on_delete_action)
+                ("user_interactions", "user_id", "user_interactions_user_id_fkey", "SET NULL"),
+                ("alerts", "user_id", "alerts_user_id_fkey", "CASCADE"),
+                ("notifications", "user_id", "notifications_user_id_fkey", "CASCADE"),
+                ("reviews", "user_id", "reviews_user_id_fkey", "CASCADE"),
+                ("sold_reports", "user_id", "sold_reports_user_id_fkey", "CASCADE"),
+                ("item_edits", "edited_by", "item_edits_edited_by_fkey", "CASCADE"),
+                ("boosts", "user_id", "boosts_user_id_fkey", "CASCADE"),
+                ("subscriptions", "user_id", "subscriptions_user_id_fkey", "CASCADE"),
+            ]
+            for table, column, constraint, action in fk_actions:
+                conn.execute(text(
+                    f"""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = '{constraint}'
+                              AND conrelid = '{table}'::regclass
+                        ) THEN
+                            ALTER TABLE {table} DROP CONSTRAINT {constraint};
+                        END IF;
+                    END $$;
+                    """
+                ))
+                conn.execute(text(
+                    f"ALTER TABLE {table} ADD CONSTRAINT {constraint} "
+                    f"FOREIGN KEY ({column}) REFERENCES users(id) ON DELETE {action}"
+                ))
+            logger.info("✅ user-deletion FK policy migration verified (8 user FKs)")
+    except Exception as e:
+        logger.warning(f"⚠️ user-deletion FK policy migration failed: {e}")
+
+    try:
+        with engine.begin() as conn:
             # TECH-26 (NB-43..NB-47): monetization schema
             #   1. alerts.lapsed — additive boolean; True = deactivated by
             #      subscription lapse, distinct from user pause (lapsed=False).

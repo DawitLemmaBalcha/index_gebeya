@@ -18,9 +18,12 @@ class User(Base):
 
     # Relationships
     alerts = relationship("Alert", back_populates="user", cascade="all, delete-orphan")
-    reviews = relationship("Review", back_populates="user")
-    interactions = relationship("UserInteraction", back_populates="user")
-    notifications = relationship("Notification", back_populates="user")
+    # passive_deletes=True (user-deletion policy): the DB-level ON DELETE
+    # action does the work — without it the ORM pre-nullifies these child FKs
+    # on user delete, which violates their NOT NULL columns before the DB acts.
+    reviews = relationship("Review", back_populates="user", passive_deletes=True)
+    interactions = relationship("UserInteraction", back_populates="user", passive_deletes=True)
+    notifications = relationship("Notification", back_populates="user", passive_deletes=True)
 
 
 class UserInteraction(Base):
@@ -28,7 +31,8 @@ class UserInteraction(Base):
     __tablename__ = "user_interactions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    # user-deletion policy (ADR-0001 pattern): user delete → SET NULL (analytics history survives)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     session_id = Column(String, nullable=True)
     
     # MODIFIED: Changed to nullable=True to support generic events (e.g., Search)
@@ -51,7 +55,8 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # user-deletion policy (ADR-0001 pattern): user delete cascades alerts
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     
     # Core Criteria
     query_text = Column(String, nullable=True) # Textual representation of what they wanted
@@ -90,7 +95,8 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # user-deletion policy (ADR-0001 pattern): user delete cascades notifications
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=True)
     alert_id = Column(Integer, ForeignKey("alerts.id", ondelete="CASCADE"), nullable=True) # TECH-25: alert purge cascades its notifications at the DB level
     
@@ -149,7 +155,8 @@ class Review(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     channel_id = Column(Integer, ForeignKey("channels.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # user-deletion policy (ADR-0001 pattern): user delete cascades reviews
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     rating = Column(Integer, nullable=False)
     comment = Column(Text, nullable=True)
     user_photo_url = Column(Text, nullable=True)  # URL to reviewer's Telegram profile photo
@@ -235,7 +242,8 @@ class SoldReport(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # user-deletion policy (ADR-0001 pattern): user delete cascades sold_reports
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -253,7 +261,8 @@ class ItemEdit(Base):
     field = Column(String, nullable=False)
     old_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)
-    edited_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # user-deletion policy (ADR-0001 pattern): user delete cascades item_edits (edited_by)
+    edited_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -279,7 +288,8 @@ class Boost(Base):
     id = Column(Integer, primary_key=True, index=True)
     item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False, index=True)
     channel_id = Column(Integer, ForeignKey("channels.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # user-deletion policy (ADR-0001 pattern): user delete cascades boosts
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     source = Column(String, nullable=False, default="paid")
     price_paid_stars = Column(Integer, nullable=True)  # NULL for credit boosts
     telegram_payment_charge_id = Column(String, nullable=True, unique=True)
@@ -296,7 +306,8 @@ class Subscription(Base):
     __tablename__ = "subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # user-deletion policy (ADR-0001 pattern): user delete cascades subscriptions
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     product = Column(String, nullable=False)
     status = Column(String, nullable=False, default="active")
     telegram_payment_charge_id = Column(String, nullable=True, unique=True)
