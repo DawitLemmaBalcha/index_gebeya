@@ -387,6 +387,12 @@ class SubscriptionStatusResponse(BaseModel):
     status: Optional[str] = None
     current_period_end: Optional[datetime] = None
     extra_alerts: int = 0
+    # UAT round-2 (FIX 3): the EXTRA-ALERT ALLOWANCE (the configurable
+    # constant), NOT the held count. `extra_alerts` holds the count the
+    # user currently holds (0 for free users) and must never be used for
+    # the upsell pitch; the UI pitches with this allowance instead
+    # (closes the NB-48 QA follow-up).
+    alerts_extra_allowance: int = 0
     credit_remaining: int = 0
     credit_total: int = 0
     # NB-48 (§2.2): the status payload is the hub's data endpoint — caps,

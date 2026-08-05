@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { getAnalyticsHeaders } from '../utils/analytics';
 
@@ -7,12 +7,26 @@ import { getAnalyticsHeaders } from '../utils/analytics';
  * Mirrors the getInitData / getAnalyticsHeaders patterns from
  * useChannelInventory.js. Quote fetch is the kill-switch surface: when
  * MONETIZATION_ENABLED=0 the backend returns 503 and the section hides.
+ *
+ * UAT round-2 (FIX 1): itemId is MUTABLE — the hub's inline product
+ * picker re-quotes the newly tapped item by changing the itemId prop.
+ * A reset effect clears the stale quote/active-boost/error on every item
+ * change; the `?item` deep-link path is unchanged (initial mount resets
+ * null → null, a no-op, then refreshQuote() fetches once).
  */
 export function useBoost(itemId) {
   const [quote, setQuote] = useState(null);
   const [activeBoost, setActiveBoost] = useState(null);
   const [boosting, setBoosting] = useState(false);
   const [error, setError] = useState(null);
+
+  // FIX 1: item switched (picker selection) → drop the previous item's
+  // quote so the UI never shows stale price data for the new selection.
+  useEffect(() => {
+    setQuote(null);
+    setActiveBoost(null);
+    setError(null);
+  }, [itemId]);
 
   const getInitData = () => {
     try {

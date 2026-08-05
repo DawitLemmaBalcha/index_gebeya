@@ -17,6 +17,9 @@ const mockOpenInvoice = vi.fn()
 const mockFetchAlerts = vi.fn()
 const mockRefreshQuote = vi.fn()
 const mockPayWithStars = vi.fn()
+// UAT round-2 (FIX 1): inline product picker data machinery
+const mockFetchChannels = vi.fn()
+const mockFetchProducts = vi.fn()
 
 let mockStatus = null
 let mockSubLoading = false
@@ -25,6 +28,11 @@ let mockHasBeenFetched = false
 let mockQuote = null
 let mockActiveBoost = null
 let mockBoostError = null
+let mockChannels = []
+let mockChannelsFetched = true
+let mockProducts = []
+let mockProductsLoading = false
+let mockProductsError = null
 
 vi.mock('../hooks/useSubscription', () => ({
   useSubscription: () => ({
@@ -59,6 +67,29 @@ vi.mock('../hooks/useBoost', () => ({
     error: mockBoostError,
     payWithStars: mockPayWithStars,
     refreshQuote: mockRefreshQuote,
+  }),
+}))
+
+// UAT round-2 (FIX 1): picker data — channels + per-channel items
+vi.mock('../hooks/useOwnerChannels', () => ({
+  useOwnerChannels: () => ({
+    channels: mockChannels,
+    loading: false,
+    error: null,
+    fetchChannels: mockFetchChannels,
+    hasBeenFetched: mockChannelsFetched,
+    togglePause: vi.fn(),
+    removeChannel: vi.fn(),
+  }),
+}))
+
+vi.mock('../hooks/useOwnerProducts', () => ({
+  useOwnerProducts: () => ({
+    products: mockProducts,
+    loading: mockProductsLoading,
+    error: mockProductsError,
+    hasBeenFetched: true,
+    fetchProducts: mockFetchProducts,
   }),
 }))
 
@@ -100,6 +131,11 @@ beforeEach(() => {
   mockQuote = null
   mockActiveBoost = null
   mockBoostError = null
+  mockChannels = [{ id: 7, username: 'channel', title: 'My Channel' }]
+  mockChannelsFetched = true
+  mockProducts = []
+  mockProductsLoading = false
+  mockProductsError = null
   vi.clearAllMocks()
   mockGetStatus.mockResolvedValue({ ...defaultStatus })
 })
@@ -146,14 +182,57 @@ describe('MonetizationHub - boost tab (Rule 2.4: never a rate card)', () => {
   it('shows the floor price and NEVER a category table', () => {
     renderHub('/hub/boost')
     expect(screen.getByText(/from 25 Stars/i)).toBeInTheDocument()
-    expect(screen.getByText('Choose a product')).toBeInTheDocument()
     expect(screen.queryByRole('table')).toBeNull()
   })
 
-  it('Choose a product navigates to /stores', () => {
+  it('renders the inline product picker with item title + status (FIX 1)', () => {
+    mockProducts = [
+      { id: 1, title: 'iPhone 15', status: 'active', images: ['i.jpg'] },
+      { id: 2, title: 'MacBook Pro', status: 'sold', images: [] },
+    ]
     renderHub('/hub/boost')
-    fireEvent.click(screen.getByText('Choose a product'))
-    expect(screen.getByTestId('stores-page')).toBeInTheDocument()
+    expect(screen.getByText('iPhone 15')).toBeInTheDocument()
+    expect(screen.getByText('MacBook Pro')).toBeInTheDocument()
+    expect(screen.getByText('ACTIVE')).toBeInTheDocument()
+    expect(screen.getByText('SOLD')).toBeInTheDocument()
+    // The dead loop is gone: no "Choose a product" / stores navigation
+    expect(screen.queryByText('Choose a product')).not.toBeInTheDocument()
+  })
+
+  it('shows the empty state when the seller has no items (FIX 1)', () => {
+    mockProducts = []
+    renderHub('/hub/boost')
+    expect(
+      screen.getByText(/No products to boost yet — your items appear here after they're indexed/i)
+    ).toBeInTheDocument()
+  })
+
+  it('tapping a picker row selects the item in place: quote + boost button (FIX 1)', async () => {
+    mockProducts = [
+      { id: 42, title: 'iPhone 15', status: 'active', images: ['i.jpg'] },
+      { id: 9, title: 'MacBook Pro', status: 'active', images: [] },
+    ]
+    mockQuote = { price_stars: 150, duration_days: 7, boostable: true, active_boost: null }
+    renderHub('/hub/boost')
+    fireEvent.click(screen.getByTestId('picker-item-42'))
+    await waitFor(() => expect(screen.getByText(/150 Stars/i)).toBeInTheDocument())
+    expect(screen.getByText('Boost this item')).toBeInTheDocument()
+    // The title appears in the quote card AND the picker row
+    expect(screen.getAllByText('iPhone 15').length).toBe(2)
+  })
+
+  it('tapping another item switches the selection and re-quotes (FIX 1)', async () => {
+    mockProducts = [
+      { id: 1, title: 'Item One', status: 'active', images: [] },
+      { id: 2, title: 'Item Two', status: 'active', images: [] },
+    ]
+    mockQuote = { price_stars: 100, duration_days: 7, boostable: true, active_boost: null }
+    renderHub('/hub/boost')
+    fireEvent.click(screen.getByTestId('picker-item-1'))
+    await waitFor(() => expect(screen.getByText(/100 Stars/i)).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('picker-item-2'))
+    await waitFor(() => expect(mockRefreshQuote).toHaveBeenCalledTimes(2))
+    expect(screen.getAllByText('Item Two').length).toBe(2)
   })
 
   it('preselected item shows exact price + "Boost this item"', async () => {
@@ -187,8 +266,26 @@ describe('MonetizationHub - boost tab (Rule 2.4: never a rate card)', () => {
   it('falls back to the guide state when the quote fails (403/404/503)', async () => {
     mockBoostError = 'Quote unavailable (503)'
     renderHub('/hub/boost?item=42')
-    await waitFor(() => expect(screen.getByText('Choose a product')).toBeInTheDocument())
-    expect(screen.getByText(/from 25 Stars/i)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(/from 25 Stars/i)).toBeInTheDocument())
+    expect(screen.queryByText('Boost this item')).not.toBeInTheDocument()
+    // No dead-loop button on failure either
+    expect(screen.queryByText('Choose a product')).not.toBeInTheDocument()
+  })
+})
+
+describe('MonetizationHub - user-facing title (UAT round-2 FIX 2)', () => {
+  it('renders "Boost & Subscriptions" as the page title', () => {
+    renderHub('/hub/boost')
+    expect(screen.getAllByText('Boost & Subscriptions').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Monetization Hub')).not.toBeInTheDocument()
+  })
+
+  it('the unavailable state also uses the user-facing title', () => {
+    mockStatus = null
+    mockSubLoading = false
+    renderHub('/hub/alerts')
+    expect(screen.getAllByText('Boost & Subscriptions').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Monetization Hub')).not.toBeInTheDocument()
   })
 })
 

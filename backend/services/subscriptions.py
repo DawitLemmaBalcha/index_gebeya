@@ -290,6 +290,7 @@ def get_subscription_status(db: Session, user: User) -> dict:
             "status": None,
             "current_period_end": None,
             "extra_alerts": 0,
+            "alerts_extra_allowance": ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
             "credit_remaining": 0,
             "credit_total": 0,
             "free_cap": MAX_ALERTS_PER_USER,
@@ -305,6 +306,7 @@ def get_subscription_status(db: Session, user: User) -> dict:
         "status": sub.status,
         "current_period_end": sub.current_period_end,
         "extra_alerts": ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
+        "alerts_extra_allowance": ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
         "credit_remaining": get_credit_boosts_remaining(db, user),
         "credit_total": (
             ALL_IN_ONE_MONTHLY_BOOST_CREDIT if sub.product == "all_in_one" else 0

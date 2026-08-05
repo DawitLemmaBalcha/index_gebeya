@@ -226,6 +226,7 @@ describe('AlertsPage - cap awareness banner (NB-48 §2.4.1)', () => {
     effective_cap: 20,
     cap_banner_threshold: 2,
     extra_alerts: 0,
+    alerts_extra_allowance: 10,  // FIX 3: the allowance (not the held count)
     alerts_only_price_stars: 30,
     ...overrides,
   })
@@ -236,6 +237,14 @@ describe('AlertsPage - cap awareness banner (NB-48 §2.4.1)', () => {
     mockHasBeenFetched = true
     renderAlertsPage()
     expect(screen.getByText(/You're at 18 of 20 active alerts/i)).toBeInTheDocument()
+  })
+
+  it('banner carries the extra-alert allowance number (FIX 3)', () => {
+    mockAlerts = makeAlerts(18)
+    mockSubStatus = capStatus()
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(screen.getByText('Get 10 more active alerts')).toBeInTheDocument()
   })
 
   it('hides the banner at 17 of 20 (3 above the threshold)', () => {
@@ -284,6 +293,92 @@ describe('AlertsPage - cap awareness banner (NB-48 §2.4.1)', () => {
       </MemoryRouter>
     )
     fireEvent.click(screen.getByText(/You're at 18 of 20 active alerts/i))
+    expect(screen.getByTestId('hub-alerts')).toBeInTheDocument()
+  })
+})
+
+describe('AlertsPage - standing subscription card (UAT round-2 FIX 3)', () => {
+  const makeAlerts = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: i + 1,
+      query_text: `Alert ${i + 1}`,
+      max_price: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+      preferences: '{}',
+    }))
+
+  const capStatus = (overrides = {}) => ({
+    product: null,
+    status: null,
+    effective_cap: 20,
+    cap_banner_threshold: 2,
+    extra_alerts: 0,
+    alerts_extra_allowance: 10,
+    alerts_only_price_stars: 30,
+    ...overrides,
+  })
+
+  it('not subscribed: shows the pitch with the allowance and price', () => {
+    mockAlerts = makeAlerts(5)
+    mockSubStatus = capStatus()
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(
+      screen.getByText('More alert space — get 10 more active alerts for 30 Stars')
+    ).toBeInTheDocument()
+  })
+
+  it('is visible regardless of proximity to the cap (far from it here)', () => {
+    mockAlerts = makeAlerts(5)
+    mockSubStatus = capStatus()
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    // The cap banner is hidden at 5 of 20 (threshold 2)...
+    expect(screen.queryByText(/You're at 5 of 20 active alerts/i)).not.toBeInTheDocument()
+    // ...but the standing card still renders.
+    expect(screen.getByText(/More alert space/i)).toBeInTheDocument()
+  })
+
+  it('subscribed: shows the active status with the effective cap', () => {
+    mockAlerts = makeAlerts(3)
+    mockSubStatus = capStatus({ product: 'alerts_only', status: 'active', effective_cap: 30 })
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(screen.getByText('Alerts Plus active — 30 alerts')).toBeInTheDocument()
+    expect(screen.queryByText(/More alert space/i)).not.toBeInTheDocument()
+  })
+
+  it('hidden while the subscription status is loading', () => {
+    mockAlerts = makeAlerts(5)
+    mockSubStatus = capStatus()
+    mockSubLoading = true
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(screen.queryByText(/More alert space/i)).not.toBeInTheDocument()
+  })
+
+  it('hidden when status is null (monetization disabled)', () => {
+    mockAlerts = makeAlerts(5)
+    mockSubStatus = null
+    mockHasBeenFetched = true
+    renderAlertsPage()
+    expect(screen.queryByText(/More alert space/i)).not.toBeInTheDocument()
+  })
+
+  it('tapping the card navigates to /hub/alerts', () => {
+    mockAlerts = makeAlerts(5)
+    mockSubStatus = capStatus()
+    mockHasBeenFetched = true
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<AlertsPage />} />
+          <Route path="/hub/alerts" element={<div data-testid="hub-alerts" />} />
+        </Routes>
+      </MemoryRouter>
+    )
+    fireEvent.click(screen.getByText(/More alert space/i))
     expect(screen.getByTestId('hub-alerts')).toBeInTheDocument()
   })
 })

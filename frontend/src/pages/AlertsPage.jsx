@@ -165,7 +165,12 @@ const AlertsPage = () => {
             <p className="text-xs font-bold text-amber-800">
               You're at {alerts.length} of {subStatus.effective_cap} active alerts
             </p>
-            <p className="text-[11px] text-amber-700">More alert space is one tap away</p>
+            {/* FIX 3: the banner now carries the extra-alert allowance
+                number (alerts_extra_allowance — the configurable constant,
+                NOT the held count). */}
+            <p className="text-[11px] text-amber-700">
+              Get {subStatus.alerts_extra_allowance} more active alerts
+            </p>
           </div>
           <ChevronRight size={16} className="text-amber-500 shrink-0" />
         </button>
@@ -268,6 +273,32 @@ const AlertsPage = () => {
             Create Your First Alert
           </button>
         </div>
+      )}
+
+      {/* UAT round-2 (FIX 3): standing alerts-subscription entry — a
+          persistent card at the bottom of the alerts list, visible
+          regardless of proximity to the cap (the banner above is
+          conditional; this card always anchors the subscription offer).
+          Not subscribed → pitch with the extra-alert allowance
+          (alerts_extra_allowance, NOT the held count) + price. Subscribed
+          → active status with the effective cap. Hidden while loading or
+          when status is null (monetization disabled). Tap → hub Alerts. */}
+      {subStatus && !subLoading && (
+        <button
+          onClick={() => navigate('/hub/alerts')}
+          className="w-full mb-6 flex items-center justify-between gap-2 p-3 rounded-xl bg-white border border-gray-100 shadow-sm text-left hover:bg-gray-50 transition-colors"
+        >
+          {subStatus.product ? (
+            <p className="text-xs font-bold text-green-700">
+              Alerts Plus active — {subStatus.effective_cap} alerts
+            </p>
+          ) : (
+            <p className="text-xs font-bold text-gray-900">
+              More alert space — get {subStatus.alerts_extra_allowance} more active alerts for {subStatus.alerts_only_price_stars} Stars
+            </p>
+          )}
+          <ChevronRight size={16} className="text-gray-400 shrink-0" />
+        </button>
       )}
 
       {/* Match History Section */}

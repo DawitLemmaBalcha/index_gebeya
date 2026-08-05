@@ -6,7 +6,10 @@ from starlette.responses import Response
 import base64
 
 from database import engine
-from models import User, UserInteraction, Alert, Notification, Channel, Review, Item, ItemImage
+from models import (
+    User, UserInteraction, Alert, Notification, Channel, Review, Item, ItemImage,
+    Boost, Subscription,  # UAT round-2 (FIX 4): monetization tables
+)
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +65,8 @@ class UserInteractionAdmin(ModelView, model=UserInteraction):
 
 class AlertAdmin(ModelView, model=Alert):
     column_list = [Alert.id, Alert.user_id, Alert.query_text, Alert.max_price,
-                   Alert.is_active, Alert.created_at, Alert.expires_at, Alert.last_triggered_at]
+                   Alert.is_active, Alert.created_at, Alert.expires_at, Alert.last_triggered_at,
+                   Alert.lapsed, Alert.deleted_at]  # FIX 4: lapse + soft-delete markers
     column_searchable_list = [Alert.query_text]
     column_sortable_list = [Alert.id, Alert.created_at, Alert.best_opportunity_score]
     can_export = True
@@ -135,6 +139,43 @@ class ItemImageAdmin(ModelView, model=ItemImage):
     icon = "fa-solid fa-image"
 
 
+class BoostAdmin(ModelView, model=Boost):
+    """UAT round-2 (FIX 4): full CRUD for the boosts table."""
+    column_list = [Boost.id, Boost.item_id, Boost.channel_id, Boost.user_id,
+                   Boost.source, Boost.price_paid_stars,
+                   Boost.telegram_payment_charge_id, Boost.starts_at,
+                   Boost.ends_at, Boost.created_at]
+    column_searchable_list = [Boost.telegram_payment_charge_id]
+    column_sortable_list = [Boost.id, Boost.ends_at, Boost.created_at]
+    can_create = True
+    can_edit = True
+    can_delete = True
+    can_export = True
+    name = "Boost"
+    name_plural = "Boosts"
+    icon = "fa-solid fa-rocket"
+
+
+class SubscriptionAdmin(ModelView, model=Subscription):
+    """UAT round-2 (FIX 4): full CRUD for the subscriptions table."""
+    column_list = [Subscription.id, Subscription.user_id, Subscription.product,
+                   Subscription.status, Subscription.telegram_payment_charge_id,
+                   Subscription.invoice_payload, Subscription.current_period_start,
+                   Subscription.current_period_end, Subscription.is_recurring,
+                   Subscription.created_at]
+    column_searchable_list = [Subscription.invoice_payload,
+                              Subscription.telegram_payment_charge_id]
+    column_sortable_list = [Subscription.id, Subscription.created_at,
+                            Subscription.current_period_end]
+    can_create = True
+    can_edit = True
+    can_delete = True
+    can_export = True
+    name = "Subscription"
+    name_plural = "Subscriptions"
+    icon = "fa-solid fa-star"
+
+
 # ---------------------------------------------------------------------------
 # Setup helper
 # ---------------------------------------------------------------------------
@@ -154,6 +195,8 @@ def setup_admin(app):
     admin.add_view(UserInteractionAdmin)
     admin.add_view(AlertAdmin)
     admin.add_view(NotificationAdmin)
+    admin.add_view(BoostAdmin)  # FIX 4: monetization tables
+    admin.add_view(SubscriptionAdmin)  # FIX 4: monetization tables
     admin.add_view(ChannelAdmin)
     admin.add_view(ReviewAdmin)
     admin.add_view(ItemAdmin)

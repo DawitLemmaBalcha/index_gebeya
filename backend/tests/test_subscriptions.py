@@ -604,6 +604,27 @@ class TestGetSubscriptionStatus:
         assert status["credit_total"] == ALL_IN_ONE_MONTHLY_BOOST_CREDIT
 
     # ------------------------------------------------------------------
+    # UAT round-2 (FIX 3): alerts_extra_allowance — the EXTRA-ALERT
+    # ALLOWANCE constant on BOTH branches. `extra_alerts` is the HELD
+    # count (0 for free users) and must NOT be used for the pitch; the
+    # allowance is the truthful, configurable source (NB-48 QA follow-up).
+    # ------------------------------------------------------------------
+
+    def test_status_without_subscription_exposes_extra_alert_allowance(self, db_session):
+        user = _make_user(db_session)
+        status = get_subscription_status(db_session, user)
+        assert status["alerts_extra_allowance"] == ALERTS_SUBSCRIPTION_EXTRA_ALERTS
+        # Sanity: the held count is 0 for free users while the allowance is not.
+        assert status["extra_alerts"] == 0
+        assert status["alerts_extra_allowance"] > 0
+
+    def test_status_with_all_in_one_exposes_extra_alert_allowance(self, db_session):
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="all_in_one", charge_id="chg_stat_allow")
+        status = get_subscription_status(db_session, user)
+        assert status["alerts_extra_allowance"] == ALERTS_SUBSCRIPTION_EXTRA_ALERTS
+
+    # ------------------------------------------------------------------
     # NB-48: the status payload is the hub's data endpoint — caps,
     # banner threshold and prices on BOTH branches (blueprint §2.2).
     # ------------------------------------------------------------------
