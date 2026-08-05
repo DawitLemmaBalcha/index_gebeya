@@ -40,16 +40,22 @@ const ItemCard = ({ item, onSelect, apiUrl, variant, onMarkSold, onEdit, onRelis
   // --- MATCH CONFIDENCE BADGE ---
   const getMatchBadge = () => {
       const score = item.total_score || item.relevance_score || 0;
+      // BUG 2 fix: when the boosted badge is present (far-left top-2), the
+      // match badge stacks BELOW it (top-9) — the two left badges never
+      // overlap. Unboosted cards keep the original top-2 left-2 corner.
+      const position = item.is_boosted
+          ? 'absolute top-9 left-2'
+          : 'absolute top-2 left-2';
       if (score > 0.6) {
           return (
-              <div className="absolute top-2 left-2 bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse z-10">
+              <div className={`${position} bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse z-10`}>
                   <Sparkles size={10} /> BEST MATCH
               </div>
           );
       }
       if (score > 0.4) {
           return (
-              <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md z-10">
+              <div className={`${position} bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md z-10`}>
                   High Match
               </div>
           );
@@ -93,9 +99,10 @@ const ItemCard = ({ item, onSelect, apiUrl, variant, onMarkSold, onEdit, onRelis
       {getMatchBadge()}
       {getStatusBadge()}
 
-      {/* NB-43: Boosted badge — labeled pin (Rule 3.3), next to the match badge */}
+      {/* NB-43: Boosted badge — labeled pin (Rule 3.3), FAR-LEFT corner so it
+          can never bleed into the condition/status badges at top-2 right-2 */}
       {item.is_boosted && (
-        <div className="absolute top-2 left-16 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1 z-10">
+        <div className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md flex items-center gap-1 z-10">
           ⚡ Boosted
         </div>
       )}

@@ -256,7 +256,8 @@ def get_pinned_boosted_items(
         q = query_text.strip().lower()
         candidates = [
             i for i in candidates
-            if i.title and q in i.title.lower()
+            if (i.title and q in i.title.lower())
+            or (i.category and q in i.category.lower())
         ]
 
     if len(candidates) == 0:

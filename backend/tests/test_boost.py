@@ -484,6 +484,30 @@ class TestPinnedBoostedItems:
         pinned = get_pinned_boosted_items(db_session, query_text="iphone")
         assert [i.id for i in pinned] == [iphone.id]
 
+    def test_pinned_filters_by_query_text_matching_category(self, db_session):
+        # BUG FIX (user-verified): the search pin only matched TITLE. Rule 3.1
+        # mandates title OR category — "mobile" in "Mobile Phones" must pin
+        # "BLU G 34" even though its title doesn't contain the query.
+        user, _, blu = _make_seller_item(db_session, telegram_id=111,
+                                         title="BLU G 34", category="Mobile Phones")
+        _, _, sneakers = _make_seller_item(db_session, telegram_id=112,
+                                           title="Sneakers", category="Shoes")
+        self._boost(db_session, blu, user, charge="chg_blu")
+        self._boost(db_session, sneakers, user, charge="chg_snk")
+        db_session.commit()
+
+        pinned = get_pinned_boosted_items(db_session, query_text="mobile")
+        assert [i.id for i in pinned] == [blu.id]
+
+    def test_pinned_query_matching_neither_title_nor_category_not_pinned(self, db_session):
+        user, _, blu = _make_seller_item(db_session, telegram_id=111,
+                                         title="BLU G 34", category="Mobile Phones")
+        self._boost(db_session, blu, user, charge="chg_neither")
+        db_session.commit()
+
+        # "sneakers" is in neither the title nor the category -> no pin.
+        assert get_pinned_boosted_items(db_session, query_text="sneakers") == []
+
     def test_pinned_rotation_is_time_sliced_permutation(self, db_session):
         user, _, a = _make_seller_item(db_session, telegram_id=111, title="A")
         _, _, b = _make_seller_item(db_session, telegram_id=112, title="B")
@@ -612,6 +636,42 @@ class TestComposePinnedPage:
         assert [i.id for i in page] == [iphone.id, samsung.id]
         assert iphone.is_boosted is True
         assert samsung.is_boosted is False
+
+    def test_query_text_pins_by_category_match(self, db_session):
+        # BUG FIX (user-verified, Rule 3.1): query matches the item's title
+        # OR category (case-insensitive substring). "BLU G 34" does NOT
+        # contain "mobile", but its category "Mobile Phones" DOES — it must
+        # pin and be flagged.
+        user, _, blu = _make_seller_item(db_session, telegram_id=111,
+                                         title="BLU G 34", category="Mobile Phones")
+        _, _, sneakers = _make_seller_item(db_session, telegram_id=112,
+                                           title="Sneakers", category="Shoes")
+        self._boost(db_session, blu, user, charge="chg_blu_cat")
+        self._boost(db_session, sneakers, user, charge="chg_snk_cat")
+        db_session.commit()
+        now = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+
+        page, pinned_ids = compose_pinned_page(
+            db_session, query_text="mobile", items=[sneakers, blu], now=now)
+
+        assert pinned_ids == {blu.id}
+        assert [i.id for i in page] == [blu.id, sneakers.id]
+        assert blu.is_boosted is True
+        assert sneakers.is_boosted is False
+
+    def test_query_text_matching_neither_title_nor_category_not_pinned(self, db_session):
+        user, _, blu = _make_seller_item(db_session, telegram_id=111,
+                                         title="BLU G 34", category="Mobile Phones")
+        self._boost(db_session, blu, user, charge="chg_neither_cat")
+        db_session.commit()
+        now = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+
+        page, pinned_ids = compose_pinned_page(
+            db_session, query_text="sneakers", items=[blu], now=now)
+
+        assert pinned_ids == set()
+        assert [i.id for i in page] == [blu.id]
+        assert blu.is_boosted is False
 
     def test_pinned_presupplied_identical_to_internal_query_for_fixed_now(self, db_session):
         user, _, a = _make_seller_item(db_session, telegram_id=111, title="A")
