@@ -241,6 +241,55 @@ def startup_event():
 
     try:
         with engine.begin() as conn:
+            # CHANNEL-DELETION FK POLICY (final sweep of the FK-action bug
+            # class, a97d1e2 pattern): sqladmin hard-delete of a channels row
+            # used to fail because 3 FKs referenced channels.id with no ON
+            # DELETE action (RESTRICT default). Locked policy:
+            #   items.channel_id   → ON DELETE CASCADE (listings die)
+            #   reviews.channel_id → ON DELETE CASCADE (ratings die)
+            #   boosts.channel_id  → ON DELETE CASCADE (boosts die)
+            # The SOFT remove flow (is_active flag) is untouched — a flag,
+            # not a delete. With this, EVERY FK in models.py carries an
+            # explicit ondelete action (users: 8 in a97d1e2; items: item_id
+            # CASCADEs; alerts: TECH-25; channels: this block).
+            # Idempotency: PostgreSQL has no ADD CONSTRAINT IF NOT EXISTS, so
+            # each drop is guarded on pg_constraint existence — the repo-
+            # consistent extension of the IF NOT EXISTS idiom (TECH-25
+            # precedent). Safe on all three states: legacy DB (RESTRICT →
+            # dropped, re-added with action), prior run (action → dropped,
+            # re-added identical — a no-op churn), fresh DB (create_all made
+            # the action → no-op churn). No error path on any repeat.
+            fk_actions = [
+                # (table, column, constraint, on_delete_action)
+                ("items", "channel_id", "items_channel_id_fkey", "CASCADE"),
+                ("reviews", "channel_id", "reviews_channel_id_fkey", "CASCADE"),
+                ("boosts", "channel_id", "boosts_channel_id_fkey", "CASCADE"),
+            ]
+            for table, column, constraint, action in fk_actions:
+                conn.execute(text(
+                    f"""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = '{constraint}'
+                              AND conrelid = '{table}'::regclass
+                        ) THEN
+                            ALTER TABLE {table} DROP CONSTRAINT {constraint};
+                        END IF;
+                    END $$;
+                    """
+                ))
+                conn.execute(text(
+                    f"ALTER TABLE {table} ADD CONSTRAINT {constraint} "
+                    f"FOREIGN KEY ({column}) REFERENCES channels(id) ON DELETE {action}"
+                ))
+            logger.info("✅ channel-deletion FK policy migration verified (3 channel FKs)")
+    except Exception as e:
+        logger.warning(f"⚠️ channel-deletion FK policy migration failed: {e}")
+
+    try:
+        with engine.begin() as conn:
             # TECH-26 (NB-43..NB-47): monetization schema
             #   1. alerts.lapsed — additive boolean; True = deactivated by
             #      subscription lapse, distinct from user pause (lapsed=False).

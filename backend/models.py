@@ -141,8 +141,17 @@ class Channel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    items = relationship("Item", back_populates="channel")
-    reviews = relationship("Review", back_populates="channel")
+    # channel-deletion policy (ADR-0001 pattern): hard admin delete cascades
+    # listings/ratings/boosts — the FINAL FK-action sweep. With this change
+    # EVERY FK in models.py carries an explicit ondelete action: users (8,
+    # a97d1e2), items.item_id CASCADEs, alerts (TECH-25), channels (this).
+    # passive_deletes=True: the DB-level ON DELETE CASCADE does the work —
+    # without it the ORM pre-nullifies these child FKs on channel delete,
+    # which violates their NOT NULL columns before the DB acts (the a97d1e2
+    # trap). boosts intentionally have NO Channel-side relationship (services
+    # query explicitly) — the mapper is blind, so the DB cascade handles them.
+    items = relationship("Item", back_populates="channel", passive_deletes=True)
+    reviews = relationship("Review", back_populates="channel", passive_deletes=True)
 
 
 class Review(Base):
@@ -154,7 +163,8 @@ class Review(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    channel_id = Column(Integer, ForeignKey("channels.id"), nullable=False)
+    # channel-deletion policy (ADR-0001 pattern): hard admin delete cascades ratings
+    channel_id = Column(Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False)
     # user-deletion policy (ADR-0001 pattern): user delete cascades reviews
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     rating = Column(Integer, nullable=False)
@@ -176,7 +186,8 @@ class Item(Base):
     id = Column(Integer, primary_key=True, index=True)
     
     # Source Info
-    channel_id = Column(Integer, ForeignKey("channels.id"), nullable=False)
+    # channel-deletion policy (ADR-0001 pattern): hard admin delete cascades listings
+    channel_id = Column(Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False)
     telegram_message_id = Column(Integer, unique=True, index=True)
     
     # Content Data (Source of Truth)
@@ -287,7 +298,8 @@ class Boost(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False, index=True)
-    channel_id = Column(Integer, ForeignKey("channels.id"), nullable=False)
+    # channel-deletion policy (ADR-0001 pattern): hard admin delete cascades boosts
+    channel_id = Column(Integer, ForeignKey("channels.id", ondelete="CASCADE"), nullable=False)
     # user-deletion policy (ADR-0001 pattern): user delete cascades boosts
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     source = Column(String, nullable=False, default="paid")
