@@ -11,7 +11,7 @@ from database import get_db
 from schemas import SearchQuery, SearchResponse, ItemResponse
 from services import search as search_service
 from services.analytics import AnalyticsService
-from services.boost import get_pinned_boosted_items
+from services.boost import get_pinned_boosted_items, compose_pinned_page
 from ai_engine.vector_client import vectorize_image
 
 router = APIRouter()
@@ -59,15 +59,24 @@ def search_items(
         items_list = results_raw
         total_count = len(items_list)
 
-    # Mark boosted flags on the serialized organic items, then compose the
-    # page: pinned (rotation order) followed by the organic slice.
-    for item in items_list:
-        item.is_boosted = item.id in pinned_ids
-
-    pinned_responses = [ItemResponse.model_validate(i) for i in pinned]
+    # Compose the page through the shared pin seam (the ONE application
+    # point of the pin layer — browse and search surfaces). The pinned
+    # block (rotation order) comes first, the organic slice minus pinned
+    # follows (Rule 3.4 — no duplicates on a page). `pinned=` is
+    # pre-supplied because TestSearchPinLayer requires the pin query to run
+    # BEFORE the search (exclude_item_ids) — one query per request.
+    page, _ = compose_pinned_page(
+        db,
+        category=(None if query.category in (None, "All") else query.category),
+        query_text=query.query or None,
+        items=items_list,
+        now=now,
+        pinned=pinned,
+    )
+    pinned_responses = [ItemResponse.model_validate(i) for i in page if i.id in pinned_ids]
     for item in pinned_responses:
         item.is_boosted = True
-    page_items = pinned_responses + items_list
+    page_items = pinned_responses + [i for i in page if i.id not in pinned_ids]
 
     execution_time = (time.time() - start_time) * 1000
     

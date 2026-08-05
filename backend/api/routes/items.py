@@ -8,7 +8,9 @@ from database import get_db
 from models import Item, Channel, SoldReport
 from schemas import ItemResponse, SoldReportCreate, SoldReportResponse, ItemUpdateRequest, ItemStatusResponse
 from schemas import BoostQuoteResponse, BoostOrderResponse, BoostCreditResponse, BoostStatusResponse
+from schemas import BrowseResponse
 from services import search as search_service
+from services import catalog as catalog_service
 from services.analytics import AnalyticsService
 from services.auth import authenticate
 from services.boost import (
@@ -17,6 +19,7 @@ from services.boost import (
     get_boost_eligibility,
     create_boost_order,
     fulfill_credit_boost,
+    compose_pinned_page,
 )
 from constants import BOOST_DURATION_DAYS, MONETIZATION_ENABLED
 from services.item_status import (
@@ -83,6 +86,63 @@ def get_recent_items(limit: int = 20, db: Session = Depends(get_db)):
     )
     items = db.scalars(stmt).all()
     return items
+
+
+# =========================================================================
+# Browse seam (browse-seam blueprint §2.3): server-side category browse with
+# the boost pin layer applied on top (Rule 3.1 — the browse surface of the
+# two-surface pin contract). Registered BEFORE /{item_id} — FastAPI matches
+# in registration order and /items/browse would otherwise be swallowed by
+# the int path parameter.
+# =========================================================================
+@router.get("/browse", response_model=BrowseResponse)
+def browse_items(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    category: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    """Active items of a category, newest first, boosted pinned on top.
+
+    `category` is required — missing/blank/whitespace-only returns 400.
+    Unauthenticated (read-route convention). `total` is the organic category
+    count; the pinned block is prepended to every offset page (Rule 3.4 is a
+    per-page invariant, identical to the search surface's semantics).
+    """
+    if not category or not category.strip():
+        raise HTTPException(status_code=400, detail="category is required")
+    category = category.strip()
+
+    organic, total_count = catalog_service.browse_category(
+        db, category, limit=limit, offset=offset
+    )
+    # now=None: compose uses its internal clock — rotation stays
+    # deterministic per page load (Rule 4.2).
+    page_items, _ = compose_pinned_page(
+        db, category=category, items=organic, now=None
+    )
+
+    # --- ANALYTICS LOGGING (mirrors read_item) ---
+    user_id_header = request.headers.get("x-user-id")
+    session_id = request.headers.get("x-session-id")
+    user_id = int(user_id_header) if user_id_header and user_id_header.isdigit() else None
+
+    background_tasks.add_task(
+        AnalyticsService.log_interaction,
+        user_id=user_id,
+        session_id=session_id,
+        interaction_type="browse",
+        item_id=None,
+        meta_data={"category": category, "result_count": total_count},
+    )
+    # -------------------------
+
+    return BrowseResponse(
+        items=[ItemResponse.model_validate(i) for i in page_items],
+        total=total_count,
+    )
 
 
 @router.get("/{item_id}", response_model=ItemResponse)

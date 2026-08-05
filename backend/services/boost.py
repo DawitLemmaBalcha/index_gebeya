@@ -229,9 +229,10 @@ def get_pinned_boosted_items(
     now: datetime | None = None,
 ) -> list[Item]:
     """
-    Active boosted items for the /search/ route (D7 — the ONE application
-    point). Deterministic time-sliced rotation (Rule 4.2), no mutable state.
-    NEVER called from services/recommendation.py (Rule 3.2 — feed isolation).
+    Active boosted items eligible for the pinned block of a surface
+    (category browse or search results). Deterministic time-sliced rotation
+    (Rule 4.2), no mutable state. NEVER called from
+    services/recommendation.py (Rule 3.2 — feed isolation).
     """
     now = now or _now_utc()
     rows = db.execute(
@@ -265,6 +266,41 @@ def get_pinned_boosted_items(
         int(now.timestamp()) // (BOOST_ROTATION_MINUTES * 60) % len(candidates)
     )
     return candidates[rotation_offset:] + candidates[:rotation_offset]
+
+
+def compose_pinned_page(
+    db: Session, *,
+    category: str | None = None,
+    query_text: str | None = None,
+    items: list,
+    now: datetime | None = None,
+    pinned: list | None = None,
+) -> tuple[list, set[int]]:
+    """
+    Compose a page with the pinned boost layer applied — the ONE application
+    point of the pin layer (D7) across the eligible surfaces (category browse
+    and search results, Rule 3.1). Marks the organic list and returns the
+    pinned block (rotation order, Rule 4.2) followed by organic minus pinned
+    (Rule 3.4 — no duplicates on a page).
+
+    Duck-typed contract: `items` and `pinned` are lists of objects exposing
+    `.id` and a writable `.is_boosted` attribute (ItemResponse in the search
+    caller, ORM Item in the browse caller — Item has no is_boosted column;
+    dynamic attribute assignment works, Rule 3.3/3.4). Every pinned element
+    is flagged `is_boosted=True` so `is_boosted` rides the dynamic attribute
+    through model_validate in both callers. Does NOT touch `total` — the
+    caller owns count semantics.
+    """
+    if pinned is None:
+        pinned = get_pinned_boosted_items(
+            db, category=category, query_text=query_text, now=now
+        )
+    pinned_ids = {i.id for i in pinned}
+    for item in items:
+        item.is_boosted = item.id in pinned_ids
+    for pinned_item in pinned:
+        pinned_item.is_boosted = True
+    return pinned + [i for i in items if i.id not in pinned_ids], pinned_ids
 
 
 # ---------------------------------------------------------------------------

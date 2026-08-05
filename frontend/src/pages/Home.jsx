@@ -62,7 +62,7 @@ const Home = ({ embedded = false, initialSearchQuery = '' }) => {
         loading={shop.loading}
         error={shop.error}
         items={shop.displayItems}
-        onRetry={shop.fetchItems}
+        onRetry={shop.retry}
         onNavigate={navigate}
         visualResults={shop.visualResults}
         searchResults={shop.searchResults}

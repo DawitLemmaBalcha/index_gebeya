@@ -146,6 +146,15 @@ class SearchResponse(BaseModel):
     total: int
     execution_time_ms: float
 
+class BrowseResponse(BaseModel):
+    """GET /items/browse — server-side category browse (browse-seam §2.3).
+
+    Deliberately mirrors search's {items, total} seam (the frontend renders
+    both identically); execution_time_ms omitted by design (Deviation 4).
+    """
+    items: List[ItemResponse]
+    total: int
+
 # ----------------------------------------------------------------------
 # ALERT SCHEMAS
 # ----------------------------------------------------------------------

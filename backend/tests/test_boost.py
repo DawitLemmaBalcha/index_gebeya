@@ -29,6 +29,7 @@ from services.boost import (
     fulfill_boost,
     fulfill_credit_boost,
     get_pinned_boosted_items,
+    compose_pinned_page,
     end_boost_for_item,
     transfer_boost,
     get_boost_status,
@@ -507,6 +508,156 @@ class TestPinnedBoostedItems:
 
     def test_pinned_empty_when_no_candidates(self, db_session):
         assert get_pinned_boosted_items(db_session) == []
+
+
+# ---------------------------------------------------------------------------
+# Shared pin composition (browse-seam blueprint §2.2 — the ONE application
+# point for the pin layer across eligible surfaces: category browse and
+# search results). Duck-typed over objects exposing .id + writable
+# .is_boosted (ORM Item in browse, ItemResponse in search).
+# ---------------------------------------------------------------------------
+
+class TestComposePinnedPage:
+    def _boost(self, db, item, user, *, days_left=7, charge=None):
+        now = datetime.now(timezone.utc)
+        b = Boost(
+            item_id=item.id, channel_id=item.channel_id, user_id=user.id,
+            source="paid", price_paid_stars=100,
+            telegram_payment_charge_id=charge,
+            starts_at=now - timedelta(days=1),
+            ends_at=now + timedelta(days=days_left),
+        )
+        db.add(b)
+        return b
+
+    def test_pinned_first_in_rotation_order_and_flagged(self, db_session):
+        user, _, boosted = _make_seller_item(db_session, telegram_id=111, title="Pinned")
+        _, _, organic = _make_seller_item(db_session, telegram_id=112, title="Organic")
+        self._boost(db_session, boosted, user, charge="chg_pin")
+        db_session.commit()
+        now = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+
+        page, pinned_ids = compose_pinned_page(
+            db_session, category="Mobile Phones", items=[organic, boosted], now=now)
+
+        # Pinned first in rotation order, then organic; every pinned element
+        # flagged True, organic flagged False.
+        assert [i.id for i in page] == [boosted.id, organic.id]
+        assert pinned_ids == {boosted.id}
+        assert boosted.is_boosted is True
+        assert organic.is_boosted is False
+
+    def test_no_duplicates_when_pinned_overlaps_organic(self, db_session):
+        user, _, boosted = _make_seller_item(db_session, telegram_id=111, title="Pinned")
+        self._boost(db_session, boosted, user, charge="chg_overlap")
+        db_session.commit()
+        now = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+
+        # Rule 3.4: an item present in BOTH pinned and items appears once.
+        page, pinned_ids = compose_pinned_page(
+            db_session, category="Mobile Phones", items=[boosted], now=now)
+
+        assert [i.id for i in page] == [boosted.id]
+        assert len(page) == len({i.id for i in page})
+        assert pinned_ids == {boosted.id}
+        assert boosted.is_boosted is True
+
+    def test_no_pinned_case_returns_input_unchanged_all_false(self, db_session):
+        _, _, a = _make_seller_item(db_session, telegram_id=111, title="A")
+        _, _, b = _make_seller_item(db_session, telegram_id=112, title="B")
+        now = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+
+        page, pinned_ids = compose_pinned_page(
+            db_session, category="Mobile Phones", items=[a, b], now=now)
+
+        assert [i.id for i in page] == [a.id, b.id]
+        assert pinned_ids == set()
+        assert a.is_boosted is False
+        assert b.is_boosted is False
+
+    def test_category_filtered_pins_only(self, db_session):
+        user, _, phone = _make_seller_item(db_session, telegram_id=111,
+                                           category="Mobile Phones", title="Phone")
+        _, _, shoes = _make_seller_item(db_session, telegram_id=112,
+                                        category="Shoes", title="Sneakers")
+        _, _, other_phone = _make_seller_item(db_session, telegram_id=113,
+                                              category="Mobile Phones", title="Other Phone")
+        self._boost(db_session, phone, user, charge="chg_phone")
+        self._boost(db_session, shoes, user, charge="chg_shoes")
+        self._boost(db_session, other_phone, user, charge="chg_other")
+        db_session.commit()
+        now = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+
+        page, pinned_ids = compose_pinned_page(
+            db_session, category="Mobile Phones", items=[other_phone], now=now)
+
+        # Pinned block contains ONLY same-category boosted items (no Shoes);
+        # rotation order is clock-derived (Rule 4.2), so assert membership.
+        assert pinned_ids == {phone.id, other_phone.id}
+        assert {i.id for i in page} == {phone.id, other_phone.id}
+        assert all(i.is_boosted for i in page)
+
+    def test_query_text_pins_case_insensitive(self, db_session):
+        user, _, iphone = _make_seller_item(db_session, telegram_id=111, title="iPhone 13 Pro")
+        _, _, samsung = _make_seller_item(db_session, telegram_id=112, title="Samsung Galaxy")
+        self._boost(db_session, iphone, user, charge="chg_iphone")
+        self._boost(db_session, samsung, user, charge="chg_samsung")
+        db_session.commit()
+        now = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+
+        page, pinned_ids = compose_pinned_page(
+            db_session, query_text="IPHONE", items=[samsung, iphone], now=now)
+
+        assert pinned_ids == {iphone.id}
+        assert [i.id for i in page] == [iphone.id, samsung.id]
+        assert iphone.is_boosted is True
+        assert samsung.is_boosted is False
+
+    def test_pinned_presupplied_identical_to_internal_query_for_fixed_now(self, db_session):
+        user, _, a = _make_seller_item(db_session, telegram_id=111, title="A")
+        _, _, b = _make_seller_item(db_session, telegram_id=112, title="B")
+        _, _, c = _make_seller_item(db_session, telegram_id=113, title="C")
+        self._boost(db_session, a, user, charge="chg_a")
+        self._boost(db_session, b, user, charge="chg_b")
+        self._boost(db_session, c, user, charge="chg_c")
+        db_session.commit()
+        now = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+        organic = [b, c]  # organic list may itself contain boosted items
+
+        internal_page, internal_ids = compose_pinned_page(
+            db_session, category="Mobile Phones", items=organic, now=now)
+        pre = get_pinned_boosted_items(db_session, category="Mobile Phones", now=now)
+        supplied_page, supplied_ids = compose_pinned_page(
+            db_session, category="Mobile Phones", items=organic, now=now, pinned=pre)
+
+        # Same clock + same category -> identical pinned order, identical page.
+        assert [i.id for i in pre] == [i.id for i in get_pinned_boosted_items(
+            db_session, category="Mobile Phones", now=now)]
+        assert [i.id for i in supplied_page] == [i.id for i in internal_page]
+        assert supplied_ids == internal_ids
+        assert supplied_ids == {i.id for i in pre}
+
+    def test_duck_typed_over_item_response_objects(self, db_session):
+        # The search caller passes serialized ItemResponse instances
+        # (perform_hybrid_search output) — compose must not require ORM.
+        from schemas import ItemResponse
+        user, _, boosted = _make_seller_item(db_session, telegram_id=111, title="Pinned")
+        _, _, organic = _make_seller_item(db_session, telegram_id=112, title="Organic")
+        self._boost(db_session, boosted, user, charge="chg_duck")
+        db_session.commit()
+        now = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
+        boosted_resp = ItemResponse.model_validate(boosted)
+        organic_resp = ItemResponse.model_validate(organic)
+
+        page, pinned_ids = compose_pinned_page(
+            db_session, category="Mobile Phones",
+            items=[organic_resp, boosted_resp], now=now)
+
+        assert [i.id for i in page] == [boosted.id, organic.id]
+        assert pinned_ids == {boosted.id}
+        assert boosted_resp.is_boosted is True
+        assert organic_resp.is_boosted is False
+
 
 
 # ---------------------------------------------------------------------------

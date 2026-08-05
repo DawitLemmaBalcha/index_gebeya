@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 import { TAXONOMY } from '../constants/taxonomy';
 import { getAnalyticsHeaders } from '../utils/analytics'; 
@@ -153,17 +153,101 @@ export const useShop = () => {
     }
   }, [LIMIT, seenItemIds]);
 
+  // Browse seam (browse-seam blueprint §2.4): server-side category browse.
+  // Deliberately does NOT touch seenItemIds or _feedCache — browse results
+  // must never pollute feed state or the module-level feed cache.
+  const fetchBrowseCategory = useCallback(async (category, pageOffset = 0) => {
+    const url = `${API_BASE_URL}/items/browse?category=${encodeURIComponent(category)}&limit=${LIMIT}&offset=${pageOffset}`;
+
+    try {
+      if (pageOffset === 0) {
+        setLoading(true);
+      }
+      setError(null);
+
+      const analyticsHeaders = getAnalyticsHeaders();
+
+      const response = await fetch(url, {
+          headers: {
+              ...analyticsHeaders
+          }
+      });
+
+      if (!response.ok) throw new Error(`Server Error: ${response.status}`);
+      const data = await response.json();
+      const pageItems = data.items || [];
+
+      if (pageOffset === 0) {
+        setItems(pageItems);
+        setOffset(0);
+      } else {
+        setItems(prev => [...prev, ...pageItems]);
+      }
+
+      if (pageItems.length < LIMIT || pageItems.length === 0) {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error fetching browse items:", error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [LIMIT]);
+
   const fetchMore = useCallback(async () => {
     if (!hasMore || isFetchingMore) return;
     const newOffset = offset + LIMIT;
     setIsFetchingMore(true);
     try {
-      await fetchItems(newOffset);
+      // Mode-aware: browse mode pages the catalog seam, otherwise the feed.
+      const isBrowseMode = activeCategory !== "All" && activeCategory !== "all";
+      if (isBrowseMode) {
+        await fetchBrowseCategory(activeCategory, newOffset);
+      } else {
+        await fetchItems(newOffset);
+      }
       setOffset(newOffset);
     } finally {
       setIsFetchingMore(false);
     }
-  }, [hasMore, isFetchingMore, offset, fetchItems]);
+  }, [hasMore, isFetchingMore, offset, activeCategory, fetchItems, fetchBrowseCategory, LIMIT]);
+
+  // Mode-aware retry: re-fetch the CURRENT surface (browse seam in browse
+  // mode, feed otherwise) — ProductGrid's onRetry must never fire the feed
+  // fetcher while the user is browsing a category.
+  const retry = useCallback(() => {
+    const isBrowseMode = activeCategory !== "All" && activeCategory !== "all";
+    if (isBrowseMode) {
+      setOffset(0);
+      setHasMore(true);
+      fetchBrowseCategory(activeCategory, 0);
+    } else {
+      fetchItems(0);
+    }
+  }, [activeCategory, fetchBrowseCategory, fetchItems]);
+
+  // Browse-mode source switching: entering a real category fetches the
+  // server-side catalog seam; leaving it refetches a fresh feed; neutral ->
+  // neutral (including search's setActiveCategory("All")) is a no-op.
+  const prevCategoryRef = useRef(activeCategory);
+  useEffect(() => {
+    const prev = prevCategoryRef.current;
+    prevCategoryRef.current = activeCategory;
+    // No-op unless the category actually CHANGED (identity churn in other
+    // deps — e.g. fetchItems after a feed seenItemIds update — must not
+    // refetch the current surface).
+    if (prev === activeCategory) return;
+    const isRealCategory = (c) => !!c && c !== "All" && c !== "all";
+    if (!isRealCategory(prev) && !isRealCategory(activeCategory)) return;
+    setOffset(0);
+    setHasMore(true);
+    if (isRealCategory(activeCategory)) {
+      fetchBrowseCategory(activeCategory, 0);
+    } else {
+      fetchItems(0);
+    }
+  }, [activeCategory, fetchBrowseCategory, fetchItems]);
 
   const handleTextSearch = async (query, filters = {}) => {
     setIsSearchingText(true); setVisualResults(null); setActiveCategory("All"); 
@@ -234,7 +318,12 @@ export const useShop = () => {
   else if (searchResults) displayItems = searchResults;
   else {
       displayItems = items.filter(item => {
-        const matchesCategory = activeCategory === "All" || item.category === activeCategory;
+        // Browse mode (real category): the server already filtered by
+        // category, so the category clause is skipped; neutral passes
+        // everything — "All" AND lowercase "all" (Deviation 5). The
+        // subcategory clause and the "Other" branch stay client-side.
+        const isBrowseMode = activeCategory !== "All" && activeCategory !== "all";
+        const matchesCategory = isBrowseMode || activeCategory === "All" || activeCategory === "all";
         const matchesSubCategory = activeSubCategory === "All" || item.subcategory === activeSubCategory;
         if (activeSubCategory === "Other") {
              const knownSubs = TAXONOMY[activeCategory] || [];
@@ -256,6 +345,7 @@ export const useShop = () => {
     handleImageSearch, clearVisualSearch,
     displayItems, isSearchingText, isSearchingVisual,
     hasMore, isFetchingMore, fetchMore, LIMIT,
+    fetchBrowseCategory, retry,
     minPrice, setMinPrice, maxPrice, setMaxPrice, filterCategory, setFilterCategory,
     excludeUnpriced, setExcludeUnpriced,
     viewMode, setViewMode: setViewModePersisted,

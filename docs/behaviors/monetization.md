@@ -53,6 +53,8 @@ The free marketplace experience (browsing, searching, buying, alerts at the free
 - **Category browse** — the browse view of the item's own top-level category.
 - **Search results** — searches whose query matches the item's title or category.
 
+> Implemented 2026-08-05: category browse is a real server-side surface — `GET /items/browse` applies the pin layer via `boost.compose_pinned_page` (Rule 3.1's first true implementation; supersedes monetization-blueprint D7).
+
 **Rule 3.2 — Never In the For You Feed.** Boosted items never appear in the personalized recommendation feed. The feed is the product's trust core and is per-user; boosting has no place there.
 
 **Rule 3.3 — Merged Pin, Labeled.** The boosted item occupies the **top position of the organic results list** (not a visually separate "ads" block), and every boosted card carries a visible **"Boosted" badge**. The label protects buyer trust; the position sells the product.
