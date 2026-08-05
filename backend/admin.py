@@ -151,6 +151,10 @@ class BoostAdmin(ModelView, model=Boost):
     can_edit = True
     can_delete = True
     can_export = True
+    # form_include_pk: sqladmin hides FK columns from forms unless set;
+    # admins need to enter item/channel/user IDs directly (test-data
+    # creation without real Stars payment)
+    form_include_pk = True
     name = "Boost"
     name_plural = "Boosts"
     icon = "fa-solid fa-rocket"
@@ -171,6 +175,10 @@ class SubscriptionAdmin(ModelView, model=Subscription):
     can_edit = True
     can_delete = True
     can_export = True
+    # form_include_pk: sqladmin hides FK columns from forms unless set;
+    # admins need to enter item/channel/user IDs directly (test-data
+    # creation without real Stars payment)
+    form_include_pk = True
     name = "Subscription"
     name_plural = "Subscriptions"
     icon = "fa-solid fa-star"
