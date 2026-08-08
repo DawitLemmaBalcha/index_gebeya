@@ -1,6 +1,6 @@
 # Platform Ops Console — `/ops`
 
-> **Status:** ⚠️ NOT YET IMPLEMENTED (locked design, 2026-08-06 — see pending-behaviors.md NB-49..NB-54)
+> **Status:** ✅ IMPLEMENTED (2026-08-06, commits 93fe8c6..29a7376 on feat/ops-console, QA APPROVED)
 
 ---
 

@@ -152,7 +152,7 @@ The three paid products are undiscoverable. The Alerts-Only subscription was off
 - Backend: `constants.py` gains the cap-banner threshold (e.g., `ALERT_CAP_BANNER_THRESHOLD`, default 2 alerts below cap); hub data (usage counts, active boosts, prices, subscription status) served via existing endpoints — no new payment logic.
 - Tests: frontend tests for banner visibility at threshold, hub tab routing/deep-link, no-rate-card rendering; backend test for the threshold constant behavior. Full regression green.
 
-## NB-49: Ops Console — Shell, Auth & Scaffolding
+## NB-49: [IMPLEMENTED] Ops Console — Shell, Auth & Scaffolding
 
 **Priority:** HIGH
 **Affected Features:** Admin, Ops
@@ -174,7 +174,7 @@ All platform operations today are env config + restarts + raw sqladmin row-editi
 
 ---
 
-## NB-50: Ops Console — Section 1: Overview (full implementation)
+## NB-50: [IMPLEMENTED] Ops Console — Section 1: Overview (full implementation)
 
 **Priority:** HIGH
 **Affected Features:** Ops, Ingestion, Schedulers
@@ -195,7 +195,7 @@ No single screen answers "is the platform healthy right now?" — service status
 
 ---
 
-## NB-51: Ops Console — Section 6: Monetization (pricing, toggles, revenue, moderation, test tools)
+## NB-51: [IMPLEMENTED] Ops Console — Section 6: Monetization (pricing, toggles, revenue, moderation, test tools)
 
 **Priority:** HIGH
 **Affected Features:** Monetization, Ops
@@ -217,7 +217,7 @@ Boost prices are env config requiring restarts; no demand context; feature kill 
 
 ---
 
-## NB-52: Ops Console — Sections 8 & 9: Settings & Flags + Audit
+## NB-52: [IMPLEMENTED] Ops Console — Sections 8 & 9: Settings & Flags + Audit
 
 **Priority:** HIGH
 **Affected Features:** Ops
@@ -236,7 +236,7 @@ Operational knobs live in env files; there is no effective-config view and no au
 
 ---
 
-## NB-53: Ops Console — Section 7: Payments
+## NB-53: [IMPLEMENTED] Ops Console — Section 7: Payments
 
 **Priority:** MEDIUM
 **Affected Features:** Monetization, Payments
@@ -254,7 +254,7 @@ Star revenue and payment state are invisible outside logs; reconciliation has no
 
 ---
 
-## NB-54: Ops Console — Section 10: Support Toolkit
+## NB-54: [IMPLEMENTED] Ops Console — Section 10: Support Toolkit
 
 **Priority:** MEDIUM
 **Affected Features:** Ops, Monetization, Stores

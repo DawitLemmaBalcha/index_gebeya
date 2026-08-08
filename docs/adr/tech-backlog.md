@@ -74,7 +74,7 @@ Six phases, each with its own QA gate + atomic commit on `feat/monetization`:
 
 ## TECH-32..TECH-37: Platform Ops Console (NB-49..NB-54)
 
-**Status:** PENDING — behavior doc: `docs/behaviors/ops-console.md` (locked 2026-08-06)
+**Status:** IMPLEMENTED ✅ — commits `93fe8c6`..`29a7376` on `feat/ops-console` (QA APPROVED)
 **Date:** 2026-08-06
 
 Six phases, each with QA gate + atomic commit on `feat/ops-console`:
