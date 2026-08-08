@@ -28,14 +28,15 @@ from constants import (
     MAX_ALERTS_PER_USER,
     SUBSCRIPTION_PERIOD_SECONDS,
     # NB-48 (§2.2): hub payload fields. ALERT_CAP_BANNER_THRESHOLD is the
-    # banner display threshold; BOOST_* feed the hub's "from X Stars" floor
-    # and duration copy. NO import of services/boost here (cycle rule —
-    # boost.py imports subscriptions.py, never the reverse).
+    # banner display threshold; BOOST_DURATION_DAYS feeds the hub's
+    # duration copy. NO import of services/boost here (cycle rule —
+    # boost.py imports subscriptions.py, never the reverse). The boost
+    # FLOOR now comes from services/boost_pricing (D12 cycle rule).
     ALERT_CAP_BANNER_THRESHOLD,
     BOOST_DURATION_DAYS,
-    BOOST_PRICE_STARS,
 )
 from models import Alert, Boost, Subscription, User
+from services.boost_pricing import get_boost_floor
 from services.telegram_payments import star_payments
 
 logger = logging.getLogger("index_subscriptions")
@@ -279,11 +280,10 @@ def get_subscription_status(db: Session, user: User) -> dict:
     (caps + banner threshold + prices + boost floor/duration)."""
     sub = get_active_subscription(db, user)
     # NB-48: the floor mirrors services.boost.get_boost_price's Other-bucket
-    # fallback (boost._OTHER_FLOOR). Deliberate mirror: subscriptions.py must
-    # NEVER import boost.py (cycle rule), so the floor is computed from the
-    # constants directly. "Other" is the designated floor bucket (Rule 2.2);
-    # min() guards a malformed config missing the key.
-    boost_floor = BOOST_PRICE_STARS.get("Other", min(BOOST_PRICE_STARS.values()))
+    # fallback. It now comes from services/boost_pricing (D12): the 'Other'
+    # DB row, else the constant floor 25 — subscriptions.py NEVER imports
+    # boost.py (cycle rule).
+    boost_floor = get_boost_floor(db)
     if not sub:
         return {
             "product": None,

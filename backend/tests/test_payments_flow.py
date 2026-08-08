@@ -153,7 +153,11 @@ class TestInternalFulfillBoost:
         assert resp.status_code == 400, resp.text
 
     def test_fulfill_kill_switch_503(self, db_session, monkeypatch):
-        monkeypatch.setattr("api.routes.payments.MONETIZATION_ENABLED", 0)
+        # D11: registry control — the module-level constant patch is gone
+        monkeypatch.setattr(
+            "services.settings_registry.get_setting",
+            lambda db, key, **kw: False,
+        )
         client = _payments_client(db_session)
         resp = client.post(
             "/internal/payments/fulfill-boost",
@@ -247,7 +251,11 @@ class TestBoostRoutes:
         assert boost["ends_at"] is not None
 
     def test_boost_routes_kill_switch_503(self, db_session, monkeypatch):
-        monkeypatch.setattr("api.routes.items.MONETIZATION_ENABLED", 0)
+        # D11: registry control — the module-level constant patch is gone
+        monkeypatch.setattr(
+            "services.settings_registry.get_setting",
+            lambda db, key, **kw: False,
+        )
         _, _, item = _make_seller_item(db_session)
         client = _items_client(db_session)
 

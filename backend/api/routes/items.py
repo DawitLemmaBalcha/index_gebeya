@@ -21,7 +21,8 @@ from services.boost import (
     fulfill_credit_boost,
     compose_pinned_page,
 )
-from constants import BOOST_DURATION_DAYS, MONETIZATION_ENABLED
+from constants import BOOST_DURATION_DAYS
+from services import settings_registry
 from services.item_status import (
     report_sold,
     relist_item as item_relist,
@@ -34,9 +35,16 @@ from services.item_status import (
 router = APIRouter()
 
 
-def _monetization_enabled_or_503():
-    """Kill switch (blueprint §6.1): MONETIZATION_ENABLED=0 -> 503 at router level."""
-    if not MONETIZATION_ENABLED:
+def _monetization_enabled_or_503(db: Session, *, credit: bool = False):
+    """Kill switch (blueprint §6.1): registry reads per request — instant
+    effect, no restart. 503 preserves the exact current behavior. Quote/order
+    gate on monetization + boost purchases; the credit path gates on
+    monetization + credit boosts."""
+    if not settings_registry.get_setting(db, "monetization_enabled"):
+        raise HTTPException(status_code=503, detail="Monetization is currently disabled")
+    if credit and not settings_registry.get_setting(db, "credit_boosts_enabled"):
+        raise HTTPException(status_code=503, detail="Monetization is currently disabled")
+    if not credit and not settings_registry.get_setting(db, "boost_purchases_enabled"):
         raise HTTPException(status_code=503, detail="Monetization is currently disabled")
 
 
@@ -323,7 +331,7 @@ def get_item_boost_quote(
 ):
     """Owner-only quote: price for THIS item's category + active-boost status
     + boostability so the UI can hide the section for non-active items."""
-    _monetization_enabled_or_503()
+    _monetization_enabled_or_503(db)
     user = authenticate(init_data, db)
     item = _require_boost_owner(db, user, item_id)
     status = get_boost_status(db, item_id)
@@ -346,7 +354,7 @@ async def create_item_boost_order(
     db: Session = Depends(get_db),
 ):
     """Owner-only: create a Stars invoice to boost this item (Rule 2.7)."""
-    _monetization_enabled_or_503()
+    _monetization_enabled_or_503(db)
     user = authenticate(init_data, db)
     item = _require_boost_owner(db, user, item_id)
     return await create_boost_order(db, user, item)
@@ -359,7 +367,7 @@ def create_item_credit_boost(
     db: Session = Depends(get_db),
 ):
     """Owner-only: consume one all-in-one monthly boost credit (Rule 7.3)."""
-    _monetization_enabled_or_503()
+    _monetization_enabled_or_503(db, credit=True)
     user = authenticate(init_data, db)
     item = _require_boost_owner(db, user, item_id)
     boost = fulfill_credit_boost(db, user, item)

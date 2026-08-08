@@ -15,9 +15,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
-from constants import MONETIZATION_ENABLED
 from database import get_db
 from schemas import FulfillBoostRequest, FulfillSubscriptionRequest, SubscriptionStateRequest
+from services import settings_registry
 from services.auth import authenticate
 from services.boost import fulfill_boost
 from services.subscriptions import fulfill_subscription_payment, handle_subscription_state_update
@@ -27,9 +27,10 @@ logger = logging.getLogger("index_payments_routes")
 router = APIRouter()
 
 
-def _monetization_enabled_or_503():
-    """Kill switch (blueprint §6.1): fulfillment endpoints 503 — nothing activates."""
-    if not MONETIZATION_ENABLED:
+def _monetization_enabled_or_503(db: Session):
+    """Kill switch (blueprint §6.1): registry read per request — fulfillment
+    endpoints 503 — nothing activates. Instant effect, no restart."""
+    if not settings_registry.get_setting(db, "monetization_enabled"):
         raise HTTPException(status_code=503, detail="Monetization is currently disabled")
 
 
@@ -42,7 +43,7 @@ def fulfill_boost_route(
 ):
     """Idempotent boost activation on successful_payment (Rule 2.7).
     init_data travels in the query string (listener wire format, §2.6)."""
-    _monetization_enabled_or_503()
+    _monetization_enabled_or_503(db)
     if not body.telegram_payment_charge_id or not body.invoice_payload:
         raise HTTPException(status_code=400, detail="Missing charge id or invoice payload")
 
@@ -71,7 +72,7 @@ def fulfill_subscription_route(
     x_internal_service: Optional[str] = Header(None, alias="X-Internal-Service"),
 ):
     """Idempotent subscription activation on successful_payment (Rule 7.1.1)."""
-    _monetization_enabled_or_503()
+    _monetization_enabled_or_503(db)
     if not body.telegram_payment_charge_id or not body.invoice_payload:
         raise HTTPException(status_code=400, detail="Missing charge id or invoice payload")
 
@@ -104,7 +105,7 @@ def subscription_state_route(
 ):
     """User-side subscription updates (canceled/active/failed) from the
     PTB 22.8 api_kwargs seam (D2)."""
-    _monetization_enabled_or_503()
+    _monetization_enabled_or_503(db)
     user = authenticate(init_data or body.init_data or "", db, x_internal_service)
     handle_subscription_state_update(
         db,

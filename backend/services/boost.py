@@ -20,17 +20,15 @@ from sqlalchemy.orm import Session
 
 from constants import (
     BOOST_DURATION_DAYS,
-    BOOST_PRICE_STARS,
     BOOST_ROTATION_MINUTES,
-    MONETIZATION_ENABLED,
 )
 from models import Boost, Channel, Item, User
+from services import settings_registry
+from services.boost_pricing import get_boost_price  # re-export (D12, D14)
 from services.subscriptions import get_credit_boosts_remaining
 from services.telegram_payments import star_payments
 
 logger = logging.getLogger("index_boost")
-
-_OTHER_FLOOR = 25
 
 
 def _now_utc() -> datetime:
@@ -40,15 +38,6 @@ def _now_utc() -> datetime:
 # ---------------------------------------------------------------------------
 # Purchase (buyer-facing, invoked by route modules)
 # ---------------------------------------------------------------------------
-
-def get_boost_price(db: Session, item: Item) -> int:
-    """BOOST_PRICE_STARS[item.category] exact-key, else the Other floor (D12).
-    Always returns a positive int."""
-    price = BOOST_PRICE_STARS.get(item.category)
-    if not price:
-        price = BOOST_PRICE_STARS.get("Other", _OTHER_FLOOR)
-    return max(1, int(price))
-
 
 def _active_boost_exists(db: Session, item_id: int) -> bool:
     now = _now_utc()
@@ -96,7 +85,7 @@ def _validate_boost_eligibility(db: Session, user: User, item: Item) -> Channel:
 
 async def create_boost_order(db: Session, user: User, item: Item) -> dict:
     """Create a Stars invoice for a boost on this item (Rule 2.7)."""
-    if not MONETIZATION_ENABLED:
+    if not settings_registry.get_setting(db, "monetization_enabled"):
         raise HTTPException(status_code=503, detail="Monetization is currently disabled")
 
     _validate_boost_eligibility(db, user, item)
@@ -191,7 +180,7 @@ def fulfill_credit_boost(db: Session, user: User, item: Item) -> Boost:
     telegram_payment_charge_id=NULL, price_paid_stars=NULL) — placement-
     indistinguishable from paid boosts.
     """
-    if not MONETIZATION_ENABLED:
+    if not settings_registry.get_setting(db, "monetization_enabled"):
         raise HTTPException(status_code=503, detail="Monetization is currently disabled")
 
     _validate_boost_eligibility(db, user, item)

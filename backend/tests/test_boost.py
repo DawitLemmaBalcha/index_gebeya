@@ -238,7 +238,11 @@ class TestCreateBoostOrder:
     @pytest.mark.asyncio
     async def test_order_kill_switch_returns_503(self, db_session, monkeypatch):
         fake = _install_fake(db_session, monkeypatch)
-        monkeypatch.setattr("services.boost.MONETIZATION_ENABLED", 0)
+        # D11: registry control — the module-level constant patch is gone
+        monkeypatch.setattr(
+            "services.settings_registry.get_setting",
+            lambda db, key, **kw: False,
+        )
         user, _, item = _make_seller_item(db_session)
 
         with pytest.raises(HTTPException) as exc:
@@ -284,7 +288,14 @@ class TestFulfillBoost:
 
         # The category price changes AFTER the order was placed — fulfillment
         # must still record the charged amount, never re-read the price.
-        monkeypatch.setattr("services.boost.BOOST_PRICE_STARS", {"Mobile Phones": 999, "Other": 999})
+        # NB-51: prices are DB-first — the monkeypatched constant is gone;
+        # change the boost_prices row instead (D11-class migration).
+        from services.boost_pricing import set_boost_price
+        set_boost_price(
+            db_session, category="Mobile Phones", subcategory="",
+            price_stars=999, updated_by="admin",
+        )
+        assert get_boost_price(db_session, item) == 999  # the price DID change
 
         first = fulfill_boost(
             db_session,
@@ -998,6 +1009,10 @@ class TestChannelBoostsRoute:
     def test_kill_switch_returns_503(self, db_session, monkeypatch):
         user, channel, item = _make_seller_item(db_session)
         self._active_boost_row(db_session, item, user)
-        monkeypatch.setattr("api.routes.channels.MONETIZATION_ENABLED", 0)
+        # D11: registry control — the module-level constant patch is gone
+        monkeypatch.setattr(
+            "services.settings_registry.get_setting",
+            lambda db, key, **kw: False,
+        )
         resp = self._boosts(db_session, channel.id)
         assert resp.status_code == 503

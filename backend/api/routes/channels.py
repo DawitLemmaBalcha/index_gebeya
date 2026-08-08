@@ -17,17 +17,17 @@ from schemas import ChannelStatsResponse, BoostSummaryResponse
 from services.auth import authenticate
 from services.stats import get_channel_dashboard  # NB-47 seller intelligence
 from services.boost import list_active_channel_boosts  # NB-48 stores boost card
-from constants import MONETIZATION_ENABLED  # NB-48 kill switch
+from services import settings_registry  # NB-48 kill switch (registry read)
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 router = APIRouter()
 logger = logging.getLogger("index_channels")
 
 
-def _monetization_enabled_or_503():
-    """Kill switch (blueprint §6.1): MONETIZATION_ENABLED=0 -> 503 at router
-    level (mirrors api/routes/items.py)."""
-    if not MONETIZATION_ENABLED:
+def _monetization_enabled_or_503(db: Session):
+    """Kill switch (blueprint §6.1): registry read per request — instant
+    effect (mirrors api/routes/items.py)."""
+    if not settings_registry.get_setting(db, "monetization_enabled"):
         raise HTTPException(status_code=503, detail="Monetization is currently disabled")
 
 
@@ -454,7 +454,7 @@ def get_channel_boosts(
     stats route uses: boost data is owner-sensitive in the boost domain).
     Kill switch: 503 when monetization is disabled.
     """
-    _monetization_enabled_or_503()
+    _monetization_enabled_or_503(db)
     user = authenticate(init_data, db)
 
     channel = db.scalar(
