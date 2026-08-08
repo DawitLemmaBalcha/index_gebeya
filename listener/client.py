@@ -1,8 +1,46 @@
+import asyncio
 import httpx
+from datetime import datetime, timezone
 from config import API_URL, ALERTS_API_URL, API_BASE, logger
+from stats import stats
 
 # NEW: Internal Secret Header
 INTERNAL_HEADERS = {"X-Internal-Service": "index-listener"}
+
+
+def _to_iso(epoch_ts) -> str | None:
+    """Epoch -> ISO 8601 (UTC), None passthrough for the heartbeat payload."""
+    if epoch_ts is None:
+        return None
+    return datetime.fromtimestamp(epoch_ts, tz=timezone.utc).isoformat()
+
+
+async def send_heartbeat(queue: asyncio.Queue) -> None:
+    """NB-50: periodic listener heartbeat — the ONLY listener health signal
+    (blueprint §2.7). Every 30s POST {API_BASE}/internal/heartbeat with the
+    internal header; failures are logged, never fatal."""
+    while True:
+        try:
+            payload = {
+                "queue_depth": queue.qsize(),
+                "items_processed_total": stats["items_processed_total"],
+                "last_update_at": _to_iso(stats["last_update_at"]),
+                "started_at": _to_iso(stats["started_at"]),
+                "photo_refresher": stats["photo_refresher"],
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    f"{API_BASE}/internal/heartbeat",
+                    json=payload,
+                    headers=INTERNAL_HEADERS,
+                )
+            if response.status_code != 200:
+                logger.warning(
+                    f"💓 Heartbeat failed ({response.status_code}): {response.text[:200]}"
+                )
+        except Exception as e:
+            logger.warning(f"💓 Heartbeat exception: {e}")
+        await asyncio.sleep(30)
 
 async def send_to_api(payload: dict):
     """Sends payload to Backend API (Ingestion). Returns dict with success, item_id, title, price, status_code."""

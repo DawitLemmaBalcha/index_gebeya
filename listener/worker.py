@@ -1,7 +1,9 @@
 import asyncio
+import time
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from client import send_to_api, get_channel_info
 from config import logger, HEARTBEAT_INTERVAL, MAX_RETRIES_LIMIT, WEB_APP_URL
+from stats import stats
 
 
 async def background_worker(queue: asyncio.Queue, bot):
@@ -77,6 +79,11 @@ async def background_worker(queue: asyncio.Queue, bot):
 
             # WAIT before retrying (The Heartbeat)
             await asyncio.sleep(HEARTBEAT_INTERVAL)
+
+        # --- NB-50: record ingest stats for the heartbeat payload ---
+        if result and result.get('success'):
+            stats["items_processed_total"] += 1
+            stats["last_update_at"] = time.time()
 
         # --- TECH-19: Edit DM with result ---
         if dm_message is not None and result is not None:

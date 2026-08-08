@@ -15,6 +15,7 @@ from worker import background_worker
 from notifications import notification_poller
 from photo_refresher import channel_photo_refresher
 from payments import handle_pre_checkout, handle_successful_payment, handle_subscription_update  # NB-43..NB-46
+from client import send_heartbeat  # NB-50: heartbeat sender
 
 # --- SILENCE HTTPX LOGS (POLLING NOISE) ---
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -75,6 +76,10 @@ if __name__ == '__main__':
         # C. Channel Photo Refresher
         asyncio.create_task(channel_photo_refresher(app.bot))
         logger.info("✅ Channel Photo Refresher Injected")
+
+        # D. NB-50: Heartbeat sender (listener presence + worker stats)
+        asyncio.create_task(send_heartbeat(job_queue))
+        logger.info("✅ Heartbeat Sender Injected")
 
     application.post_init = post_init
 

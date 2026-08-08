@@ -1,8 +1,10 @@
 import asyncio
+import time
 import httpx
 from telegram import Bot
 from telegram.error import TelegramError
 from config import logger, API_BASE, CHANNEL_PHOTO_REFRESH_INTERVAL
+from stats import stats
 
 
 async def channel_photo_refresher(bot: Bot):
@@ -85,8 +87,15 @@ async def channel_photo_refresher(bot: Bot):
                 await asyncio.sleep(per_channel_delay)
 
             logger.info(f"📸 Channel photo refresh cycle completed. Sleeping for {CHANNEL_PHOTO_REFRESH_INTERVAL}s")
+            # NB-50: scheduler stats ride the heartbeat payload (D9)
+            stats["photo_refresher"]["last_run_at"] = time.time()
+            stats["photo_refresher"]["last_success_at"] = time.time()
+            stats["photo_refresher"]["last_error"] = None
 
         except Exception as e:
             logger.error(f"📸 Photo refresher encountered an error: {e}")
+            # NB-50: the failure is surfaced via the heartbeat payload
+            stats["photo_refresher"]["last_run_at"] = time.time()
+            stats["photo_refresher"]["last_error"] = str(e)
 
         await asyncio.sleep(CHANNEL_PHOTO_REFRESH_INTERVAL)

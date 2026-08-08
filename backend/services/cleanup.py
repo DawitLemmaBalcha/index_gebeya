@@ -21,6 +21,7 @@ from sqlalchemy import select, func, or_
 from database import SessionLocal
 from models import Item, Channel, UserInteraction, Alert, Notification
 from services.owner_dm import send_owner_dm_sync
+from services.scheduler_runs import record_scheduler_run
 from constants import (
     SOFT_DELETED_RETENTION_DAYS,
     REPORTED_SOLD_RETENTION_DAYS,
@@ -200,14 +201,30 @@ def run_daily_cleanup() -> dict:
 
 
 def run_cleanup_and_log() -> None:
-    """Wrapper: runs cleanup and logs results."""
+    """Wrapper: runs cleanup, logs results, records the scheduler run
+    (NB-50 — the ops console Overview reads scheduler_runs)."""
     logger.info("🧹 Starting daily cleanup cycle...")
-    summary = run_daily_cleanup()
-    logger.info(
-        f"🧹 Cleanup complete: "
-        f"{summary['soft_deleted_removed']} soft-deleted, "
-        f"{summary['reported_sold_removed']} reported-sold removed, "
-        f"{summary['stale_flagged']} items flagged as stale, "
-        f"{summary['alerts_purged']} dead alerts purged, "
-        f"{summary['notifications_purged']} old notifications purged"
-    )
+    db = SessionLocal()
+    try:
+        try:
+            record_scheduler_run(db, scheduler="cleanup", success=False, error="started")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not record cleanup scheduler start: {e}")
+        summary = run_daily_cleanup()
+        logger.info(
+            f"🧹 Cleanup complete: "
+            f"{summary['soft_deleted_removed']} soft-deleted, "
+            f"{summary['reported_sold_removed']} reported-sold removed, "
+            f"{summary['stale_flagged']} items flagged as stale, "
+            f"{summary['alerts_purged']} dead alerts purged, "
+            f"{summary['notifications_purged']} old notifications purged"
+        )
+        record_scheduler_run(db, scheduler="cleanup", success=True, result=summary)
+    except Exception as e:
+        logger.warning(f"⚠️ Cleanup cycle failed: {e}")
+        try:
+            record_scheduler_run(db, scheduler="cleanup", success=False, error=str(e))
+        except Exception:
+            logger.warning("⚠️ Could not record cleanup scheduler run")
+    finally:
+        db.close()
