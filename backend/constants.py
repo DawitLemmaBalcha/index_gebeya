@@ -141,3 +141,8 @@ MONETIZATION_ENABLED: int = _get_config("MONETIZATION_ENABLED", 1, int)  # 0 = k
 # active alerts of the effective cap (frontend display threshold).
 ALERT_CAP_BANNER_THRESHOLD: int = _get_config("ALERT_CAP_BANNER_THRESHOLD", 2, int)
 SUBSCRIPTION_PERIOD_SECONDS: int = 2592000  # HARD-LOCKED by Telegram (30d); NO env override
+
+# NB-54: the Mini App origin for the support-toolkit deep-link generator
+# (mirrors listener/config.py WEB_APP_URL; patterns verified: worker.py:110,
+# App.jsx:51).
+WEB_APP_URL: str = os.getenv("WEB_APP_URL", "https://indexgebeya.cfd")
