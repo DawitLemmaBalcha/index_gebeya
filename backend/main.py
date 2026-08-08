@@ -1,5 +1,6 @@
 import os
 import logging
+import threading
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,9 +9,11 @@ from sqlalchemy import text
 from database import engine, Base, ensure_db_extensions
 from ai_engine.vector_client import initialize_taxonomy_index
 from admin import setup_admin
+from starlette.middleware.sessions import SessionMiddleware
 
 # 👇 IMPORT ROUTERS 👇
 from api.routes import ingestion, search, items, reviews, alerts, notifications, analytics, feed, channels, payments, subscriptions
+from api.routes import ops_auth, ops_health, ops_monetization, ops_settings, ops_audit, ops_payments, ops_tools, internal as internal_routes
 
 # Initialize Logging
 logging.basicConfig(level=logging.INFO)
@@ -43,6 +46,73 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# NB-49: ops-console session (cookie `ops_session`, key `ops_admin`).
+# Deliberately SEPARATE from sqladmin's sub-app session (cookie `session`,
+# D1): a console login can never open /admin and vice versa.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("ADMIN_SECRET_KEY", "change-me-in-production"),
+    session_cookie="ops_session",
+    max_age=604800,
+    same_site="lax",
+)
+
+# ===================================================================
+# Phase 5.5/5.6 — TECH-22/TECH-31 scheduler closures (module level so
+# tests can drive the instrumented paths; NB-50 records scheduler_runs)
+# ===================================================================
+
+def _schedule_cleanup():
+    """Daily cleanup: run + record the scheduler run (NB-50)."""
+    try:
+        from services.cleanup import run_cleanup_and_log
+
+        run_cleanup_and_log()
+    except Exception as e:
+        logger.warning(f"⚠️ Cleanup task failed: {e}")
+    threading.Timer(86400, _schedule_cleanup).start()  # 24h
+
+
+def _schedule_reconcile():
+    """Daily star-payments reconciliation. The guard reads the REGISTRY
+    inside the closure (blueprint §6) — a kill-switch flip stops the
+    replay pass without a restart. NB-50: the run is recorded."""
+    try:
+        import asyncio
+        from database import SessionLocal
+        from services.reconciliation import reconcile_star_payments
+        from services.scheduler_runs import record_scheduler_run
+        from services.settings_registry import get_setting
+
+        db = SessionLocal()
+        try:
+            if get_setting(db, "monetization_enabled"):
+                summary = asyncio.run(reconcile_star_payments(db))
+                logger.info(f"✅ Star payments reconciliation: {summary}")
+                record_scheduler_run(
+                    db, scheduler="reconciliation", success=True, result=summary
+                )
+            else:
+                logger.info("⏸️ Star reconciliation skipped (monetization disabled)")
+                record_scheduler_run(
+                    db, scheduler="reconciliation", success=True,
+                    result={"skipped": "monetization disabled"},
+                )
+        except Exception as e:
+            logger.warning(f"⚠️ Star reconcile task failed: {e}")
+            try:
+                record_scheduler_run(
+                    db, scheduler="reconciliation", success=False, error=str(e)
+                )
+            except Exception:
+                logger.warning("⚠️ Could not record reconciliation scheduler run")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"⚠️ Star reconcile scheduler setup failed: {e}")
+    threading.Timer(86400, _schedule_reconcile).start()  # 24h
+
 
 @app.on_event("startup")
 def startup_event():
@@ -347,6 +417,89 @@ def startup_event():
     except Exception as e:
         logger.warning(f"⚠️ TECH-26 schema migration failed: {e}")
 
+    try:
+        with engine.begin() as conn:
+            # TECH-32 (NB-49): ops console schema — audit log + settings KV
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id SERIAL PRIMARY KEY,
+                    admin_user VARCHAR NOT NULL,
+                    action VARCHAR NOT NULL,
+                    section VARCHAR NOT NULL,
+                    entity_type VARCHAR NOT NULL,
+                    entity_id VARCHAR,
+                    before JSON,
+                    after JSON,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+                """
+            ))
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS admin_settings (
+                    key VARCHAR PRIMARY KEY,
+                    value VARCHAR,
+                    type VARCHAR NOT NULL,
+                    source VARCHAR NOT NULL,
+                    description VARCHAR NOT NULL
+                )
+                """
+            ))
+            logger.info("✅ TECH-32 schema migration verified (audit_log, admin_settings)")
+    except Exception as e:
+        logger.warning(f"⚠️ TECH-32 schema migration failed: {e}")
+
+    try:
+        with engine.begin() as conn:
+            # TECH-33 (NB-50): scheduler runs + listener heartbeat
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS scheduler_runs (
+                    id SERIAL PRIMARY KEY,
+                    scheduler VARCHAR UNIQUE,
+                    last_run_at TIMESTAMPTZ,
+                    last_success_at TIMESTAMPTZ,
+                    last_error VARCHAR,
+                    last_result JSON
+                )
+                """
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_scheduler_runs_scheduler ON scheduler_runs (scheduler)"
+            ))
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS listener_heartbeat (
+                    id INTEGER PRIMARY KEY,
+                    last_seen_at TIMESTAMPTZ NOT NULL,
+                    payload JSON
+                )
+                """
+            ))
+            logger.info("✅ TECH-33 schema migration verified (scheduler_runs, listener_heartbeat)")
+    except Exception as e:
+        logger.warning(f"⚠️ TECH-33 schema migration failed: {e}")
+
+    try:
+        with engine.begin() as conn:
+            # TECH-34 (NB-51): DB-first boost prices — composite PK
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS boost_prices (
+                    category VARCHAR NOT NULL,
+                    subcategory VARCHAR NOT NULL,
+                    price_stars INTEGER NOT NULL,
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_by VARCHAR,
+                    PRIMARY KEY (category, subcategory)
+                )
+                """
+            ))
+            logger.info("✅ TECH-34 schema migration verified (boost_prices)")
+    except Exception as e:
+        logger.warning(f"⚠️ TECH-34 schema migration failed: {e}")
+
     # ===================================================================
     # Phase 4 — Create indexes (SINGLE SOURCE OF TRUTH)
     # ===================================================================
@@ -405,20 +558,8 @@ def startup_event():
     # Phase 5.5 — TECH-22: Schedule daily cleanup background task
     # ===================================================================
     try:
-        import threading
-        from services.cleanup import run_cleanup_and_log
-
-        def _schedule_cleanup():
-            try:
-                run_cleanup_and_log()
-            except Exception as e:
-                logger.warning(f"⚠️ Cleanup task failed: {e}")
-            threading.Timer(86400, _schedule_cleanup).start()  # 24h
-
         threading.Timer(60, _schedule_cleanup).start()  # first run after 60s
         logger.info("✅ TECH-22 daily cleanup scheduler registered")
-    except ImportError as e:
-        logger.warning(f"⚠️ Could not import cleanup service: {e}")
     except Exception as e:
         logger.warning(f"⚠️ Cleanup scheduler setup failed: {e}")
 
@@ -426,33 +567,27 @@ def startup_event():
     # Phase 5.6 — TECH-31: Daily Star payments reconciliation
     # ===================================================================
     try:
-        import asyncio
-        import threading
-        from constants import MONETIZATION_ENABLED
-        from services.reconciliation import reconcile_star_payments
-
-        def _schedule_reconcile():
-            try:
-                if MONETIZATION_ENABLED:
-                    from database import SessionLocal
-                    db = SessionLocal()
-                    try:
-                        summary = asyncio.run(reconcile_star_payments(db))
-                        logger.info(f"✅ Star payments reconciliation: {summary}")
-                    finally:
-                        db.close()
-                else:
-                    logger.info("⏸️ Star reconciliation skipped (MONETIZATION_ENABLED=0)")
-            except Exception as e:
-                logger.warning(f"⚠️ Star reconcile task failed: {e}")
-            threading.Timer(86400, _schedule_reconcile).start()  # 24h
-
         threading.Timer(3600, _schedule_reconcile).start()  # first run after 1h
         logger.info("✅ TECH-31 daily star reconciliation scheduler registered")
-    except ImportError as e:
-        logger.warning(f"⚠️ Could not import reconciliation service: {e}")
     except Exception as e:
         logger.warning(f"⚠️ Star reconcile scheduler setup failed: {e}")
+
+    # ===================================================================
+    # Phase 5.7 — NB-51: seed boost prices (idempotent ON CONFLICT DO
+    # NOTHING; operator price edits are never overwritten by later seeds)
+    # ===================================================================
+    try:
+        from database import SessionLocal
+        from services.boost_pricing import seed_boost_prices
+
+        db = SessionLocal()
+        try:
+            seeded = seed_boost_prices(db)
+            logger.info(f"✅ Boost price seed verified ({seeded} rows inserted)")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"⚠️ Boost price seed failed: {e}")
 
 @app.get("/")
 def read_root():
@@ -475,6 +610,17 @@ app.include_router(channels.router, prefix="/channels", tags=["Channels"])
 # NB-43..NB-47: Monetization routers (blueprint §3.4) — internal payments first
 app.include_router(payments.router)  # no prefix — internal paths are explicit
 app.include_router(subscriptions.router, prefix="/subscriptions", tags=["Subscriptions"])
+
+# NB-49..NB-54: Platform Ops Console — internal seam (no prefix) + the
+# seven ops section routers (shell-first: registered from Phase 1)
+app.include_router(internal_routes.router)
+app.include_router(ops_auth.router, prefix="/ops/auth", tags=["Ops"])
+app.include_router(ops_health.router, prefix="/ops/health", tags=["Ops"])
+app.include_router(ops_monetization.router, prefix="/ops/monetization", tags=["Ops"])
+app.include_router(ops_settings.router, prefix="/ops/settings", tags=["Ops"])
+app.include_router(ops_audit.router, prefix="/ops/audit", tags=["Ops"])
+app.include_router(ops_payments.router, prefix="/ops/payments", tags=["Ops"])
+app.include_router(ops_tools.router, prefix="/ops/tools", tags=["Ops"])
 
 # SQLAdmin — full CRUD dashboard at /admin
 setup_admin(app)

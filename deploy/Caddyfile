@@ -41,6 +41,32 @@ indexgebeya.cfd {
     handle /subscriptions* {
         reverse_proxy index_api:8000
     }
+    # NB-49..NB-54: ops console API handles (blueprint D7). The /ops page
+    # itself and any other /ops/* path continue through the SPA catch-all.
+    handle /ops/auth* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/health* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/monetization* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/settings* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/audit* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/payments* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/tools* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/internal* {
+        reverse_proxy index_api:8000
+    }
 
     # Everything else → React SPA
     handle {

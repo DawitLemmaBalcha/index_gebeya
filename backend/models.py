@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, BigInteger, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, BigInteger, Boolean, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
@@ -329,3 +329,71 @@ class Subscription(Base):
     is_recurring = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# ----------------------------------------------------------------------
+# 5. PLATFORM OPS CONSOLE LAYER (TECH-32..TECH-37 / NB-49..NB-54)
+# ----------------------------------------------------------------------
+class AuditLog(Base):
+    """NB-49: one row per console mutation. Rows are NEVER deleted — no
+    delete route exists anywhere (ops-console.md Rule 1.4)."""
+    __tablename__ = "audit_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_user = Column(String, nullable=False)
+    action = Column(String, nullable=False)
+    section = Column(String, nullable=False)
+    entity_type = Column(String, nullable=False)
+    entity_id = Column(String, nullable=True)
+    before = Column(JSON, nullable=True)
+    after = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AdminSetting(Base):
+    """NB-49: typed KV settings — one row per key; row presence ⇒ source
+    'db'. The registry (services/settings_registry.py) resolves live values
+    DB row → env var → constant default."""
+    __tablename__ = "admin_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=True)
+    type = Column(String, nullable=False)  # int|float|str|bool|json
+    source = Column(String, nullable=False)  # 'db'|'env'
+    description = Column(String, nullable=False)
+
+
+class BoostPrice(Base):
+    """NB-51: DB-first boost prices (Rule 4.1.1). Composite PK
+    (category, subcategory); price ≥ 1 (route-validated)."""
+    __tablename__ = "boost_prices"
+
+    category = Column(String, primary_key=True)
+    subcategory = Column(String, primary_key=True)
+    price_stars = Column(Integer, nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by = Column(String, nullable=True)
+
+
+class SchedulerRun(Base):
+    """NB-50: one row per scheduler name (cleanup, reconciliation,
+    photo_refresher), upserted by the jobs themselves. `last_result` is
+    the additive run-now summary (D5)."""
+    __tablename__ = "scheduler_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scheduler = Column(String, unique=True, index=True, nullable=False)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    last_success_at = Column(DateTime(timezone=True), nullable=True)
+    last_error = Column(String, nullable=True)
+    last_result = Column(JSON, nullable=True)
+
+
+class ListenerHeartbeat(Base):
+    """NB-50: single-row (id fixed 1) listener presence signal — the ONLY
+    listener-side health source (D9: the listener is HTTP-only)."""
+    __tablename__ = "listener_heartbeat"
+
+    id = Column(Integer, primary_key=True)  # fixed 1
+    last_seen_at = Column(DateTime(timezone=True), nullable=False)
+    payload = Column(JSON, nullable=True)

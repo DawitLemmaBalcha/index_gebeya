@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator
-from typing import Optional, Union, Dict, Any, List
+from typing import Optional, Union, Dict, Any, List, Literal
 from datetime import datetime
 
 # ----------------------------------------------------------------------
@@ -461,3 +461,53 @@ class ChannelStatsResponse(BaseModel):
     is_pro: bool
     core: ChannelStatsCore
     pro: Optional[ChannelStatsPro] = None
+
+
+# ----------------------------------------------------------------------
+# PLATFORM OPS CONSOLE SCHEMAS (NB-49..NB-54)
+# ----------------------------------------------------------------------
+class OpsLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class OpsPriceUpdateRequest(BaseModel):
+    price_stars: int
+
+
+class OpsPriceBulkRequest(BaseModel):
+    action: Literal["set_category", "percent", "reset"]
+    category: str
+    subcategory: Optional[str] = None
+    price_stars: Optional[int] = None
+    percent: Optional[int] = None
+
+
+class OpsToggleUpdateRequest(BaseModel):
+    value: bool
+
+
+class OpsSettingUpdateRequest(BaseModel):
+    value: str
+
+
+class OpsRefundRequest(BaseModel):
+    telegram_payment_charge_id: str
+
+
+class TestBoostRequest(BaseModel):
+    item_id: int
+
+
+class TestSubscriptionRequest(BaseModel):
+    user_id: int
+    product: str
+
+
+class SimulatePaymentRequest(BaseModel):
+    telegram_payment_charge_id: str
+    invoice_payload: str
+    total_amount: int
+    subscription_expiration_date: Optional[datetime] = None
+    is_recurring: bool = False
+    is_first_recurring: bool = False

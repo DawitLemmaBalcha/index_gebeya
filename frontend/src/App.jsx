@@ -6,6 +6,7 @@ import AlertsPage from './pages/AlertsPage';
 import StoresPage from './pages/StoresPage';
 import LandingPage from './pages/LandingPage';
 import MonetizationHub from './pages/MonetizationHub';
+import OpsConsole from './pages/OpsConsole';
 import BottomNav from './components/BottomNav';
 
 const isTelegramWebView = () => {
@@ -61,6 +62,12 @@ function MainLayout({ initialSearchQuery = '', initialTab }) {
 }
 
 const App = () => {
+  // NB-49 (D8): the ops console is a standalone page — guard BEFORE the
+  // Telegram gate so non-Telegram visitors land on /ops, not LandingPage.
+  if (window.location.pathname.startsWith('/ops')) {
+    return <OpsConsole />;
+  }
+
   // Capture Telegram user identity once — enables owner checks (report sold, re-list, inventory)
   try {
     const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;

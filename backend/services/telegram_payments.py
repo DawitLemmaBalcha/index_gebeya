@@ -59,6 +59,11 @@ class StarPaymentsAdapter(Protocol):
         """GET /bot{TOKEN}/getMyStarBalance."""
         ...
 
+    async def refund_star_payment(self, *, telegram_payment_charge_id: str) -> bool:
+        """POST /bot{TOKEN}/refundStarPayment — operator refunds (NB-53).
+        Returns True on success; raises RuntimeError on API failure."""
+        ...
+
 
 class HttpxStarPaymentsAdapter:
     """The real adapter: raw httpx to api.telegram.org (D5)."""
@@ -149,6 +154,12 @@ class HttpxStarPaymentsAdapter:
 
     async def get_my_star_balance(self) -> int:
         return await self._get("getMyStarBalance")
+
+    async def refund_star_payment(self, *, telegram_payment_charge_id: str) -> bool:
+        await self._post("refundStarPayment", {
+            "telegram_payment_charge_id": telegram_payment_charge_id,
+        })
+        return True
 
 
 # module-level default instance for production;

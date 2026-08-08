@@ -55,6 +55,17 @@ def _test_db_schema():
     Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def _clear_boost_price_cache():
+    """NB-51: the boost-price module cache is process-global; tests seed
+    different prices per test, so the cache must be clean between tests."""
+    from services import boost_pricing
+
+    boost_pricing._cache.clear()
+    yield
+    boost_pricing._cache.clear()
+
+
 @pytest.fixture()
 def db_session(_test_db_schema):
     """Fresh, empty session for each test (all tables truncated)."""

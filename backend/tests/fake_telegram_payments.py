@@ -52,3 +52,10 @@ class FakeStarPaymentsAdapter:
 
     async def get_my_star_balance(self):
         return 0
+
+    async def refund_star_payment(self, *, telegram_payment_charge_id):
+        self.calls.append({
+            "method": "refund_star_payment",
+            "telegram_payment_charge_id": telegram_payment_charge_id,
+        })
+        return True
