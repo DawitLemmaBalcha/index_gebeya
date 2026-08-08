@@ -69,3 +69,19 @@ Six phases, each with its own QA gate + atomic commit on `feat/monetization`:
 - **TECH-29 (Phase 4):** seller intelligence — `services/stats.py` (views/alert-matches/dispatched core; price-positioning/category-pulse/top-performers pro), `GET /channels/{id}/stats`, `SellerIntelligenceDashboard.jsx` + ChannelInventory tab.
 - **TECH-30 (Phase 5):** frontend subscriptions UI — `useSubscription.js`, StoresPage subscription card + upgrade entry, credit-boost button, end-to-end manual pass (quote → invoice → paid → badge; subscription → cap raised; cancel → extras paused `lapsed=True`; renewal → reactivated).
 - **TECH-31 (Phase 6):** reconciliation (`getStarTransactions` replay, daily timer, `MONETIZATION_ENABLED` guard), full regression (baseline 116 passed / 2 pre-existing failures / 18-22 skipped), frontend build.
+
+---
+
+## TECH-32..TECH-37: Platform Ops Console (NB-49..NB-54)
+
+**Status:** PENDING — behavior doc: `docs/behaviors/ops-console.md` (locked 2026-08-06)
+**Date:** 2026-08-06
+
+Six phases, each with QA gate + atomic commit on `feat/ops-console`:
+
+- **TECH-32 (NB-49):** Shell — `/ops` route, admin auth in separate session namespace from sqladmin, role-bearing seam, one audit wrapper (`audit_log` table), settings registry (`admin_settings` KV + registry), ten-section scaffolding with "Coming soon" stubs, shared component kit.
+- **TECH-33 (NB-50):** Section 1 Overview — service/bot/worker health via `/ops/health`, `scheduler_runs` table written by cleanup/reconciliation/photo-refresher, listener heartbeat, star balance + pending-payment count, 30s polling with age labels.
+- **TECH-34 (NB-51):** Section 6 Monetization — `boost_prices` table (category/subcategory → Stars), DB-first price reads with cache + invalidation, seed from constants, demand-context pricing UI with bulk actions, instant feature toggles, subscription settings, revenue dashboard, boost moderation (end-early), test tools.
+- **TECH-35 (NB-52):** Sections 8+9 — Settings & Flags (full registry surface, effective-config view, env-vs-db labeling) + Audit (read-only filtered list).
+- **TECH-36 (NB-53):** Section 7 Payments — Star ledger, balance, reconciliation run-now, refund action with confirm+audit.
+- **TECH-37 (NB-54):** Section 10 Support Toolkit — TEST boost/subscription grants, payment-webhook simulator (drives the real fulfillment path), deep-link generator.

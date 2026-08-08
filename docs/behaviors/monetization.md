@@ -22,7 +22,7 @@ The free marketplace experience (browsing, searching, buying, alerts at the free
 
 **Rule 1.2 — One-Way Flow.** Stars are a collection rail only. The platform never pays sellers out in Stars. Refunds are not issued for boost time or subscription time (see Boost Lifecycle for the one exception: dedup replacement transfers the boost).
 
-**Rule 1.3 — Configuration.** Every price, duration, rotation cadence, and subscription allowance lives in `backend/constants.py` with environment-variable overrides (house pattern). No hardcoded monetization numbers anywhere.
+**Rule 1.3 — Configuration.** Every price, duration, rotation cadence, and subscription allowance lives in `backend/constants.py` with environment-variable overrides (house pattern). No hardcoded monetization numbers anywhere. **AMENDED (2026-08-06, NB-49..54 / ops-console.md §4):** boost prices are moving **DB-first** — `boost_prices` table seeded from these constants, editable live from the `/ops` console; constants remain the seed/fallback defaults. Subscription prices and allowances become live `admin_settings` flags. The instant-effect rule applies: edits take effect without restart.
 
 ---
 
@@ -30,9 +30,9 @@ The free marketplace experience (browsing, searching, buying, alerts at the free
 
 **Rule 2.1 — One Duration, No Tiers.** A boost is a single unit: **7 days** (`BOOST_DURATION_DAYS`, default 7). There is no 3-day or 14-day option. Deliberately simple — one price, one duration.
 
-**Rule 2.2 — Price by Top-Level Category.** Boost price varies by the item's top-level category (e.g., phones/electronics cost more than makeup/stationery). Prices are defined per category in a single configuration table (`BOOST_PRICE_STARS` keyed by top-level category). The "Other / Uncategorized" bucket gets the floor price. Subcategory-level pricing does not exist.
+**Rule 2.2 — Price by Category, Subcategory-Granular.** Boost price varies by the item's **subcategory** (falling back to the top-level category, then the "Other" floor). Prices are defined in the `boost_prices` DB table (`category`, `subcategory` → Stars), seeded from `BOOST_PRICE_STARS` defaults, editable live from the `/ops` console pricing screen (ops-console.md §4.1). Subcategory-level pricing exists: e.g., "iPhones" vs "Phone Accessories" can differ within Mobile Phones. **AMENDED (2026-08-06):** supersedes the earlier "top-level category only" wording — subcategory granularity is the model, per the ops-console lock-in.
 
-**Rule 2.3 — No Ladder, No Auction.** The price for a category is a flat published number. It is adjusted **manually** by the operators when the volume of boosters changes materially (more boosters → raise price; fewer → lower). There is no automatic price-ladder trigger and no bidding. A seller must never see the price move reactively between two visits to the same category.
+**Rule 2.3 — No Ladder, No Auction.** The price for a category is a flat published number. It is adjusted **manually** by the operators when the volume of boosters changes materially (more boosters → raise price; fewer → lower). There is no automatic price-ladder trigger and no bidding. A seller must never see the price move reactively between two visits to the same category. **AMENDED (2026-08-06):** manual adjustment is now data-driven via the `/ops` console pricing screen, which shows active/weekly boost counts beside each price (ops-console.md §4.1.4). The no-ladder/no-auction rule is unchanged.
 
 **Rule 2.4 — Price Shown In Context, Never As a Rate Card.** The seller only ever sees the boost price **on the specific item they are boosting** ("Boost this item for 7 days — 150 Stars"). The platform never displays a global boost price list, so sellers never compare category prices against each other.
 

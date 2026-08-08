@@ -152,6 +152,125 @@ The three paid products are undiscoverable. The Alerts-Only subscription was off
 - Backend: `constants.py` gains the cap-banner threshold (e.g., `ALERT_CAP_BANNER_THRESHOLD`, default 2 alerts below cap); hub data (usage counts, active boosts, prices, subscription status) served via existing endpoints — no new payment logic.
 - Tests: frontend tests for banner visibility at threshold, hub tab routing/deep-link, no-rate-card rendering; backend test for the threshold constant behavior. Full regression green.
 
+## NB-49: Ops Console — Shell, Auth & Scaffolding
+
+**Priority:** HIGH
+**Affected Features:** Admin, Ops
+**File(s):** `frontend/src/pages/OpsConsole.jsx` (new), `frontend/src/App.jsx` (route `/ops`), admin auth session (new, separate namespace from sqladmin), `backend/api/routes/ops_auth.py` (new), `backend/models.py` (`audit_log`, `admin_settings`), `backend/services/audit.py` (new), `backend/services/settings_registry.py` (new), `backend/main.py` (migrations)
+**Behavior doc:** `docs/behaviors/ops-console.md` §§1–2
+
+**The Gap:**
+All platform operations today are env config + restarts + raw sqladmin row-editing. There is no curated, audited, action-oriented operations surface — and no shell to grow one without patchwork.
+
+**User Acceptance Criteria:**
+- `/ops` route renders a standalone admin page (no bottom nav, no Telegram embed), gated by admin credentials (username/password → session) in a **separate session namespace from sqladmin** (console login ≠ sqladmin access).
+- Left-rail nav lists **all ten sections** (§2 map); unimplemented sections render a "Coming soon" stub — the shell shape never changes as sections ship.
+- The auth seam carries a `role` field internally (always `admin` in v1); permission checks call `has_role(session, "admin")` so future roles are data changes, not code changes.
+- **One audit wrapper**: every console mutation writes `audit_log` rows `{admin_user, action, section, entity_type, entity_id, before, after, created_at}` via the single mutation path. Audit rows are never deleted.
+- **Settings registry**: `admin_settings` typed KV table + registry `(key, type, current_value, source: db|env, description)`; powers the effective-config view.
+- Shared component kit (table, empty-state, confirm, toast, inline-edit) used across all sections.
+- Backend: `/ops/health` probe endpoint skeleton + auth endpoints; migrations for `audit_log` + `admin_settings`.
+- Tests: auth separation (console session doesn't open sqladmin), audit wrapper writes rows on mutation, settings registry reads/writes with source labeling, route gating (no console access unauthenticated). Full regression green.
+
+---
+
+## NB-50: Ops Console — Section 1: Overview (full implementation)
+
+**Priority:** HIGH
+**Affected Features:** Ops, Ingestion, Schedulers
+**File(s):** `backend/api/routes/ops_health.py` (new), `backend/models.py` (`scheduler_runs` table), `backend/services/cleanup.py` + `backend/services/reconciliation.py` + `listener/photo_refresher.py` (write `scheduler_runs`), listener heartbeat (new), `frontend/src/sections/OpsOverview.jsx` (new)
+**Behavior doc:** `docs/behaviors/ops-console.md` §3
+
+**The Gap:**
+No single screen answers "is the platform healthy right now?" — service status, bot health, ingestion throughput, AI failover, scheduler runs, and money signals are scattered across logs and sqladmin.
+
+**User Acceptance Criteria:**
+- Service health: api/listener/frontend/db up-down, uptime, restart counts (poll ≤ 30s, data labeled with age).
+- Bot health: Telegram connection state, update lag, handler error rate (last hour).
+- Ingestion worker: queue depth, items/hour, rate-limit headroom, AI-provider status + failover events (24h).
+- Schedulers: for cleanup, reconciliation, photo refresher — last run, last success, last error (requires the new `scheduler_runs` table written by each job; instrumentation gap closed).
+- Money signals: star balance, pending/unfulfilled payment count.
+- No fake numbers anywhere — every figure traces to a real probe or table.
+- Tests: health endpoint shape, scheduler_runs writes, stale-data labeling. Full regression green.
+
+---
+
+## NB-51: Ops Console — Section 6: Monetization (pricing, toggles, revenue, moderation, test tools)
+
+**Priority:** HIGH
+**Affected Features:** Monetization, Ops
+**File(s):** `backend/models.py` (`boost_prices` table), `backend/services/boost.py` (price reads go DB-first with cache + invalidation; seed from constants on startup), `backend/services/settings_registry.py` (feature toggles + subscription settings as DB flags), `backend/api/routes/ops_monetization.py` (new), `frontend/src/sections/OpsMonetization.jsx` (new)
+**Behavior doc:** `docs/behaviors/ops-console.md` §4; `docs/behaviors/monetization.md` Rules 1.3/2.2/2.3 (amended)
+
+**The Gap:**
+Boost prices are env config requiring restarts; no demand context; feature kill switches require env edits; revenue is invisible; moderation is sqladmin row-hacking.
+
+**User Acceptance Criteria:**
+- `boost_prices` table (category, subcategory, price_stars, updated_at, updated_by), seeded from `BOOST_PRICE_STARS` defaults on startup; `get_boost_price` reads DB-first (fallback chain: subcategory → category → Other floor) with a small cache invalidated on edit; **edits take effect instantly, no restart**.
+- Pricing screen: subcategories grouped by category, each row `Subcategory | Price | Active boosts | Boosts this week` (demand context from `boosts` joined to items); inline edit with confirm; bulk actions "Set category", "+N% across category", "Reset to floor".
+- Feature toggles as instant DB flags: `MONETIZATION_ENABLED`, boost purchases, subscription purchases, credit boosts — 503/UI-hide behavior preserved exactly.
+- Subscription settings visible + editable live: alerts-only price, all-in-one price, extra-alert allowance, monthly credit.
+- Revenue dashboard: Stars earned (from `getStarTransactions` ledger), active subs, active boosts, expiring-soon (24h). Real data only.
+- Boost moderation: curated active-boost list (item/channel/source/ends-at/price); **end boost early** action invoking existing `end_boost_for_item`, audit-logged, no refunds.
+- Price edits never disturb in-flight purchases (invoice fixed at creation).
+- Tests: seed-on-startup, DB-first fallback chain, cache invalidation on edit, instant toggle effect (503 path), demand-context counts, end-early moderation, in-flight price stability. Full regression green.
+
+---
+
+## NB-52: Ops Console — Sections 8 & 9: Settings & Flags + Audit
+
+**Priority:** HIGH
+**Affected Features:** Ops
+**File(s):** `backend/services/settings_registry.py` (complete registry surface), `backend/api/routes/ops_settings.py` (new), `backend/api/routes/ops_audit.py` (new), `frontend/src/sections/OpsSettings.jsx` (new), `frontend/src/sections/OpsAudit.jsx` (new)
+**Behavior doc:** `docs/behaviors/ops-console.md` §§5–6
+
+**The Gap:**
+Operational knobs live in env files; there is no effective-config view and no audit trail for console actions.
+
+**User Acceptance Criteria:**
+- Settings registry surfaces every operational knob (monetization flags, alert cap, banner threshold, rotation minutes, retention days, LLM fail-open policy): description, live value, source (db/env).
+- DB-sourced knobs: editable with confirm + audit, instant effect. Env-sourced knobs: read-only with "requires deploy" labeling — the console never claims an edit took effect when it didn't.
+- Effective-config view: full current configuration, DB overrides on top of env defaults, source-labeled.
+- Audit section: read-only list of every console mutation, filterable by section and admin; no edits/deletes.
+- Tests: registry read/write + source labeling, env-vs-db precedence, audit list filtering, read-only enforcement. Full regression green.
+
+---
+
+## NB-53: Ops Console — Section 7: Payments
+
+**Priority:** MEDIUM
+**Affected Features:** Monetization, Payments
+**File(s):** `backend/api/routes/ops_payments.py` (new), `frontend/src/sections/OpsPayments.jsx` (new)
+**Behavior doc:** `docs/behaviors/ops-console.md` §7
+
+**The Gap:**
+Star revenue and payment state are invisible outside logs; reconciliation has no run-now control; refunds require raw API calls.
+
+**User Acceptance Criteria:**
+- Star transaction ledger (from `getStarTransactions`), current balance, last reconciliation run + result.
+- Reconciliation run-now button triggering the existing daily reconciliation immediately, result displayed.
+- Refund action via `refundStarPayment` for a specific charge id, confirm + audit + warning dialog.
+- Tests: ledger rendering, run-now invocation, refund guard rails. Full regression green.
+
+---
+
+## NB-54: Ops Console — Section 10: Support Toolkit
+
+**Priority:** MEDIUM
+**Affected Features:** Ops, Monetization, Stores
+**File(s):** `backend/api/routes/ops_tools.py` (new), `frontend/src/sections/OpsTools.jsx` (new)
+**Behavior doc:** `docs/behaviors/ops-console.md` §8
+
+**The Gap:**
+UAT and support workflows require sqladmin row-inserts (test boosts/subscriptions) and there is no way to simulate a payment fulfillment or generate deep links.
+
+**User Acceptance Criteria:**
+- One-click TEST boost grant (item) and TEST subscription grant/revoke (user): clearly labeled TEST, audit-logged, no real payment.
+- **Payment-webhook simulator**: trigger a synthetic `successful_payment` fulfillment for a charge id + payload — the exact listener flow, without Telegram. The primary UAT tool for the monetization stack.
+- Deep-link generator: Mini App links to any item/channel for support handoffs.
+- All actions: explicit confirmation, audit rows, never touch real Telegram payments.
+- Tests: simulator drives the same fulfillment path as the real listener flow (idempotency included); grant/revoke guards. Full regression green.
+
 ---
 
 # ARCHIVE — Implemented Tickets
