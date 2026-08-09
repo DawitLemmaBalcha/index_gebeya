@@ -95,3 +95,13 @@ Six phases, each with QA gate + atomic commit on `feat/ops-console`:
 **The gap:** the ops settings panel can edit `alerts_subscription_extra_alerts`, `all_in_one_monthly_boost_credit`, and `max_alerts_per_user`, but the consumers still read constants: `get_effective_alert_cap` (subscriptions.py ~71), `get_credit_boosts_remaining` (~92), `credit_total` (~319), `alerts_extra_allowance` (~300/316) — and `MonetizationHub.jsx` hardcodes "2 free boosts" instead of the registry value. These knobs are write-only today; ops admins could set a value and see no effect (same bug class just fixed for prices).
 
 **Acceptance criteria:** all three keys registry-driven at every consumer read-site (fail-open to constants); the "2 free boosts" credit pitch in MonetizationHub renders from `credit_total`/registry; tests prove the ops-PUT → webapp-effect loop for cap and credit (mirroring TestOpsPriceLoop); no behavior change when no DB rows exist.
+
+---
+
+## TECH-39: Shared `useRefetchOnActivation` primitive + StoresPage/hub refactor (QA post-mortem)
+
+**Status:** PENDING — QA post-mortem from the zero-channel/activation fix (11272b6), 2026-08-08
+
+**The gap:** (1) the `if (active) getStatus()` activation-refetch pattern is duplicated in AlertsPage and StoresPage — the always-mounted `display:none` tab pattern in MainLayout is a systemic staleness trap; a shared `useRefetchOnActivation(active, fn)` primitive prevents the next instance. (2) StoresPage (553L) and MonetizationHub (484L) exceed the 300-line guideline (pre-existing), and the "Add Channel" CTA fragment is duplicated — a refactor for size + dedup is due.
+
+**Acceptance criteria:** shared primitive hook with tests; both pages consume it; CTA fragment extracted; file sizes reduced or documented as intentional with extraction boundaries; full frontend suite green.
