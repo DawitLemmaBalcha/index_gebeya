@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from database import engine, get_db
 from models import Boost, ListenerHeartbeat, SchedulerRun, Subscription
+from services import alerting  # NB-20: live LLM judge fail-open counters
 from services.telegram_payments import star_payments
 
 from .ops_auth import require_ops_admin
@@ -184,8 +185,15 @@ async def get_health(db: Session = Depends(get_db), _: None = Depends(require_op
         "unavailable", source=None, note="no data source — 429s are not tracked"
     )
     services["ingestion.ai_providers"] = _signal(
-        "unavailable", source=None,
-        note="no health endpoint for groq/gemini (raw HTTP, no status tracking) — NB-20 is the future surface",
+        "ok",
+        value={
+            "llm_judge_error_count": alerting.JUDGE_ERROR_COUNT,
+            "llm_judge_error_last_ts": (
+                alerting.JUDGE_ERROR_LAST_TS.isoformat() if alerting.JUDGE_ERROR_LAST_TS else None
+            ),
+        },
+        source="alerting.JUDGE_ERROR_COUNT / JUDGE_ERROR_LAST_TS",
+        note="LLM judge fail-open observability (NB-20); groq/gemini health probes remain out of scope",
     )
 
     # --- schedulers ---

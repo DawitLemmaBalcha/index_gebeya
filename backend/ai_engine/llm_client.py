@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import httpx 
+from enum import Enum
 
 logger = logging.getLogger("index_llm")
 
@@ -9,14 +10,28 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "llama-3.1-8b-instant" 
 
-def verify_match_with_llm(item_title: str, alert_query: str, preferences: dict) -> bool:
+class JudgeVerdict(Enum):
+    """NB-20: tri-state LLM judge verdict — the orchestrator distinguishes
+    a genuine REJECTION from an ERROR (fail-open) and APPROVAL.
+
+    - APPROVED: 200 + valid JSON + `match: true`.
+    - REJECTED: 200 + valid JSON + `match: false` OR a MISSING `match` key
+      (fail-closed preserved — see the call-site comment).
+    - ERRORED:  no key / non-200 / unparseable payload / exception — the
+      orchestrator fail-OPENS and counts it for ops observability.
+    """
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    ERRORED = "errored"
+
+def verify_match_with_llm(item_title: str, alert_query: str, preferences: dict) -> JudgeVerdict:
     """
     Synchronous LLM Judge with 3-Scenario Logic.
     Decides which persona to adopt based on the user's strictness settings.
     """
     if not GROQ_API_KEY:
         logger.warning("⚠️ GROQ_API_KEY missing. Skipping LLM verification.")
-        return True
+        return JudgeVerdict.ERRORED
 
     strict_brand = preferences.get("strict_brand", False)
     strict_model = preferences.get("strict_model", False)
@@ -97,17 +112,33 @@ def verify_match_with_llm(item_title: str, alert_query: str, preferences: dict) 
             )
             
             if response.status_code == 200:
-                data = response.json()
-                content = data['choices'][0]['message']['content']
-                result = json.loads(content)
-                is_match = result.get("match", False)
-                
-                logger.info(f"🤖 LLM Verdict: {is_match} | Mode: {mode_log} | Query: '{alert_query}' vs Item: '{item_title}'")
-                return is_match
+                try:
+                    data = response.json()
+                    content = data['choices'][0]['message']['content']
+                    result = json.loads(content)
+                except Exception:
+                    logger.error(f"💥 LLM Client Exception: unparseable judge payload for '{alert_query}'")
+                    return JudgeVerdict.ERRORED
+
+                if not isinstance(result, dict):
+                    logger.error(f"💥 LLM Client Exception: judge payload is not a JSON object for '{alert_query}'")
+                    return JudgeVerdict.ERRORED
+
+                logger.info(f"🤖 LLM Verdict: {result.get('match')} | Mode: {mode_log} | Query: '{alert_query}' vs Item: '{item_title}'")
+
+                if "match" not in result:
+                    # NB-20: the pre-tri-state code read result.get("match",
+                    # False) — a 200 with a MISSING `match` key fail-CLOSED.
+                    # Mapped to REJECTED so match outcomes never change (only
+                    # logging granularity and the ops counter differ).
+                    return JudgeVerdict.REJECTED
+                if result.get("match"):
+                    return JudgeVerdict.APPROVED
+                return JudgeVerdict.REJECTED
             else:
                 logger.error(f"❌ LLM Error {response.status_code}: {response.text}")
-                return True # Fail open if LLM is down
+                return JudgeVerdict.ERRORED # Fail open if LLM is down
                 
         except Exception as e:
             logger.error(f"💥 LLM Client Exception: {e}")
-            return True
+            return JudgeVerdict.ERRORED

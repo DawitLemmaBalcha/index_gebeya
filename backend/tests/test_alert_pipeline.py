@@ -22,6 +22,7 @@ from models import Alert, Item, User, Channel, Notification
 from services.alerting import process_new_item
 from ai_engine.matcher import MatchTier, MatchResult
 from ai_engine.vector_client import vectorize_text
+from ai_engine.llm_client import JudgeVerdict
 
 
 # =========================================================================
@@ -108,7 +109,10 @@ def test_hybrid_ring_without_speed_pass_invokes_judge(db_session):
 
     def judge_spy(item_title, alert_query, preferences):
         judge_calls.append((item_title, alert_query, preferences))
-        return True
+        # NB-20: the judge now returns a JudgeVerdict member — with the
+        # orchestrator's enum-identity comparisons a bare `True` would be
+        # treated as an unknown verdict (skipped).
+        return JudgeVerdict.APPROVED
 
     with patch(
         "services.alerting.evaluate_match",

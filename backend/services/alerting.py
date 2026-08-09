@@ -9,7 +9,7 @@ import numpy as np
 from models import Alert, Item, User, Notification
 from ai_engine.matcher import evaluate_match, MatchTier
 from ai_engine.vector_client import vectorize_text
-from ai_engine.llm_client import verify_match_with_llm 
+from ai_engine.llm_client import verify_match_with_llm, JudgeVerdict
 from constants import (
     MAX_ALERTS_PER_USER,
     MAX_MATCHES_BEFORE_PAUSE,
@@ -21,6 +21,11 @@ from constants import (
 from services.subscriptions import get_effective_alert_cap  # NB-46 (D3): the single cap authority
 
 logger = logging.getLogger("index_alerts")
+
+# NB-20: LLM judge fail-open observability (process-local; no DB table —
+# acceptable for v1 per the architect). Reset on API restart.
+JUDGE_ERROR_COUNT = 0
+JUDGE_ERROR_LAST_TS = None  # UTC datetime or None
 
 def _create_system_notification(db: Session, user_id: int, alert_id: int, message: str, tier: str) -> None:
     """
@@ -105,13 +110,26 @@ def process_new_item(db: Session, item_id: int):
                 preferences = json.loads(alert.preferences) if alert.preferences else {}
                 
                 logger.info(f"⚖️ Invoking LLM Judge for Alert {alert.id}...")
-                is_verified = verify_match_with_llm(item.title, alert.query_text, preferences)
+                verdict = verify_match_with_llm(item.title, alert.query_text, preferences)
 
-                if not is_verified:
+                if verdict is JudgeVerdict.REJECTED:
                     logger.info(f"🛑 LLM Rejected: '{alert.query_text}' vs '{item.title}'")
                     continue
-                else:
+
+                if verdict is JudgeVerdict.ERRORED:
+                    # NB-20: fail-open — same dispatch outcome as the legacy
+                    # exception→True path, but counted + timestamped for ops.
+                    global JUDGE_ERROR_COUNT, JUDGE_ERROR_LAST_TS
+                    JUDGE_ERROR_COUNT += 1
+                    JUDGE_ERROR_LAST_TS = datetime.now(timezone.utc)
+                    logger.warning(f"⚠️ LLM Judge errored — fail-open: '{alert.query_text}' vs '{item.title}'")
+                elif verdict is JudgeVerdict.APPROVED:
                     logger.info(f"✅ LLM Approved: '{alert.query_text}' vs '{item.title}'")
+                else:
+                    # Defensive: a non-enum return (stale mock, future drift)
+                    # fails CLOSED — never dispatch on an unknown verdict.
+                    logger.warning(f"⚠️ LLM Judge returned unknown verdict {verdict!r} — skipping")
+                    continue
 
             # -----------------------------------------------------------
             # DISPATCH DECISION

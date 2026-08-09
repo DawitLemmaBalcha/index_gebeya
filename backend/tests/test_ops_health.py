@@ -135,13 +135,34 @@ class TestHealthShape:
             assert "status" in data["services"][name]
 
     def test_sources_are_never_fabricated(self, db_session, monkeypatch):
-        # Signals without a data source render unavailable + reason
+        # Signals without a data source render unavailable + reason; the
+        # ai_providers signal is REAL since NB-20 (LLM judge fail-open
+        # counters from services.alerting).
         client = _client(db_session, monkeypatch, fake=FakeStarPaymentsAdapter())
         data = client.get("/ops/health").json()["services"]
         assert data["bot.handler_error_rate"]["status"] == "unavailable"
         assert data["ingestion.rate_limit_headroom"]["status"] == "unavailable"
-        assert data["ingestion.ai_providers"]["status"] == "unavailable"
-        assert "reason" in data["ingestion.ai_providers"] or data["ingestion.ai_providers"].get("note")
+        assert data["ingestion.ai_providers"]["status"] == "ok"
+        value = data["ingestion.ai_providers"]["value"]
+        assert isinstance(value["llm_judge_error_count"], int)
+        assert "llm_judge_error_last_ts" in value
+
+    def test_ai_providers_counter_is_live_not_a_stale_import(self, db_session, monkeypatch):
+        """NB-20: the ai_providers signal must reflect the CURRENT judge
+        counters at request time (a value-bound import would pin 0 forever)."""
+        from services import alerting
+
+        snapshot = (alerting.JUDGE_ERROR_COUNT, alerting.JUDGE_ERROR_LAST_TS)
+        try:
+            alerting.JUDGE_ERROR_COUNT += 3
+            alerting.JUDGE_ERROR_LAST_TS = datetime.now(timezone.utc)
+            client = _client(db_session, monkeypatch, fake=FakeStarPaymentsAdapter())
+            signal = client.get("/ops/health").json()["services"]["ingestion.ai_providers"]
+            assert signal["status"] == "ok"
+            assert signal["value"]["llm_judge_error_count"] >= 3
+            assert signal["value"]["llm_judge_error_last_ts"] is not None
+        finally:
+            alerting.JUDGE_ERROR_COUNT, alerting.JUDGE_ERROR_LAST_TS = snapshot
 
 
 class TestListenerSignals:
