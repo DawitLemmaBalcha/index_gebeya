@@ -20,13 +20,13 @@
 
 ---
 
-## NB-19: Missing Product Condition and Location in Frontend Display (existing, low priority)
+## NB-19: [IMPLEMENTED] Missing Product Condition and Location in Frontend Display
 
 *(Unchanged — retained from original ledger)*
 
 ---
 
-## NB-20: LLM Judge "Fail-Open" Does Not Distinguish Between Error Types (existing, low priority)
+## NB-20: [IMPLEMENTED] LLM Judge "Fail-Open" Does Not Distinguish Between Error Types
 
 *(Unchanged — retained from original ledger)*
 

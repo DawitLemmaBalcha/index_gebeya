@@ -100,7 +100,7 @@ Six phases, each with QA gate + atomic commit on `feat/ops-console`:
 
 ## TECH-39: Shared `useRefetchOnActivation` primitive + StoresPage/hub refactor (QA post-mortem)
 
-**Status:** PENDING — QA post-mortem from the zero-channel/activation fix (11272b6), 2026-08-08
+**Status:** IMPLEMENTED ✅ — commit `3aea612` on `feat/cleanup-5tickets` (QA APPROVED)
 
 **The gap:** (1) the `if (active) getStatus()` activation-refetch pattern is duplicated in AlertsPage and StoresPage — the always-mounted `display:none` tab pattern in MainLayout is a systemic staleness trap; a shared `useRefetchOnActivation(active, fn)` primitive prevents the next instance. (2) StoresPage (553L) and MonetizationHub (484L) exceed the 300-line guideline (pre-existing), and the "Add Channel" CTA fragment is duplicated — a refactor for size + dedup is due.
 
