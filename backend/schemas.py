@@ -82,6 +82,13 @@ class ItemResponse(ItemBase):
 
     specs: Union[Dict[str, Any], str, None] = None 
 
+    # NB-17/19: extracted listing attributes (nullable — NULL = not extracted).
+    # Deliberately NOT on ItemBase/ItemCreate: no API create surface exists
+    # (ingestion constructs the ORM directly); keeping them off the base
+    # avoids implying a create path can set them.
+    condition: Optional[str] = None
+    location: Optional[str] = None
+
     # TECH-21: Expose soft-delete status
     is_active: bool = True 
 

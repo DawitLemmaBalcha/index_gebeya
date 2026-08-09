@@ -213,4 +213,44 @@ describe('ProductPage', () => {
 
     localStorage.removeItem('index_user_id')
   })
+
+  // NB-17/19: additive ProductPage displays — location line (hidden when
+  // absent) + condition row with the 'Used' fallback.
+  const renderWithItem = async (item) => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(item) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
+
+    render(
+      <MemoryRouter initialEntries={['/item/1']}>
+        <Routes>
+          <Route path="/item/:id" element={<ProductPage />} />
+        </Routes>
+      </MemoryRouter>
+    )
+    await waitFor(() => {
+      expect(screen.getByText(item.title)).toBeDefined()
+    }, { timeout: 5000 })
+  }
+
+  it('renders the location line when the item has a location', async () => {
+    await renderWithItem({ ...mockItem, location: 'Bole, Addis Ababa' })
+    expect(screen.getByText('📍 Bole, Addis Ababa')).toBeDefined()
+  })
+
+  it('hides the location line when the item has no location', async () => {
+    await renderWithItem({ ...mockItem, location: null })
+    expect(screen.queryByText(/📍/)).toBeNull()
+  })
+
+  it('renders the extracted condition value in the Specifications card', async () => {
+    await renderWithItem({ ...mockItem, condition: 'New' })
+    expect(screen.getByText('New')).toBeDefined()
+  })
+
+  it('condition falls back to "Used" when the item has no condition', async () => {
+    await renderWithItem({ ...mockItem, condition: null })
+    expect(screen.getByText('Used')).toBeDefined()
+  })
 })

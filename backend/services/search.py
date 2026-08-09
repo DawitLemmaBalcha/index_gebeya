@@ -1,6 +1,7 @@
 import time
 import os
 import json
+from collections import defaultdict
 from sqlalchemy import text, bindparam
 from sqlalchemy.orm import Session
 from typing import List, Optional, Any, Tuple
@@ -9,6 +10,7 @@ import numpy as np
 # Absolute imports (Docker-friendly)
 from ai_engine.vector_client import vectorize_text
 from schemas import ItemResponse, ChannelResponse
+from models import ItemImage
 from constants import SEMANTIC_WEIGHT, LEXICAL_WEIGHT, DEFAULT_RESULT_LIMIT
 
 def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: int, offset: int, exclude_unpriced: bool = False, exclude_item_ids: Optional[List[int]] = None) -> List[ItemResponse]:
@@ -44,6 +46,8 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
             i.subcategory,
             i.image_path, 
             i.specs,
+            i.condition,
+            i.location,
             i.telegram_message_id, 
             i.created_at,
             i.phone_number,
@@ -131,7 +135,7 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
         except:
             specs_dict = {}
 
-        # 3. Create Item Response
+        # 3. Create Item Response (images filled post-loop — full gallery)
         items.append(ItemResponse(
             id=row.id,
             title=row.title, 
@@ -143,15 +147,31 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
             category=row.category,
             subcategory=row.subcategory,
             specs=specs_dict,
+            condition=row.condition,
+            location=row.location,
             image_path=row.image_path,
             created_at=row.created_at,
             channel=channel_obj,
-            images=[row.image_path] if row.image_path else [],
+            images=[],
             
             # Explicitly Map Score
             total_score=row.total_score,
             relevance_score=row.total_score # For backward compatibility
         ))
+
+    # NB-17: single source of truth — `images` is ALWAYS the full gallery.
+    # Batch-enrich in ONE query for all built items; legacy items with no
+    # ItemImage rows fall back to the backward-compat thumbnail singleton.
+    if items:
+        gallery_by_item = defaultdict(list)
+        img_stmt = text(
+            "SELECT item_id, image_path FROM item_images WHERE item_id IN :ids ORDER BY id"
+        ).bindparams(bindparam("ids", expanding=True))
+        img_rows = db.execute(img_stmt, {"ids": [it.id for it in items]}).fetchall()
+        for img in img_rows:
+            gallery_by_item[img.item_id].append(img.image_path)
+        for it in items:
+            it.images = gallery_by_item[it.id] or ([it.image_path] if it.image_path else [])
         
     return items
 

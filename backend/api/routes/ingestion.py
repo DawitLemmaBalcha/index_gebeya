@@ -214,6 +214,8 @@ async def parse_telegram_post(
             category=getattr(ext, 'category', 'Uncategorized'),
             subcategory=getattr(ext, 'subcategory', 'General'),
             specs=str(getattr(ext, 'item_metadata', {})),
+            condition=getattr(ext, 'condition', None),
+            location=getattr(ext, 'location', None),
             image_path=post.image_path,
             image_vector=visual_vector, # Storing the CENTROID
             is_dedup=was_replaced     # TECH-21: flag dedup replacements

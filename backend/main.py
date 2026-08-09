@@ -195,6 +195,20 @@ def startup_event():
 
     try:
         with engine.begin() as conn:
+            # NB-17/19: Add condition/location columns to items (nullable —
+            # NULL means "not extracted"; no backfill, legacy rows stay NULL)
+            conn.execute(text(
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS condition VARCHAR"
+            ))
+            conn.execute(text(
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS location VARCHAR"
+            ))
+            logger.info("✅ NB-17/19 schema migration verified (items.condition, items.location)")
+    except Exception as e:
+        logger.warning(f"⚠️ NB-17/19 schema migration failed: {e}")
+
+    try:
+        with engine.begin() as conn:
             # TECH-23: Create item_edits table for inventory edit history audit log
             conn.execute(text(
                 """

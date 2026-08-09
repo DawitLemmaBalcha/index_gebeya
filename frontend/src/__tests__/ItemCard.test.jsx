@@ -71,3 +71,18 @@ describe('ItemCard badge layout (BUG 2 — boosted/condition collision)', () => 
     expect(screen.queryByText('⚡ Boosted')).toBeNull()
   })
 })
+
+describe('ItemCard condition/location from API (NB-17/19)', () => {
+  it('renders a real extracted condition (New) instead of the Used fallback', () => {
+    render(<ItemCard item={boostedCard({ condition: 'New' })} apiUrl="" onSelect={vi.fn()} />)
+    expect(screen.getByText('New')).toBeDefined()
+    expect(screen.queryByText('Used')).toBeNull()
+  })
+
+  it('renders the extracted location line', () => {
+    render(
+      <ItemCard item={boostedCard({ location: 'Bole' })} apiUrl="" onSelect={vi.fn()} />
+    )
+    expect(screen.getByText('Bole')).toBeDefined()
+  })
+})

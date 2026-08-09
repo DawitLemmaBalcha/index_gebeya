@@ -207,6 +207,10 @@ class Item(Base):
     # Structured Specs (JSON)
     specs = Column(String, nullable=True)
     
+    # NB-17/19: extracted listing attributes (nullable — NULL = not extracted)
+    condition = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    
     # Media (Representative/Thumbnail)
     image_path = Column(String)
     

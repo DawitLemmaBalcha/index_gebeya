@@ -330,6 +330,13 @@ const ProductPage = () => {
 
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                         <h3 className="text-lg font-bold text-gray-900 mb-4">Specifications</h3>
+                        {/* NB-17/19: condition surfaces first — the real
+                            extracted value with the 'Used' fallback (legacy
+                            items / NULL from the API). */}
+                        <div className="bg-gray-50 p-3 rounded-lg mb-4">
+                            <span className="block text-xs text-gray-500 uppercase tracking-wide">Condition</span>
+                            <span className="block text-sm font-medium text-gray-900">{item.condition || 'Used'}</span>
+                        </div>
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             {Object.entries(parsedSpecs).map(([key, val]) => (
                                 <div key={key} className="bg-gray-50 p-3 rounded-lg">
@@ -370,6 +377,11 @@ const ProductPage = () => {
                                 <span className="text-xs font-bold">Alert Me</span>
                             </button>
                         </div>
+
+                        {/* NB-17/19: listing location — hidden when absent */}
+                        {item.location && (
+                            <p className="text-xs text-gray-500 mb-4">📍 {item.location}</p>
+                        )}
 
                         {/* TECH-22: Status Badge */}
                         {item.status && item.status !== 'active' && (
