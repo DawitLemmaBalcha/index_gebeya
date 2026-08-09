@@ -90,7 +90,7 @@ Six phases, each with QA gate + atomic commit on `feat/ops-console`:
 
 ## TECH-38: Registry-driven cap/credit/allowance accounting (QA condition)
 
-**Status:** PENDING — QA condition from the ops price-propagation fix (ffef58f), 2026-08-08
+**Status:** IMPLEMENTED ✅ — commit `e6dddab` on `feat/tech-38` (QA APPROVED)
 
 **The gap:** the ops settings panel can edit `alerts_subscription_extra_alerts`, `all_in_one_monthly_boost_credit`, and `max_alerts_per_user`, but the consumers still read constants: `get_effective_alert_cap` (subscriptions.py ~71), `get_credit_boosts_remaining` (~92), `credit_total` (~319), `alerts_extra_allowance` (~300/316) — and `MonetizationHub.jsx` hardcodes "2 free boosts" instead of the registry value. These knobs are write-only today; ops admins could set a value and see no effect (same bug class just fixed for prices).
 
