@@ -85,3 +85,13 @@ Six phases, each with QA gate + atomic commit on `feat/ops-console`:
 - **TECH-35 (NB-52):** Sections 8+9 — Settings & Flags (full registry surface, effective-config view, env-vs-db labeling) + Audit (read-only filtered list).
 - **TECH-36 (NB-53):** Section 7 Payments — Star ledger, balance, reconciliation run-now, refund action with confirm+audit.
 - **TECH-37 (NB-54):** Section 10 Support Toolkit — TEST boost/subscription grants, payment-webhook simulator (drives the real fulfillment path), deep-link generator.
+
+---
+
+## TECH-38: Registry-driven cap/credit/allowance accounting (QA condition)
+
+**Status:** PENDING — QA condition from the ops price-propagation fix (ffef58f), 2026-08-08
+
+**The gap:** the ops settings panel can edit `alerts_subscription_extra_alerts`, `all_in_one_monthly_boost_credit`, and `max_alerts_per_user`, but the consumers still read constants: `get_effective_alert_cap` (subscriptions.py ~71), `get_credit_boosts_remaining` (~92), `credit_total` (~319), `alerts_extra_allowance` (~300/316) — and `MonetizationHub.jsx` hardcodes "2 free boosts" instead of the registry value. These knobs are write-only today; ops admins could set a value and see no effect (same bug class just fixed for prices).
+
+**Acceptance criteria:** all three keys registry-driven at every consumer read-site (fail-open to constants); the "2 free boosts" credit pitch in MonetizationHub renders from `credit_total`/registry; tests prove the ops-PUT → webapp-effect loop for cap and credit (mirroring TestOpsPriceLoop); no behavior change when no DB rows exist.
