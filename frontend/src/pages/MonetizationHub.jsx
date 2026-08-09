@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Star, Bell, Sparkles, Rocket, ChevronDown, Loader2, Package, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Star, Bell, Sparkles, Rocket, ChevronDown, Loader2, Package } from 'lucide-react';
 import { useSubscription } from '../hooks/useSubscription';
 import { useBoost } from '../hooks/useBoost';
 import { useAlerts } from '../hooks/useAlerts';
 import { useOwnerChannels } from '../hooks/useOwnerChannels';
 import { useOwnerProducts } from '../hooks/useOwnerProducts';
+import AddChannelButton from '../components/AddChannelButton';
 import { API_BASE_URL } from '../config';
 
 /**
@@ -139,15 +140,10 @@ function BoostTab({ status, itemId, boost, products, productsLoading, productsEr
           <p className="text-sm text-gray-600 mb-3">
             You haven't added a channel/group/store yet to Index Gebeya — do that first
           </p>
-          <a
-            href="https://t.me/IndexGebeyaBot?start=addchannel"
-            target="_blank"
-            rel="noopener noreferrer"
+          <AddChannelButton
+            label="Add Channel/Group"
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 transition-colors"
-          >
-            <PlusCircle size={14} />
-            Add Channel/Group
-          </a>
+          />
         </div>
       ) : (
         /* UAT round-2 (FIX 1): inline product picker — the seller's items
@@ -323,15 +319,10 @@ function AllInOneTab({ status, openInvoice, navigate, channels, channelsFetched 
           <p className="text-sm text-gray-600 mb-3">
             You haven't added a channel/group/store yet to Index Gebeya — do that first
           </p>
-          <a
-            href="https://t.me/IndexGebeyaBot?start=addchannel"
-            target="_blank"
-            rel="noopener noreferrer"
+          <AddChannelButton
+            label="Add Channel/Group"
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 transition-colors"
-          >
-            <PlusCircle size={14} />
-            Add Channel/Group
-          </a>
+          />
         </div>
       )}
 

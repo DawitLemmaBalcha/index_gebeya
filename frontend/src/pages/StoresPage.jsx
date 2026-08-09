@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, PlusCircle, Loader2, RefreshCw, AlertCircle, X, Sparkles, Star, Rocket } from 'lucide-react';
+import { Store, Package, Eye, ExternalLink, Pause, Play, Trash2, Loader2, RefreshCw, AlertCircle, X, Sparkles, Star, Rocket } from 'lucide-react';
 import { useOwnerChannels } from '../hooks/useOwnerChannels';
 import { useSubscription } from '../hooks/useSubscription';
 import { useBoosts } from '../hooks/useBoosts';
+import { useRefetchOnActivation } from '../hooks/useRefetchOnActivation';
+import AddChannelButton from '../components/AddChannelButton';
 import { API_BASE_URL } from '../config';
 import { getAnalyticsHeaders } from '../utils/analytics';
 import ChannelInventory from '../components/ChannelInventory';
@@ -30,11 +32,15 @@ const StoresPage = ({ deepLink, active = true }) => {
   // NB-46: subscription status for the card. BUG 2: the page stays mounted
   // across tab switches (MainLayout toggles display only), so a single
   // mount fetch goes stale — refetch whenever the Stores tab becomes active.
-  useEffect(() => {
-    if (active && hasBeenFetched) {
-      getStatus();
-    }
-  }, [active, hasBeenFetched, getStatus]);
+  // TECH-39: the hasBeenFetched gate lives here (not in the hook) via the
+  // stable wrapper — effect fires when hasBeenFetched flips false→true
+  // (active only) and on activation (gate already true). Deps-equivalent to
+  // the old [active, hasBeenFetched, getStatus] effect.
+  const refetchSubscriptionStatus = useCallback(() => {
+    if (hasBeenFetched) getStatus();
+  }, [hasBeenFetched, getStatus]);
+
+  useRefetchOnActivation(active, refetchSubscriptionStatus);
 
   // NB-48: active boosts for the boost management card — fan out per
   // channel. Runs for zero channels too (BUG 1): fetchBoosts([]) fans out
@@ -380,15 +386,7 @@ const StoresPage = ({ deepLink, active = true }) => {
             <p className="text-sm font-semibold text-brand-800">Want to list another channel?</p>
             <p className="text-xs text-brand-600 mt-0.5">Add @IndexGebeyaBot as admin to your channel.</p>
           </div>
-          <a
-            href="https://t.me/IndexGebeyaBot?start=addchannel"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 transition-colors shrink-0"
-          >
-            <PlusCircle size={14} />
-            Add Channel
-          </a>
+          <AddChannelButton />
         </div>
 
         {/* Confirmation Modal */}
@@ -536,15 +534,7 @@ const StoresPage = ({ deepLink, active = true }) => {
           <p className="text-sm font-semibold text-brand-800">Want to list a channel or group?</p>
           <p className="text-xs text-brand-600 mt-0.5">Add @IndexGebeyaBot as admin to your channel or group.</p>
         </div>
-        <a
-          href="https://t.me/IndexGebeyaBot?start=addchannel"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-2 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 transition-colors shrink-0"
-        >
-          <PlusCircle size={14} />
-          Add Channel
-        </a>
+        <AddChannelButton />
       </div>
     </div>
   );

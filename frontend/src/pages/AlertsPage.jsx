@@ -6,6 +6,7 @@ import { getAnalyticsHeaders } from '../utils/analytics';
 import AlertModal from '../components/AlertModal';
 import { useAlerts } from '../hooks/useAlerts';
 import { useSubscription } from '../hooks/useSubscription';
+import { useRefetchOnActivation } from '../hooks/useRefetchOnActivation';
 
 const AlertsPage = ({ active = true }) => {
   const navigate = useNavigate();
@@ -33,9 +34,10 @@ const AlertsPage = ({ active = true }) => {
   // bottom-nav tab; hidden tabs don't fetch.
   const { status: subStatus, loading: subLoading, getStatus } = useSubscription();
 
-  useEffect(() => {
-    if (active) getStatus();
-  }, [active, getStatus]);
+  // TECH-39: refetch-on-activation primitive — mount-active fetches once,
+  // hidden tabs never fetch, activation refetches. getStatus is already a
+  // stable useCallback (useSubscription, [] deps) so the hook contract holds.
+  useRefetchOnActivation(active, getStatus);
 
   // Lazy load: fetch only on first activation
   useEffect(() => {
