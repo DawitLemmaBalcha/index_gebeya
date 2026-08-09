@@ -14,9 +14,9 @@
 
 ---
 
-## NB-18: Expired Alerts Are Never Permanently Removed (existing, low priority)
+## NB-18: [CLOSED — superseded by TECH-25] Expired Alerts Are Never Permanently Removed
 
-*(Unchanged — retained from original ledger)*
+*(Closed 2026-08-08. TECH-25 (commit f774c2c) fully covers this: cleanup Phase 4 purges expired/deleted alerts after ALERT_RETENTION_DAYS with notification cascade; the expiry gate deactivates expired alerts at match time so matching never loads them; the alerts UI never lists inactive alerts. Evidence: test_tech25.py purge tests. See docs/plans/cleanup-5tickets-blueprint.md §5.3.)*
 
 ---
 
