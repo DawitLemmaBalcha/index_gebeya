@@ -382,3 +382,84 @@ describe('AlertsPage - standing subscription card (UAT round-2 FIX 3)', () => {
     expect(screen.getByTestId('hub-alerts')).toBeInTheDocument()
   })
 })
+
+describe('AlertsPage - subscription status freshness on re-activation (BUG 2)', () => {
+  const makeAlerts = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: i + 1,
+      query_text: `Alert ${i + 1}`,
+      max_price: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+      preferences: '{}',
+    }))
+
+  const capStatus = (overrides = {}) => ({
+    product: null,
+    status: null,
+    effective_cap: 20,
+    cap_banner_threshold: 2,
+    extra_alerts: 0,
+    alerts_extra_allowance: 10,
+    alerts_only_price_stars: 30,
+    ...overrides,
+  })
+
+  it('stale allowance is replaced when the tab is hidden and shown again', () => {
+    mockAlerts = makeAlerts(5)
+    mockSubStatus = null
+    const allowances = [10, 15]
+    mockGetStatus.mockImplementation(async () => {
+      mockSubStatus = capStatus({ alerts_extra_allowance: allowances.shift() })
+      return mockSubStatus
+    })
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <AlertsPage active={false} />
+      </MemoryRouter>
+    )
+    // Hidden tab must NOT fetch at app-start mount (pre-fix: AlertsPage is
+    // always mounted and fetches once at app start — this assertion fails)
+    expect(mockGetStatus).not.toHaveBeenCalled()
+
+    // First activation → fetch #1 (allowance 10)
+    rerender(
+      <MemoryRouter>
+        <AlertsPage active={true} />
+      </MemoryRouter>
+    )
+    expect(mockGetStatus).toHaveBeenCalledTimes(1)
+    rerender(
+      <MemoryRouter>
+        <AlertsPage active={true} />
+      </MemoryRouter>
+    )
+    expect(
+      screen.getByText('More alert space — get 10 more active alerts for 30 Stars')
+    ).toBeInTheDocument()
+
+    // Leave the tab; ops bumps alerts_subscription_extra_alerts → 15; come back
+    rerender(
+      <MemoryRouter>
+        <AlertsPage active={false} />
+      </MemoryRouter>
+    )
+    expect(mockGetStatus).toHaveBeenCalledTimes(1)
+    rerender(
+      <MemoryRouter>
+        <AlertsPage active={true} />
+      </MemoryRouter>
+    )
+    expect(mockGetStatus).toHaveBeenCalledTimes(2)
+    rerender(
+      <MemoryRouter>
+        <AlertsPage active={true} />
+      </MemoryRouter>
+    )
+    // The fresh fetch's allowance (15) must replace the stale one (10)
+    expect(
+      screen.getByText('More alert space — get 15 more active alerts for 30 Stars')
+    ).toBeInTheDocument()
+  })
+})

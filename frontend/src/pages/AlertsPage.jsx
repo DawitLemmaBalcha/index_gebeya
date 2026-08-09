@@ -7,7 +7,7 @@ import AlertModal from '../components/AlertModal';
 import { useAlerts } from '../hooks/useAlerts';
 import { useSubscription } from '../hooks/useSubscription';
 
-const AlertsPage = () => {
+const AlertsPage = ({ active = true }) => {
   const navigate = useNavigate();
   const {
     alerts,
@@ -25,13 +25,17 @@ const AlertsPage = () => {
   const [submittingActionId, setSubmittingActionId] = useState(null);
 
   // NB-48: cap-awareness banner — subscription context (effective cap,
-  // threshold) fetched once on mount; banner hidden while loading or when
-  // monetization is disabled (getStatus 503s → status stays null).
+  // threshold, alerts_extra_allowance) fetched on mount and re-fetched
+  // whenever the Alerts tab becomes active again. BUG 2: the page stays
+  // mounted across tab switches (MainLayout toggles display only), so a
+  // single mount fetch goes stale — e.g. after the ops console changes
+  // alerts_subscription_extra_alerts. The active flag is driven by the
+  // bottom-nav tab; hidden tabs don't fetch.
   const { status: subStatus, loading: subLoading, getStatus } = useSubscription();
 
   useEffect(() => {
-    getStatus();
-  }, [getStatus]);
+    if (active) getStatus();
+  }, [active, getStatus]);
 
   // Lazy load: fetch only on first activation
   useEffect(() => {

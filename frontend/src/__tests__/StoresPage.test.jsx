@@ -165,3 +165,84 @@ describe('StoresPage - boost management card (NB-48)', () => {
     expect(screen.queryByText('Boost a product')).not.toBeInTheDocument()
   })
 })
+
+describe('StoresPage - zero-channel (non-owner) monetization sections (BUG 1)', () => {
+  beforeEach(() => {
+    mockChannels = []
+    mockHasBeenFetched = true
+  })
+
+  it('shows the subscription card ("Boost your selling power") + All-in-One CTA', () => {
+    renderStores()
+    expect(screen.getByText('Boost your selling power')).toBeInTheDocument()
+    expect(screen.getByText('All-in-One')).toBeInTheDocument()
+  })
+
+  it('shows the Active Boosts card with its empty state', () => {
+    renderStores()
+    expect(screen.getByText('Active Boosts')).toBeInTheDocument()
+    expect(screen.getByText('No active boosts')).toBeInTheDocument()
+  })
+
+  it('fetches boosts for zero channels (empty fan-out) so the card can render', () => {
+    renderStores()
+    expect(mockFetchBoosts).toHaveBeenCalledWith([])
+  })
+
+  it('keeps the educational prompt plus an Add Channel link to /addchannel', () => {
+    renderStores()
+    expect(screen.getByText('Add Your Store')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Add Channel' })
+    expect(link).toHaveAttribute('href', 'https://t.me/IndexGebeyaBot?start=addchannel')
+  })
+})
+
+describe('StoresPage - owner layout regression (BUG 1)', () => {
+  it('owner with channels still sees the full existing layout', () => {
+    mockChannels = [
+      { id: 1, username: 'channel_one', title: 'Channel One', indexing_paused: false, product_count: 3 },
+    ]
+    renderStores()
+    // header
+    expect(screen.getByText('My Stores')).toBeInTheDocument()
+    // monetization cards
+    expect(screen.getByText('Boost your selling power')).toBeInTheDocument()
+    expect(screen.getByText('Active Boosts')).toBeInTheDocument()
+    // channel management UI
+    expect(screen.getByText('@channel_one')).toBeInTheDocument()
+    expect(screen.getByText('Manage')).toBeInTheDocument()
+    // add-another-channel CTA
+    expect(screen.getByRole('link', { name: 'Add Channel' })).toHaveAttribute(
+      'href',
+      'https://t.me/IndexGebeyaBot?start=addchannel'
+    )
+    // no non-owner prompt
+    expect(screen.queryByText('Add Your Store')).not.toBeInTheDocument()
+  })
+})
+
+describe('StoresPage - subscription status freshness (BUG 2)', () => {
+  it('does not fetch status while the tab is hidden; refetches on activation', () => {
+    const { rerender } = render(
+      <MemoryRouter initialEntries={['/stores']}>
+        <Routes>
+          <Route path="/stores" element={<StoresPage active={false} />} />
+          <Route path="/hub/:tab?" element={<HubStub />} />
+        </Routes>
+      </MemoryRouter>
+    )
+    // Hidden at mount: no status fetch (pre-fix the page is always mounted
+    // and fetches once at app start, so this assertion fails)
+    expect(mockGetStatus).not.toHaveBeenCalled()
+
+    rerender(
+      <MemoryRouter initialEntries={['/stores']}>
+        <Routes>
+          <Route path="/stores" element={<StoresPage active={true} />} />
+          <Route path="/hub/:tab?" element={<HubStub />} />
+        </Routes>
+      </MemoryRouter>
+    )
+    expect(mockGetStatus).toHaveBeenCalledTimes(1)
+  })
+})

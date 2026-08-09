@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Star, Bell, Sparkles, Rocket, ChevronDown, Loader2, Package } from 'lucide-react';
+import { ArrowLeft, Star, Bell, Sparkles, Rocket, ChevronDown, Loader2, Package, PlusCircle } from 'lucide-react';
 import { useSubscription } from '../hooks/useSubscription';
 import { useBoost } from '../hooks/useBoost';
 import { useAlerts } from '../hooks/useAlerts';
@@ -61,7 +61,7 @@ function HowStarsExplainer() {
   );
 }
 
-function BoostTab({ status, itemId, boost, products, productsLoading, productsError, onSelectItem, onRetryProducts }) {
+function BoostTab({ status, itemId, boost, products, productsLoading, productsError, onSelectItem, onRetryProducts, channels, channelsFetched }) {
   const { quote, activeBoost, boosting, error: boostError, payWithStars } = boost;
   const hasItem = !!itemId;
   const selectedItem = products.find((p) => String(p.id) === String(itemId));
@@ -131,80 +131,100 @@ function BoostTab({ status, itemId, boost, products, productsLoading, productsEr
         </>
       )}
 
-      {/* UAT round-2 (FIX 1): inline product picker — the seller's items
-          across their channels; tapping a row selects it in place. The
-          dead-loop /stores picker button is removed entirely. */}
-      <div className="mb-4">
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
-          Your products
-        </h3>
-        {productsLoading && products.length === 0 ? (
-          <p className="text-sm text-gray-500 flex items-center gap-2">
-            <Loader2 size={14} className="animate-spin" /> Loading your products…
+      {/* BUG 1: with no channels there is nothing to pick — replace the
+          picker with guidance + an Add Channel/Group CTA (deep link into
+          the bot's /addchannel flow). */}
+      {channelsFetched && channels.length === 0 ? (
+        <div className="mb-4 rounded-xl bg-gray-50 border border-gray-100 p-4 text-center">
+          <p className="text-sm text-gray-600 mb-3">
+            You haven't added a channel/group/store yet to Index Gebeya — do that first
           </p>
-        ) : products.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No products to boost yet — your items appear here after they're indexed.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {products.map((p) => {
-              const selected = String(p.id) === String(itemId);
-              const thumb = p.images?.[0] || p.image_path;
-              return (
-                <li key={p.id}>
-                  <button
-                    onClick={() => onSelectItem(p.id)}
-                    data-testid={`picker-item-${p.id}`}
-                    aria-pressed={selected}
-                    className={`w-full flex items-center gap-3 p-2 rounded-xl border text-left transition-colors ${
-                      selected
-                        ? 'border-amber-400 bg-amber-50'
-                        : 'border-gray-100 bg-white hover:bg-gray-50'
-                    }`}
-                  >
-                    {thumb ? (
-                      <img
-                        src={`${API_BASE_URL}/media/${thumb}`}
-                        alt=""
-                        className="w-10 h-10 rounded-lg object-cover shrink-0"
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                        <Package size={16} className="text-gray-400" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">
-                        {p.title || `Item #${p.id}`}
-                      </p>
-                      {p.channel?.username && (
-                        <p className="text-[10px] text-gray-400 truncate">@{p.channel.username}</p>
-                      )}
-                    </div>
-                    <span
-                      className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        p.status === 'active'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-500'
+          <a
+            href="https://t.me/IndexGebeyaBot?start=addchannel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 transition-colors"
+          >
+            <PlusCircle size={14} />
+            Add Channel/Group
+          </a>
+        </div>
+      ) : (
+        /* UAT round-2 (FIX 1): inline product picker — the seller's items
+           across their channels; tapping a row selects it in place. The
+           dead-loop /stores picker button is removed entirely. */
+        <div className="mb-4">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+            Your products
+          </h3>
+          {productsLoading && products.length === 0 ? (
+            <p className="text-sm text-gray-500 flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" /> Loading your products…
+            </p>
+          ) : products.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No products to boost yet — your items appear here after they're indexed.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {products.map((p) => {
+                const selected = String(p.id) === String(itemId);
+                const thumb = p.images?.[0] || p.image_path;
+                return (
+                  <li key={p.id}>
+                    <button
+                      onClick={() => onSelectItem(p.id)}
+                      data-testid={`picker-item-${p.id}`}
+                      aria-pressed={selected}
+                      className={`w-full flex items-center gap-3 p-2 rounded-xl border text-left transition-colors ${
+                        selected
+                          ? 'border-amber-400 bg-amber-50'
+                          : 'border-gray-100 bg-white hover:bg-gray-50'
                       }`}
                     >
-                      {(p.status || 'active').toUpperCase()}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {productsError && productsError !== 'NOT_IN_TELEGRAM' && products.length === 0 && (
-          <p className="text-xs text-red-600 mt-2">
-            Couldn't load your products.{' '}
-            <button onClick={onRetryProducts} className="underline">Retry</button>
-          </p>
-        )}
-      </div>
+                      {thumb ? (
+                        <img
+                          src={`${API_BASE_URL}/media/${thumb}`}
+                          alt=""
+                          className="w-10 h-10 rounded-lg object-cover shrink-0"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                          <Package size={16} className="text-gray-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {p.title || `Item #${p.id}`}
+                        </p>
+                        {p.channel?.username && (
+                          <p className="text-[10px] text-gray-400 truncate">@{p.channel.username}</p>
+                        )}
+                      </div>
+                      <span
+                        className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          p.status === 'active'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {(p.status || 'active').toUpperCase()}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {productsError && productsError !== 'NOT_IN_TELEGRAM' && products.length === 0 && (
+            <p className="text-xs text-red-600 mt-2">
+              Couldn't load your products.{' '}
+              <button onClick={onRetryProducts} className="underline">Retry</button>
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Cross-sell (Rule 10.2.7) */}
       <p className="mt-4 text-xs text-gray-500">
@@ -250,7 +270,7 @@ function AlertsTab({ status, alerts, openInvoice }) {
   );
 }
 
-function AllInOneTab({ status, openInvoice, navigate }) {
+function AllInOneTab({ status, openInvoice, navigate, channels, channelsFetched }) {
   const subscribed = !!status.product;
   return (
     <div data-testid="hub-tab-all-in-one" className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
@@ -276,6 +296,27 @@ function AllInOneTab({ status, openInvoice, navigate }) {
           Extra alert cap — everything in Alerts Only
         </li>
       </ul>
+
+      {/* BUG 1: boosts depend on indexed channels — when the seller has
+          none, acknowledge the dependency and point at /addchannel before
+          pushing the sale. */}
+      {channelsFetched && channels.length === 0 && (
+        <div className="mb-4 rounded-xl bg-gray-50 border border-gray-100 p-4 text-center">
+          <p className="text-sm text-gray-600 mb-3">
+            You haven't added a channel/group/store yet to Index Gebeya — do that first
+          </p>
+          <a
+            href="https://t.me/IndexGebeyaBot?start=addchannel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 transition-colors"
+          >
+            <PlusCircle size={14} />
+            Add Channel/Group
+          </a>
+        </div>
+      )}
+
       {subscribed ? (
         <p className="text-sm text-green-700 font-semibold mb-4">
           Active — {status.product === 'all_in_one' ? 'All-in-One' : 'Alerts Only'} subscription
@@ -419,6 +460,8 @@ const MonetizationHub = () => {
         {activeTab === 'boost' && (
           <BoostTab
             status={status}
+            channels={channels}
+            channelsFetched={channelsFetched}
             itemId={selectedItemId}
             boost={boost}
             products={products}
@@ -429,7 +472,9 @@ const MonetizationHub = () => {
           />
         )}
         {activeTab === 'alerts' && <AlertsTab status={status} alerts={alerts} openInvoice={openInvoice} />}
-        {activeTab === 'all-in-one' && <AllInOneTab status={status} openInvoice={openInvoice} navigate={navigate} />}
+        {activeTab === 'all-in-one' && (
+          <AllInOneTab status={status} channels={channels} channelsFetched={channelsFetched} openInvoice={openInvoice} navigate={navigate} />
+        )}
         <HowStarsExplainer />
       </div>
     </div>

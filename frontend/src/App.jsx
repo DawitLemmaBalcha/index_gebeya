@@ -37,14 +37,15 @@ function MainLayout({ initialSearchQuery = '', initialTab }) {
           <Home embedded={true} initialSearchQuery={initialSearchQuery} />
         </div>
 
-        {/* Alerts Tab — always mounted */}
+        {/* Alerts Tab — always mounted; active prop drives refetching
+            subscription status when the tab is shown again (BUG 2) */}
         <div style={{ display: (!isProductPage && activeTab === 'alerts') ? 'block' : 'none' }}>
-          <AlertsPage />
+          <AlertsPage active={activeTab === 'alerts'} />
         </div>
 
         {/* Stores Tab — always mounted */}
         <div style={{ display: (!isProductPage && activeTab === 'stores') ? 'block' : 'none' }}>
-          <StoresPage deepLink={deepLink} />
+          <StoresPage deepLink={deepLink} active={activeTab === 'stores'} />
         </div>
 
         {/* Product Page Route */}

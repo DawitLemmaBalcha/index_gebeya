@@ -380,3 +380,38 @@ describe('MonetizationHub - cross-sell one-liners (Rule 10.2.7)', () => {
     expect(screen.getByTestId('hub-tab-boost')).toBeInTheDocument()
   })
 })
+
+describe('MonetizationHub - no-channels guidance (BUG 1)', () => {
+  beforeEach(() => {
+    mockChannels = []
+    mockChannelsFetched = true
+  })
+
+  it('Boost tab: replaces the picker with guidance + Add Channel/Group CTA', () => {
+    renderHub('/hub/boost')
+    expect(
+      screen.getByText("You haven't added a channel/group/store yet to Index Gebeya — do that first")
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Add Channel/Group' })).toHaveAttribute(
+      'href',
+      'https://t.me/IndexGebeyaBot?start=addchannel'
+    )
+    // The picker is NOT rendered for zero channels
+    expect(screen.queryByText('Your products')).not.toBeInTheDocument()
+    expect(screen.queryByText(/No products to boost yet/i)).not.toBeInTheDocument()
+    // The "from X Stars" floor line stays above the empty state
+    expect(screen.getByText(/from 25 Stars/i)).toBeInTheDocument()
+  })
+
+  it('All-in-One tab: guidance + CTA under the superset pitch', () => {
+    renderHub('/hub/all-in-one')
+    expect(screen.getByText(/Seller Intelligence/i)).toBeInTheDocument()
+    expect(
+      screen.getByText("You haven't added a channel/group/store yet to Index Gebeya — do that first")
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Add Channel/Group' })).toHaveAttribute(
+      'href',
+      'https://t.me/IndexGebeyaBot?start=addchannel'
+    )
+  })
+})
