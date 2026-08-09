@@ -208,7 +208,7 @@ function BoostTab({ status, itemId, boost, products, productsLoading, productsEr
 
       {/* Cross-sell (Rule 10.2.7) */}
       <p className="mt-4 text-xs text-gray-500">
-        All-in-One includes 2 free boosts every period plus seller intelligence.
+        All-in-One includes {status.credit_total} free boosts every period plus seller intelligence.
       </p>
     </div>
   );

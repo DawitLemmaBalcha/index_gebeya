@@ -723,3 +723,113 @@ class TestRegistryDrivenPrices:
         result = await create_subscription_order(db_session, user, "alerts_only")
         assert result["price_stars"] == ALERTS_ONLY_PRICE_STARS
         assert fake.calls[0]["prices"] == [("Alerts Only", ALERTS_ONLY_PRICE_STARS)]
+
+
+# ---------------------------------------------------------------------------
+# User-verified regression (TECH-38): the cap/allowance/credit knobs saved
+# via the ops console were write-only — cap math, credit accounting, lapse
+# slicing and the status payload read the CONSTANTS directly. These tests
+# lock the registry read sites: DB row wins, else constant default.
+# ---------------------------------------------------------------------------
+
+class TestRegistryDrivenCapAndCredit:
+    def test_free_cap_follows_registry_row(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "max_alerts_per_user", "30")
+        user = _make_user(db_session)
+        assert get_effective_alert_cap(db_session, user) == 30
+
+    def test_subscribed_cap_follows_both_registry_rows(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "max_alerts_per_user", "30")
+        set_setting(db_session, "alerts_subscription_extra_alerts", "15")
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="all_in_one", charge_id="chg_cap_reg")
+        assert get_effective_alert_cap(db_session, user) == 45
+
+    def test_credit_follows_registry_row(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "all_in_one_monthly_boost_credit", "5")
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="all_in_one", charge_id="chg_cred_reg")
+        assert get_credit_boosts_remaining(db_session, user) == 5
+
+    def test_credit_decrements_after_one_credit_boost(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "all_in_one_monthly_boost_credit", "5")
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="all_in_one", charge_id="chg_cred_reg2")
+        channel, item = _make_channel_item(db_session, user)
+        now = datetime.now(timezone.utc)
+        db_session.add(Boost(
+            item_id=item.id, channel_id=channel.id, user_id=user.id,
+            source="credit", price_paid_stars=None,
+            telegram_payment_charge_id=None,
+            starts_at=now, ends_at=now + timedelta(days=7),
+        ))
+        db_session.commit()
+        assert get_credit_boosts_remaining(db_session, user) == 4
+
+    def test_status_payload_follows_registry_rows_without_subscription(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "max_alerts_per_user", "30")
+        set_setting(db_session, "alerts_subscription_extra_alerts", "15")
+        user = _make_user(db_session)
+        status = get_subscription_status(db_session, user)
+        assert status["free_cap"] == 30
+        assert status["alerts_extra_allowance"] == 15
+        assert status["effective_cap"] == 30
+
+    def test_status_payload_follows_registry_rows_with_subscription(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "max_alerts_per_user", "30")
+        set_setting(db_session, "alerts_subscription_extra_alerts", "15")
+        set_setting(db_session, "all_in_one_monthly_boost_credit", "5")
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="all_in_one", charge_id="chg_stat_reg")
+        status = get_subscription_status(db_session, user)
+        assert status["free_cap"] == 30
+        assert status["extra_alerts"] == 15
+        assert status["alerts_extra_allowance"] == 15
+        assert status["credit_total"] == 5
+        assert status["effective_cap"] == 45
+
+    def test_lapse_slices_at_registry_free_cap(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "max_alerts_per_user", "3")
+        user = _make_user(db_session)
+        alerts = [_make_alert(db_session, user) for _ in range(6)]
+
+        lapse_benefits(db_session, user)
+
+        for alert in alerts[:3]:
+            db_session.refresh(alert)
+            assert alert.is_active is True
+            assert alert.lapsed is False
+        for alert in alerts[3:]:
+            db_session.refresh(alert)
+            assert alert.is_active is False
+            assert alert.lapsed is True
+
+    def test_reactivation_fills_to_registry_effective_cap(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "max_alerts_per_user", "2")
+        set_setting(db_session, "alerts_subscription_extra_alerts", "2")
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, charge_id="chg_reac_reg")
+        for _ in range(2):
+            _make_alert(db_session, user)
+        lapsed = [
+            _make_alert(db_session, user, is_active=False, lapsed=True)
+            for _ in range(3)
+        ]
+
+        reactivate_lapsed_alerts(db_session, user)
+
+        for alert in lapsed[:2]:
+            db_session.refresh(alert)
+            assert alert.is_active is True
+            assert alert.lapsed is True
+        db_session.refresh(lapsed[2])
+        assert lapsed[2].is_active is False
+        assert lapsed[2].lapsed is True

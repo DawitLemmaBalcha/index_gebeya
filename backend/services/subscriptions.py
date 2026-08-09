@@ -21,9 +21,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from constants import (
-    ALL_IN_ONE_MONTHLY_BOOST_CREDIT,
-    ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
-    MAX_ALERTS_PER_USER,
     SUBSCRIPTION_PERIOD_SECONDS,
     # NB-48 (§2.2): hub payload fields. ALERT_CAP_BANNER_THRESHOLD is the
     # banner display threshold; BOOST_DURATION_DAYS feeds the hub's
@@ -39,6 +36,10 @@ from services.boost_pricing import get_boost_floor
 # admin_settings registry (ops console writes it). The constants stay the
 # seed defaults via get_setting's fallback chain. settings_registry imports
 # models/constants/sqlalchemy ONLY — cycle-free (blueprint D12).
+# TECH-38: the cap/allowance/credit reads are registry-driven too — the
+# three keys (max_alerts_per_user, alerts_subscription_extra_alerts,
+# all_in_one_monthly_boost_credit) are consumed exclusively via
+# get_setting; their constants no longer appear in this module.
 from services.settings_registry import get_setting
 from services.telegram_payments import star_payments
 
@@ -66,10 +67,13 @@ def get_active_subscription(db: Session, user: User) -> Subscription | None:
 
 
 def get_effective_alert_cap(db: Session, user: User) -> int:
-    """The single cap authority (blueprint D3): free cap + subscription extra."""
+    """The single cap authority (blueprint D3): free cap + subscription
+    extra. Both reads are registry-driven (TECH-38): the DB row wins,
+    else env/constant default via get_setting's fallback chain."""
+    free_cap = get_setting(db, "max_alerts_per_user")
     if get_active_subscription(db, user):
-        return MAX_ALERTS_PER_USER + ALERTS_SUBSCRIPTION_EXTRA_ALERTS
-    return MAX_ALERTS_PER_USER
+        return free_cap + get_setting(db, "alerts_subscription_extra_alerts")
+    return free_cap
 
 
 def get_credit_boosts_remaining(db: Session, user: User) -> int:
@@ -89,7 +93,7 @@ def get_credit_boosts_remaining(db: Session, user: User) -> int:
             Boost.created_at <= sub.current_period_end,
         )
     ) or 0
-    return max(0, ALL_IN_ONE_MONTHLY_BOOST_CREDIT - used)
+    return max(0, get_setting(db, "all_in_one_monthly_boost_credit") - used)
 
 
 def lapse_benefits(db: Session, user: User) -> None:
@@ -98,12 +102,13 @@ def lapse_benefits(db: Session, user: User) -> None:
     the free cap, oldest-first by id, marking them lapsed=True — distinct
     from user pause (is_active=False, lapsed=False).
     """
+    free_cap = get_setting(db, "max_alerts_per_user")
     active_alerts = db.scalars(
         select(Alert)
         .where(Alert.user_id == user.id, Alert.is_active == True)
         .order_by(Alert.id.asc())
     ).all()
-    for alert in active_alerts[MAX_ALERTS_PER_USER:]:
+    for alert in active_alerts[free_cap:]:
         alert.is_active = False
         alert.lapsed = True
     db.commit()
@@ -292,15 +297,17 @@ def get_subscription_status(db: Session, user: User) -> dict:
     # boost.py (cycle rule).
     boost_floor = get_boost_floor(db)
     if not sub:
+        free_cap = get_setting(db, "max_alerts_per_user")
+        extra_allowance = get_setting(db, "alerts_subscription_extra_alerts")
         return {
             "product": None,
             "status": None,
             "current_period_end": None,
             "extra_alerts": 0,
-            "alerts_extra_allowance": ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
+            "alerts_extra_allowance": extra_allowance,
             "credit_remaining": 0,
             "credit_total": 0,
-            "free_cap": MAX_ALERTS_PER_USER,
+            "free_cap": free_cap,
             "effective_cap": get_effective_alert_cap(db, user),
             "cap_banner_threshold": ALERT_CAP_BANNER_THRESHOLD,
             "alerts_only_price_stars": get_setting(db, "alerts_only_price_stars"),
@@ -308,17 +315,20 @@ def get_subscription_status(db: Session, user: User) -> dict:
             "boost_floor_price_stars": boost_floor,
             "boost_duration_days": BOOST_DURATION_DAYS,
         }
+    extra_allowance = get_setting(db, "alerts_subscription_extra_alerts")
+    free_cap = get_setting(db, "max_alerts_per_user")
     return {
         "product": sub.product,
         "status": sub.status,
         "current_period_end": sub.current_period_end,
-        "extra_alerts": ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
-        "alerts_extra_allowance": ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
+        "extra_alerts": extra_allowance,
+        "alerts_extra_allowance": extra_allowance,
         "credit_remaining": get_credit_boosts_remaining(db, user),
         "credit_total": (
-            ALL_IN_ONE_MONTHLY_BOOST_CREDIT if sub.product == "all_in_one" else 0
+            get_setting(db, "all_in_one_monthly_boost_credit")
+            if sub.product == "all_in_one" else 0
         ),
-        "free_cap": MAX_ALERTS_PER_USER,
+        "free_cap": free_cap,
         "effective_cap": get_effective_alert_cap(db, user),
         "cap_banner_threshold": ALERT_CAP_BANNER_THRESHOLD,
         "alerts_only_price_stars": get_setting(db, "alerts_only_price_stars"),

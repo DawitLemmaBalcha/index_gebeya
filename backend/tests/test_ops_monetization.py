@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
 
-from constants import BOOST_PRICE_STARS
+from constants import BOOST_PRICE_STARS, MAX_ALERTS_PER_USER
 from database import get_db
 from models import AuditLog, Boost, Channel, Item, Subscription, User
 from services.boost_pricing import seed_boost_prices, set_boost_price
@@ -306,6 +306,115 @@ class TestOpsPriceLoop:
         )
         assert status.status_code == 200, status.text
         assert status.json()["alerts_only_price_stars"] == 45
+
+
+class TestOpsCapCreditLoop:
+    """User-verified regression (TECH-38): the cap/allowance/credit knobs
+    saved in /ops were write-only — the status payload and cap math read
+    the constants. Full loop: PUT each key via its ops route, then the
+    webapp-facing /subscriptions/status (and the service) must reflect it
+    immediately."""
+
+    def _web_client(self, db_session):
+        from api.routes import subscriptions as subs_router
+        app = FastAPI()
+        app.include_router(subs_router.router, prefix="/subscriptions")
+        def _override_db():
+            yield db_session
+        app.dependency_overrides[get_db] = _override_db
+        return TestClient(app)
+
+    def _settings_client(self, db_session):
+        from api.routes import ops_auth, ops_settings
+        app = FastAPI()
+        app.add_middleware(SessionMiddleware, secret_key="t", session_cookie="ops_session")
+        app.include_router(ops_auth.router, prefix="/ops/auth")
+        app.include_router(ops_settings.router, prefix="/ops/settings")
+        def _override_db():
+            yield db_session
+        app.dependency_overrides[get_db] = _override_db
+        client = TestClient(app)
+        login = client.post(
+            "/ops/auth/login",
+            json={"username": ADMIN_USER, "password": ADMIN_PASS},
+        )
+        assert login.status_code == 200
+        return client
+
+    def _subscribe(self, db_session, user, *, product, charge_id):
+        now = datetime.now(timezone.utc)
+        db_session.add(Subscription(
+            user_id=user.id, product=product, status="active",
+            telegram_payment_charge_id=charge_id,
+            invoice_payload=f"s:{user.id}:{product}:abc",
+            current_period_start=now - timedelta(days=1),
+            current_period_end=now + timedelta(days=29),
+        ))
+        db_session.commit()
+
+    def test_extra_alerts_put_reaches_status_immediately(self, db_session):
+        from models import User
+        user = User(telegram_id=333, username="u333")
+        db_session.add(user)
+        db_session.commit()
+        self._subscribe(db_session, user, product="alerts_only",
+                        charge_id="chg_loop_extra")
+
+        ops = _monetization_client(db_session)
+        resp = ops.put(
+            "/ops/monetization/settings/alerts_subscription_extra_alerts",
+            json={"value": "15"},
+        )
+        assert resp.status_code == 200, resp.text
+
+        web = self._web_client(db_session)
+        init_data = f'user={json.dumps({"id": 333, "username": "u333"})}'
+        status = web.get("/subscriptions/status", params={"init_data": init_data})
+        assert status.status_code == 200, status.text
+        assert status.json()["extra_alerts"] == 15
+        assert status.json()["effective_cap"] == MAX_ALERTS_PER_USER + 15
+
+    def test_boost_credit_put_reaches_status_immediately(self, db_session):
+        from models import User
+        user = User(telegram_id=334, username="u334")
+        db_session.add(user)
+        db_session.commit()
+        self._subscribe(db_session, user, product="all_in_one",
+                        charge_id="chg_loop_credit")
+
+        ops = _monetization_client(db_session)
+        resp = ops.put(
+            "/ops/monetization/settings/all_in_one_monthly_boost_credit",
+            json={"value": "5"},
+        )
+        assert resp.status_code == 200, resp.text
+
+        web = self._web_client(db_session)
+        init_data = f'user={json.dumps({"id": 334, "username": "u334"})}'
+        status = web.get("/subscriptions/status", params={"init_data": init_data})
+        assert status.status_code == 200, status.text
+        assert status.json()["credit_total"] == 5
+
+    def test_max_alerts_put_reaches_status_and_service_immediately(self, db_session):
+        from models import User
+        from services.subscriptions import get_effective_alert_cap
+        user = User(telegram_id=335, username="u335")
+        db_session.add(user)
+        db_session.commit()
+
+        # max_alerts_per_user is edited from the Section 8 Settings route
+        # (/ops/settings/{key}), NOT the monetization settings surface.
+        ops = self._settings_client(db_session)
+        resp = ops.put("/ops/settings/max_alerts_per_user", json={"value": "30"})
+        assert resp.status_code == 200, resp.text
+
+        web = self._web_client(db_session)
+        init_data = f'user={json.dumps({"id": 335, "username": "u335"})}'
+        status = web.get("/subscriptions/status", params={"init_data": init_data})
+        assert status.status_code == 200, status.text
+        assert status.json()["free_cap"] == 30
+        # service-level: the cap authority itself reads the row
+        assert get_effective_alert_cap(db_session, user) == 30
 
 
 class TestRevenue:

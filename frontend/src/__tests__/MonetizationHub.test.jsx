@@ -361,9 +361,11 @@ describe('MonetizationHub - How Stars explainer (Rule 10.2.5)', () => {
 })
 
 describe('MonetizationHub - cross-sell one-liners (Rule 10.2.7)', () => {
-  it('boost tab cross-sells All-in-One', () => {
+  it('boost tab cross-sells All-in-One with the API-driven credit number (TECH-38)', () => {
+    mockStatus = { ...defaultStatus, credit_total: 5 }
     renderHub('/hub/boost')
-    expect(screen.getByText(/2 free boosts/i)).toBeInTheDocument()
+    // The number comes from the mocked payload (5), not a hardcoded literal.
+    expect(screen.getByText(/5 free boosts/i)).toBeInTheDocument()
   })
 
   it('alerts tab cross-sells All-in-One', () => {
