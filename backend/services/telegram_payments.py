@@ -147,13 +147,50 @@ class HttpxStarPaymentsAdapter:
         offset: int = 0,
         limit: int = 100,
     ) -> List[dict]:
-        return await self._get("getStarTransactions", {
+        """Protocol: -> List[dict]. Telegram's getStarTransactions result is
+        {"transactions": [...], "transactions_count": N} — unwrap the list
+        (or pass a raw list through) and normalize every
+        StarTransaction.amount ({"amount": N, "nanostar_amount": M}) to the
+        int N the port promises. Consumers (ops ledger, reconciliation,
+        ops health) rely on both shapes."""
+        result = await self._get("getStarTransactions", {
             "offset": offset,
             "limit": limit,
         })
+        if isinstance(result, dict):
+            transactions = result.get("transactions") or []
+        elif isinstance(result, list):
+            transactions = result
+        else:
+            transactions = []
+        rows = []
+        for tx in transactions:
+            amount = tx.get("amount")
+            if isinstance(amount, dict):
+                try:
+                    amount = int(amount.get("amount", 0))
+                except (TypeError, ValueError):
+                    amount = 0
+            row = dict(tx)
+            row["amount"] = amount
+            rows.append(row)
+        return rows
 
     async def get_my_star_balance(self) -> int:
-        return await self._get("getMyStarBalance")
+        """Protocol: -> int. Telegram's getMyStarBalance result is
+        {"amount": N} — extract the int (pass an already-int result through).
+        Never raises for shape problems: the ops health endpoint must not
+        crash on a malformed body."""
+        result = await self._get("getMyStarBalance")
+        try:
+            if isinstance(result, dict):
+                return int(result.get("amount", 0))
+            return int(result)
+        except (TypeError, ValueError):
+            logger.warning(
+                "telegram_payments: getMyStarBalance unparseable result: %r", result
+            )
+            return 0
 
     async def refund_star_payment(self, *, telegram_payment_charge_id: str) -> bool:
         await self._post("refundStarPayment", {

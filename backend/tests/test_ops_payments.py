@@ -203,6 +203,112 @@ class TestRefund:
         assert resp.status_code == 400
 
 
+class TestHttpxAdapterContract:
+    """Regression (ops-console white screen, React #31): the real
+    HttpxStarPaymentsAdapter must honor the StarPaymentsAdapter Protocol
+    return SHAPES. Telegram's raw API returns `{"amount": N}` for
+    getMyStarBalance and `{"transactions": [...], "transactions_count": N}`
+    for getStarTransactions — the adapter must unwrap to int / List[dict]
+    with int `amount` (a dict rendered as a JSX child crashes the console)."""
+
+    @staticmethod
+    def _adapter(monkeypatch, responses):
+        from services.telegram_payments import HttpxStarPaymentsAdapter
+
+        adapter = HttpxStarPaymentsAdapter(bot_token="test")
+
+        async def _fake_get(method, params=None):
+            return responses[method]
+
+        monkeypatch.setattr(adapter, "_get", _fake_get)
+        return adapter
+
+    def test_get_my_star_balance_returns_int_from_result_dict(self, monkeypatch):
+        adapter = self._adapter(monkeypatch, {"getMyStarBalance": {"amount": 42}})
+        balance = asyncio.run(adapter.get_my_star_balance())
+        assert isinstance(balance, int)
+        assert balance == 42
+
+    def test_get_my_star_balance_passes_through_int_result(self, monkeypatch):
+        adapter = self._adapter(monkeypatch, {"getMyStarBalance": 7})
+        assert asyncio.run(adapter.get_my_star_balance()) == 7
+
+    def test_get_my_star_balance_missing_amount_returns_zero(self, monkeypatch):
+        adapter = self._adapter(monkeypatch, {"getMyStarBalance": {}})
+        assert asyncio.run(adapter.get_my_star_balance()) == 0
+
+    def test_get_star_transactions_unwraps_result_and_normalizes_amounts(self, monkeypatch):
+        adapter = self._adapter(monkeypatch, {
+            "getStarTransactions": {
+                "transactions": [
+                    {"id": "chg_t1", "date": 1750000000,
+                     "amount": {"amount": 150, "nanostar_amount": 0},
+                     "source": {"transaction_type": "invoice_payment"}},
+                    {"id": "chg_t2", "date": 1750000001, "amount": 30,
+                     "source": {"transaction_type": "invoice_send"}},
+                ],
+                "transactions_count": 2,
+            }
+        })
+        txs = asyncio.run(adapter.get_star_transactions(limit=100))
+        assert isinstance(txs, list)  # not the {"transactions": [...]} wrapper
+        assert txs[0]["amount"] == 150
+        assert isinstance(txs[0]["amount"], int)
+        assert txs[1]["amount"] == 30
+
+    def test_get_star_transactions_empty_result_returns_empty_list(self, monkeypatch):
+        adapter = self._adapter(monkeypatch, {"getStarTransactions": {}})
+        assert asyncio.run(adapter.get_star_transactions()) == []
+
+
+class TestHttpxAdapterThroughRoutes:
+    """The full real-bug chain: the REAL httpx adapter (not the fake) mounted
+    in the routes, fed Telegram-shaped API responses. This is the seam that
+    crashed the ops console after login."""
+
+    @staticmethod
+    def _install_real_adapter(monkeypatch, responses, module="api.routes.ops_payments"):
+        from services.telegram_payments import HttpxStarPaymentsAdapter
+
+        adapter = HttpxStarPaymentsAdapter(bot_token="test")
+
+        async def _fake_get(method, params=None):
+            return responses[method]
+
+        monkeypatch.setattr(adapter, "_get", _fake_get)
+        monkeypatch.setattr(f"{module}.star_payments", adapter)
+        return adapter
+
+    def test_balance_route_returns_int_with_real_adapter(self, db_session, monkeypatch):
+        self._install_real_adapter(monkeypatch, {"getMyStarBalance": {"amount": 42}})
+        client = _payments_client(db_session)
+        resp = client.get("/ops/payments/balance")
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body == {"balance_stars": 42}
+        assert isinstance(body["balance_stars"], int)
+
+    def test_ledger_route_unwraps_and_normalizes_with_real_adapter(self, db_session, monkeypatch):
+        self._install_real_adapter(monkeypatch, {
+            "getStarTransactions": {
+                "transactions": [
+                    {"id": "chg_rt_1", "date": 1750000000,
+                     "amount": {"amount": 150, "nanostar_amount": 0},
+                     "source": {"type": "user", "transaction_type": "invoice_payment",
+                                "user": {"id": 111}, "invoice_payload": "b:7:nonce"}},
+                ],
+                "transactions_count": 1,
+            }
+        })
+        client = _payments_client(db_session)
+        resp = client.get("/ops/payments/ledger")
+        assert resp.status_code == 200, resp.text
+        rows = resp.json()
+        assert len(rows) == 1  # NOT silently emptied by the isinstance list guard
+        assert rows[0]["amount"] == 150
+        assert isinstance(rows[0]["amount"], int)
+
+
 class TestAdapterMethodPresence:
     """D4: refund_star_payment on the Protocol, the httpx adapter and the
     fake (needed by Phase 1, asserted here at the port level)."""

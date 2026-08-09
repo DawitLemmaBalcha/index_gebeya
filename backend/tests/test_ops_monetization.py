@@ -316,6 +316,39 @@ class TestRevenue:
         assert data["expiring_soon"][0]["title"] == "iPhone"
 
 
+class TestRevenueWithRealAdapter:
+    """Regression: /ops/monetization/revenue sums int(tx['amount']) — the
+    REAL httpx adapter must unwrap Telegram's {"transactions": [...]} result
+    and normalize dict amounts, or this endpoint 500s (int({...}) TypeError)."""
+
+    def test_revenue_with_telegram_shaped_transactions(self, db_session, monkeypatch):
+        from services.telegram_payments import HttpxStarPaymentsAdapter
+
+        adapter = HttpxStarPaymentsAdapter(bot_token="test")
+
+        async def _fake_get(method, params=None):
+            return {
+                "transactions": [
+                    {"id": "chg_rev_tx1", "date": 1750000000,
+                     "amount": {"amount": 150, "nanostar_amount": 0},
+                     "source": {"transaction_type": "invoice_payment"}},
+                    {"id": "chg_rev_tx2", "date": 1750000001,
+                     "amount": {"amount": 100, "nanostar_amount": 0},
+                     "source": {"transaction_type": "invoice_payment"}},
+                    {"id": "chg_rev_tx3", "date": 1750000002, "amount": 30,
+                     "source": {"transaction_type": "invoice_send"}},
+                ],
+                "transactions_count": 3,
+            }
+
+        monkeypatch.setattr(adapter, "_get", _fake_get)
+        monkeypatch.setattr("api.routes.ops_monetization.star_payments", adapter)
+        client = _monetization_client(db_session)
+        resp = client.get("/ops/monetization/revenue")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["stars_earned_last_30d"] == 250
+
+
 class TestBoostModeration:
     def test_boosts_list_joins_item_and_channel(self, db_session):
         user, channel, item = _seller(db_session)

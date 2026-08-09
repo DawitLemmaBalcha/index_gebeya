@@ -197,6 +197,47 @@ class TestMoneySignals:
         assert services["money.star_balance"]["status"] == "ok"
         assert services["money.star_balance"]["value"] == 0
 
+    def test_star_balance_value_is_int_with_real_adapter(self, db_session, monkeypatch):
+        """Regression: the real httpx adapter must expose the star balance as
+        an int (Telegram returns {"amount": N}) — the Overview signal value
+        must not be a dict."""
+        from services.telegram_payments import HttpxStarPaymentsAdapter
+
+        adapter = HttpxStarPaymentsAdapter(bot_token="test")
+
+        async def _fake_get(method, params=None):
+            return {"amount": 42}
+
+        monkeypatch.setattr(adapter, "_get", _fake_get)
+        client = _client(db_session, monkeypatch, fake=adapter)
+        signal = client.get("/ops/health").json()["services"]["money.star_balance"]
+        assert signal["status"] == "ok"
+        assert signal["value"] == 42
+        assert isinstance(signal["value"], int)
+
+    def test_pending_payments_unwraps_wrapped_transactions(self, db_session, monkeypatch):
+        """Regression: getStarTransactions returns {"transactions": [...]};
+        the health signal must see the list, not an empty ledger."""
+        from services.telegram_payments import HttpxStarPaymentsAdapter
+
+        adapter = HttpxStarPaymentsAdapter(bot_token="test")
+
+        async def _fake_get(method, params=None):
+            return {
+                "transactions": [
+                    {"id": "chg_wrap_1", "date": 1750000000,
+                     "amount": {"amount": 150, "nanostar_amount": 0},
+                     "source": {"transaction_type": "invoice_payment"}},
+                ],
+                "transactions_count": 1,
+            }
+
+        monkeypatch.setattr(adapter, "_get", _fake_get)
+        client = _client(db_session, monkeypatch, fake=adapter)
+        signal = client.get("/ops/health").json()["services"]["money.pending_payments"]
+        assert signal["status"] == "ok"
+        assert signal["value"]["count"] == 1
+
     def test_star_balance_error_is_signal_level(self, db_session, monkeypatch):
         class _BrokenAdapter(FakeStarPaymentsAdapter):
             async def get_my_star_balance(self):

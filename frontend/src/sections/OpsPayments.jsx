@@ -85,7 +85,7 @@ export default function OpsPayments({ setToast }) {
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <div className="text-xs text-gray-400">Star balance</div>
           <div className="mt-1 text-2xl font-semibold text-gray-800">
-            {balance?.balance_stars ?? '—'} ⭐
+            {typeof balance?.balance_stars === 'number' ? balance.balance_stars : '—'} ⭐
           </div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -153,7 +153,7 @@ export default function OpsPayments({ setToast }) {
             columns={[
               { key: 'id', label: 'ID' },
               { key: 'date', label: 'Date', render: (r) => (r.date ? new Date(r.date * 1000).toLocaleString() : '—') },
-              { key: 'amount', label: 'Amount ⭐' },
+              { key: 'amount', label: 'Amount ⭐', render: (r) => (typeof r.amount === 'number' ? r.amount : '—') },
               { key: 'transaction_type', label: 'Type' },
               { key: 'payload_prefix', label: 'Prefix' },
               { key: 'user_id', label: 'User' },
