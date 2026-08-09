@@ -394,6 +394,9 @@ class TestOpsCapCreditLoop:
         status = web.get("/subscriptions/status", params={"init_data": init_data})
         assert status.status_code == 200, status.text
         assert status.json()["credit_total"] == 5
+        # Benefit-first: the pitch value (credit_allowance) follows the row
+        # immediately too.
+        assert status.json()["credit_allowance"] == 5
 
     def test_max_alerts_put_reaches_status_and_service_immediately(self, db_session):
         from models import User

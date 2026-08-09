@@ -618,11 +618,46 @@ class TestGetSubscriptionStatus:
         assert status["extra_alerts"] == 0
         assert status["alerts_extra_allowance"] > 0
 
+    # ------------------------------------------------------------------
+    # Benefit-first (hub copy redesign): credit_allowance — the monthly
+    # boost credit the All-in-One product INCLUDES (registry-driven, the
+    # PITCH value, present on BOTH branches). `credit_total`/`credit_
+    # remaining` stay the HELD state (0 for non-subscribers) and must
+    # never be used for the pitch.
+    # ------------------------------------------------------------------
+
+    def test_status_without_subscription_exposes_credit_allowance(self, db_session):
+        user = _make_user(db_session)
+        status = get_subscription_status(db_session, user)
+        # The pitch: the product includes the credit even before buying.
+        assert status["credit_allowance"] == ALL_IN_ONE_MONTHLY_BOOST_CREDIT
+        # The state: non-subscribers hold no credit.
+        assert status["credit_total"] == 0
+        assert status["credit_remaining"] == 0
+
     def test_status_with_all_in_one_exposes_extra_alert_allowance(self, db_session):
         user = _make_user(db_session)
         _make_subscription(db_session, user, product="all_in_one", charge_id="chg_stat_allow")
         status = get_subscription_status(db_session, user)
         assert status["alerts_extra_allowance"] == ALERTS_SUBSCRIPTION_EXTRA_ALERTS
+
+    def test_status_with_all_in_one_exposes_credit_allowance(self, db_session):
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="all_in_one", charge_id="chg_stat_allow2")
+        status = get_subscription_status(db_session, user)
+        # Pitch and state agree for subscribers: they hold what the product
+        # includes.
+        assert status["credit_allowance"] == ALL_IN_ONE_MONTHLY_BOOST_CREDIT
+        assert status["credit_allowance"] == status["credit_total"]
+
+    def test_status_with_alerts_only_exposes_credit_allowance_but_holds_none(self, db_session):
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="alerts_only", charge_id="chg_stat_allow3")
+        status = get_subscription_status(db_session, user)
+        # The pitch value is branch-independent; the held state is product-
+        # dependent.
+        assert status["credit_allowance"] == ALL_IN_ONE_MONTHLY_BOOST_CREDIT
+        assert status["credit_total"] == 0
 
     # ------------------------------------------------------------------
     # NB-48: the status payload is the hub's data endpoint — caps,
@@ -780,6 +815,16 @@ class TestRegistryDrivenCapAndCredit:
         assert status["alerts_extra_allowance"] == 15
         assert status["effective_cap"] == 30
 
+    def test_credit_allowance_follows_registry_row_without_subscription(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "all_in_one_monthly_boost_credit", "7")
+        user = _make_user(db_session)
+        status = get_subscription_status(db_session, user)
+        # The pitch follows the registry row even for non-subscribers, while
+        # the held state stays 0.
+        assert status["credit_allowance"] == 7
+        assert status["credit_total"] == 0
+
     def test_status_payload_follows_registry_rows_with_subscription(self, db_session):
         from services.settings_registry import set_setting
         set_setting(db_session, "max_alerts_per_user", "30")
@@ -792,6 +837,7 @@ class TestRegistryDrivenCapAndCredit:
         assert status["extra_alerts"] == 15
         assert status["alerts_extra_allowance"] == 15
         assert status["credit_total"] == 5
+        assert status["credit_allowance"] == 5
         assert status["effective_cap"] == 45
 
     def test_lapse_slices_at_registry_free_cap(self, db_session):

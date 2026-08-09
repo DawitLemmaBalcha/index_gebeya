@@ -404,6 +404,12 @@ class SubscriptionStatusResponse(BaseModel):
     alerts_extra_allowance: int = 0
     credit_remaining: int = 0
     credit_total: int = 0
+    # Benefit-first (hub copy redesign): credit_allowance — the monthly
+    # boost credit the All-in-One product INCLUDES (registry-driven, ALWAYS
+    # present on both branches — the PITCH value). `credit_total`/
+    # `credit_remaining` are the user's HELD state (0 for non-subscribers)
+    # and must never be used for the pitch.
+    credit_allowance: int = 0
     # NB-48 (§2.2): the status payload is the hub's data endpoint — caps,
     # banner threshold and prices. Zero-defaulted, additive — existing
     # consumers are untouched.

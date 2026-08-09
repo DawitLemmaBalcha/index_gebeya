@@ -299,6 +299,10 @@ def get_subscription_status(db: Session, user: User) -> dict:
     if not sub:
         free_cap = get_setting(db, "max_alerts_per_user")
         extra_allowance = get_setting(db, "alerts_subscription_extra_alerts")
+        # Benefit-first: credit_allowance is what the All-in-One product
+        # INCLUDES (the pitch value — always present, registry-driven);
+        # credit_total/credit_remaining stay 0 here (the held state).
+        boost_credit = get_setting(db, "all_in_one_monthly_boost_credit")
         return {
             "product": None,
             "status": None,
@@ -307,6 +311,7 @@ def get_subscription_status(db: Session, user: User) -> dict:
             "alerts_extra_allowance": extra_allowance,
             "credit_remaining": 0,
             "credit_total": 0,
+            "credit_allowance": boost_credit,
             "free_cap": free_cap,
             "effective_cap": get_effective_alert_cap(db, user),
             "cap_banner_threshold": ALERT_CAP_BANNER_THRESHOLD,
@@ -317,6 +322,10 @@ def get_subscription_status(db: Session, user: User) -> dict:
         }
     extra_allowance = get_setting(db, "alerts_subscription_extra_alerts")
     free_cap = get_setting(db, "max_alerts_per_user")
+    # Benefit-first: credit_allowance is what the All-in-One product
+    # INCLUDES (the pitch value — always present, registry-driven);
+    # credit_total is the HELD state (only all_in_one subscribers hold it).
+    boost_credit = get_setting(db, "all_in_one_monthly_boost_credit")
     return {
         "product": sub.product,
         "status": sub.status,
@@ -324,10 +333,8 @@ def get_subscription_status(db: Session, user: User) -> dict:
         "extra_alerts": extra_allowance,
         "alerts_extra_allowance": extra_allowance,
         "credit_remaining": get_credit_boosts_remaining(db, user),
-        "credit_total": (
-            get_setting(db, "all_in_one_monthly_boost_credit")
-            if sub.product == "all_in_one" else 0
-        ),
+        "credit_total": boost_credit if sub.product == "all_in_one" else 0,
+        "credit_allowance": boost_credit,
         "free_cap": free_cap,
         "effective_cap": get_effective_alert_cap(db, user),
         "cap_banner_threshold": ALERT_CAP_BANNER_THRESHOLD,

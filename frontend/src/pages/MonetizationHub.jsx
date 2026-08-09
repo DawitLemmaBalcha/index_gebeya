@@ -226,9 +226,11 @@ function BoostTab({ status, itemId, boost, products, productsLoading, productsEr
         </div>
       )}
 
-      {/* Cross-sell (Rule 10.2.7) */}
+      {/* Cross-sell (Rule 10.2.7). Benefit-first (hub copy redesign): the
+          one-liner pitches what the product INCLUDES (credit_allowance),
+          never the held credit_total (0 for non-subscribers). */}
       <p className="mt-4 text-xs text-gray-500">
-        All-in-One includes {status.credit_total} free boosts every period plus seller intelligence.
+        All-in-One includes {status.credit_allowance} free boosts every period plus seller intelligence.
       </p>
     </div>
   );
@@ -242,16 +244,27 @@ function AlertsTab({ status, alerts, openInvoice }) {
         <Bell size={18} className="text-brand-600" />
         <h2 className="text-base font-bold text-gray-900">More alerts, fewer missed buyers</h2>
       </div>
-      <p className="text-sm text-gray-600 mb-1">
-        You're at {alerts.length} of {status.effective_cap} active alerts.
-      </p>
       {subscribed ? (
-        <p className="text-sm text-green-700 font-semibold">
-          Covered — {status.product === 'all_in_one' ? 'All-in-One' : 'Alerts Only'} subscription active
-        </p>
+        <>
+          <p className="text-sm text-green-700 font-semibold">
+            Covered — {status.product === 'all_in_one' ? 'All-in-One' : 'Alerts Only'} subscription active
+          </p>
+          <p className="text-sm text-gray-600">
+            Alerts cap: {status.effective_cap}.
+          </p>
+        </>
       ) : (
         <>
-          <p className="text-2xl font-extrabold text-gray-900 mb-4">
+          {/* Benefit-first (hub copy redesign): the pitch leads with what
+              the buyer GETS (the configurable extra-alert allowance — the
+              pitch value), usage stays secondary, price is the consequence. */}
+          <p className="text-2xl font-extrabold text-gray-900 mb-1">
+            Get {status.alerts_extra_allowance} more active alerts
+          </p>
+          <p className="text-sm text-gray-600 mb-4">
+            You're at {alerts.length} of {status.effective_cap} active alerts.
+          </p>
+          <p className="text-lg font-bold text-gray-900 mb-4">
             {status.alerts_only_price_stars} Stars per month
           </p>
           <button
@@ -288,12 +301,17 @@ function AllInOneTab({ status, openInvoice, navigate, channels, channelsFetched 
         </li>
         <li className="flex gap-2 text-sm text-gray-700">
           <span className="text-amber-500 shrink-0">•</span>
-          {status.credit_total} free boosts every period (
-          {status.credit_remaining}/{status.credit_total} left)
+          {/* Benefit-first (hub copy redesign): the pitch is what the
+              product INCLUDES (credit_allowance — the allowance, not the
+              held credit_total). Only subscribers see the held-state
+              counter (remaining/total). */}
+          {subscribed
+            ? `${status.credit_allowance} free boosts every period (${status.credit_remaining}/${status.credit_total} left)`
+            : `${status.credit_allowance} free boosts every period`}
         </li>
         <li className="flex gap-2 text-sm text-gray-700">
           <span className="text-amber-500 shrink-0">•</span>
-          Extra alert cap — everything in Alerts Only
+          Extra alert cap — get {status.alerts_extra_allowance} more active alerts
         </li>
       </ul>
 

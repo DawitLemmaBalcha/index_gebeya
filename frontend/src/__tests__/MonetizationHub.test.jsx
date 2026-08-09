@@ -98,8 +98,12 @@ const defaultStatus = {
   status: null,
   current_period_end: null,
   extra_alerts: 0,
+  // Benefit-first (hub copy redesign): allowance/pitch values mirror the
+  // registry constants (10 extra alerts, 2 monthly boost credit).
+  alerts_extra_allowance: 10,
   credit_remaining: 0,
   credit_total: 2,
+  credit_allowance: 2,
   free_cap: 20,
   effective_cap: 20,
   cap_banner_threshold: 2,
@@ -297,6 +301,12 @@ describe('MonetizationHub - alerts tab', () => {
     expect(screen.getByText(/30 Stars/i)).toBeInTheDocument()
   })
 
+  it('leads with the benefit headline: "Get N more active alerts" (benefit-first)', () => {
+    renderHub('/hub/alerts')
+    // The allowance from the payload, not the held count — the pitch value.
+    expect(screen.getByText(/Get 10 more active alerts/i)).toBeInTheDocument()
+  })
+
   it('buy opens the alerts_only invoice', () => {
     renderHub('/hub/alerts')
     fireEvent.click(screen.getByText('Buy Alerts Only'))
@@ -309,14 +319,35 @@ describe('MonetizationHub - alerts tab', () => {
     expect(screen.queryByText('Buy Alerts Only')).not.toBeInTheDocument()
     expect(screen.getByText(/subscription active/i)).toBeInTheDocument()
   })
+
+  it('shows the effective alert cap in the subscribed state', () => {
+    mockStatus = { ...defaultStatus, product: 'alerts_only', status: 'active', effective_cap: 30 }
+    renderHub('/hub/alerts')
+    expect(screen.getByText(/Alerts cap: 30/i)).toBeInTheDocument()
+  })
 })
 
 describe('MonetizationHub - all-in-one tab (the superset story)', () => {
-  it('lists the superset with the credit counter', () => {
-    mockStatus = { ...defaultStatus, credit_remaining: 1, credit_total: 2 }
+  it('subscribers see the credit counter with remaining/total left', () => {
+    mockStatus = { ...defaultStatus, product: 'all_in_one', status: 'active', credit_remaining: 1, credit_total: 2 }
     renderHub('/hub/all-in-one')
     expect(screen.getByText(/Seller Intelligence/i)).toBeInTheDocument()
     expect(screen.getByText(/1\/2/i)).toBeInTheDocument()
+  })
+
+  it('non-subscribers see the benefit pitch, NOT the held state (benefit-first)', () => {
+    // Faithful to the API: non-subscribers hold credit_total 0 but the
+    // product includes credit_allowance 2 — the page must pitch the
+    // allowance, never the held state.
+    mockStatus = { ...defaultStatus, credit_total: 0 }
+    renderHub('/hub/all-in-one')
+    expect(screen.getByText('2 free boosts every period')).toBeInTheDocument()
+    expect(screen.queryByText(/\(0\/0 left\)/i)).not.toBeInTheDocument()
+  })
+
+  it('the extra alert cap line is concrete: "get N more active alerts" (benefit-first)', () => {
+    renderHub('/hub/all-in-one')
+    expect(screen.getByText(/Extra alert cap — get 10 more active alerts/i)).toBeInTheDocument()
   })
 
   it('buy opens the all_in_one invoice', () => {
@@ -361,11 +392,13 @@ describe('MonetizationHub - How Stars explainer (Rule 10.2.5)', () => {
 })
 
 describe('MonetizationHub - cross-sell one-liners (Rule 10.2.7)', () => {
-  it('boost tab cross-sells All-in-One with the API-driven credit number (TECH-38)', () => {
-    mockStatus = { ...defaultStatus, credit_total: 5 }
+  it('boost tab cross-sells All-in-One with the API-driven allowance (benefit-first)', () => {
+    // The pitch value (credit_allowance 5) — even though the held state is
+    // 0 for non-subscribers, the one-liner must never say "0 free boosts".
+    mockStatus = { ...defaultStatus, credit_total: 0, credit_allowance: 5 }
     renderHub('/hub/boost')
-    // The number comes from the mocked payload (5), not a hardcoded literal.
     expect(screen.getByText(/5 free boosts/i)).toBeInTheDocument()
+    expect(screen.queryByText(/0 free boosts/i)).not.toBeInTheDocument()
   })
 
   it('alerts tab cross-sells All-in-One', () => {
