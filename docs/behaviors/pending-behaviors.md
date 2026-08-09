@@ -271,6 +271,118 @@ UAT and support workflows require sqladmin row-inserts (test boosts/subscription
 - All actions: explicit confirmation, audit rows, never touch real Telegram payments.
 - Tests: simulator drives the same fulfillment path as the real listener flow (idempotency included); grant/revoke guards. Full regression green.
 
+## NB-55: Owner Quality Loop — Edit DM Button + Category Re-trigger + Quality Events
+
+**Priority:** HIGH
+**Affected Features:** Listener, Stores, Ops
+**File(s):** `listener/worker.py` (item DM content + Edit button deep-link), `backend/services/item_status.py` (category-change re-trigger), `backend/api/routes/ops_finalize.py` (quality events endpoint, new), `frontend/src/sections/` (quality events surface, new)
+**Behavior doc:** `docs/behaviors/ops-finalization.md` §§1–2
+
+**The Gap:**
+Quality management is impractical for the admin (sqladmin reclassification is raw-row tedium). The owner — who knows the product — has no easy path to correct a misindexed item. Category corrections don't re-trigger matching, so fixed items don't move in the server-side catalog.
+
+**User Acceptance Criteria:**
+- The Indexed/Updated owner DM shows the item's image + specification summary + description, then two buttons: **Edit** and **Boost**.
+- Both buttons are deep-links into the web app (`/stores/{channelId}/{itemId}`) — NO Telegram DM editing flow. Edit lands on the product edit panel; Boost lands on the boost section (existing).
+- `update_item` re-runs alert matching AND catalog placement when category/subcategory changes (in addition to today's price/specs trigger).
+- Edits are applied immediately — no review state, no admin approval (Radar is the abuse backstop).
+- The ops console shows a **Quality Events** stream: every owner correction (category/price/title changes) as a live entry with a **Revert** action (restores prior value, flags owner for the Radar watchlist). Source: existing `ItemEdit` history — not a new logging system.
+- Tests: DM carries the two deep-link buttons; category edit re-triggers matching (notification fires); quality events list + revert action; full regression green.
+
+---
+
+## NB-56: Ban Primitive — one flag, enforced at the seams
+
+**Priority:** HIGH
+**Affected Features:** Users, Alerts, Reviews, Ingestion, Search
+**File(s):** `backend/models.py` (User.banned), `backend/services/ban.py` (new — the single check), `backend/services/alerting.py` + `api/routes/reviews.py` + `api/routes/items.py` (enforcement call sites), `backend/services/search.py` + `recommendation.py` + `catalog.py` (item hiding), `backend/api/routes/ops_finalize.py` (ban/unban endpoint)
+**Behavior doc:** `docs/behaviors/ops-finalization.md` §3
+
+**The Gap:**
+No way to neutralize a bad actor short of destructive DB surgery. sqladmin deletion is irreversible-ish and destroys evidence.
+
+**User Acceptance Criteria:**
+- Single `banned` boolean on User — reversible; no deletion; evidence stays.
+- Banned buyers: cannot create alerts, submit reviews, or report sold. Existing active alerts pause. Existing reviews stay visible (historical).
+- Banned sellers: channels pause indexing; items hide from browse/search/feed (excluded at query time — never deleted).
+- One check function, five enforcement seams: alert creation, review submission, sold-report submission, ingestion (channel-level), and item queries.
+- Unban is instant and restores everything (alerts resume, items reappear, indexing resumes).
+- Tests: each enforcement seam rejects a banned user and accepts after unban; banned seller's items absent from browse/search/feed; ingestion skips banned channels.
+
+---
+
+## NB-57: Anomaly Radar — the platform finds its own problems
+
+**Priority:** HIGH
+**Affected Features:** Ops, Notifications, Monetization
+**File(s):** `backend/api/routes/ops_finalize.py` (radar endpoint, new), `frontend/src/sections/OpsRadar.jsx` (new), detection queries over notifications/sold_reports/items/channels/judge counters
+**Behavior doc:** `docs/behaviors/ops-finalization.md` §4
+
+**The Gap:**
+Problems are discovered by log-archaeology. Dead-chat buyers, judge-error floods, report spikes, and scam-pattern channels hide in tables the admin would have to guess to look at.
+
+**User Acceptance Criteria:**
+- Computed problem list, refreshed on load, each entry with severity + at least one one-click resolution verb (action chaining is a hard rule):
+  - Dead-chat buyers (delivery failures) → Retry / Resolve
+  - Judge-error spikes (JUDGE_ERROR_COUNT delta) → Pause matching / Dismiss
+  - Report spikes (near the sold threshold) → View / Clear reports
+  - **Scam-pattern channels** (low trust + price outliers vs category median + high report rate) → Pause indexing / Ban owner
+  - Price anomalies (0 ETB, ≥10x median) → Hide item
+- Every anomaly ends in a verb; none is display-only.
+- Tests: each detection fires on seeded data; each action performs its verb; dismiss clears; full regression green.
+
+---
+
+## NB-58: Engine Diagnostics — per-item decision traces
+
+**Priority:** MEDIUM
+**Affected Features:** Ops, Alerts
+**File(s):** `backend/api/routes/ops_finalize.py` (trace endpoint, new), `frontend/src/sections/OpsDiagnostics.jsx` (new), trace reconstruction in `backend/services/alerting.py` or a new `services/trace.py`
+**Behavior doc:** `docs/behaviors/ops-finalization.md` §5
+
+**The Gap:**
+When an alert doesn't fire, nobody can see why — the engine's decisions are computed, not stored. sqladmin shows the rows that exist, never the rows that should have existed.
+
+**User Acceptance Criteria:**
+- Search an item → full decision trace: active alerts evaluated, and per-alert stage outcomes (price-gate reject, threshold miss, judge approve/reject/error, high-water-mark suppress, throttle, dedup-suppress, dispatched).
+- Drill into any alert for the full story: score components, tier, judge verdict, suppression reason.
+- The trace is reconstructed honestly from the evaluation path (replay the pipeline against the item with the same inputs) — no fabricated data.
+- Tests: seeded item+alerts produce a trace with the expected stage outcomes; drill-down shape.
+
+---
+
+## NB-59: Engine Actions — make the system do things
+
+**Priority:** MEDIUM
+**Affected Features:** Ops, Ingestion, Notifications, Payments
+**File(s):** `backend/api/routes/ops_finalize.py` (actions endpoint, new), `frontend/src/sections/OpsActions.jsx` (new)
+**Behavior doc:** `docs/behaviors/ops-finalization.md` §6
+
+**The Gap:**
+Behavior-triggering verbs (re-run matching, retry delivery, re-process a post, trigger reconciliation) require raw API calls or container fiddling.
+
+**User Acceptance Criteria:**
+- Consolidated action surface: re-run alert matching for an item; retry a failed notification; re-process a stuck ingestion post; trigger reconciliation now; trigger photo-refresh now.
+- Every action: confirm dialog, audit row, immediate result feedback; idempotent where the underlying operation is.
+- Tests: each action invokes the underlying service; audit rows written; idempotency where applicable.
+
+---
+
+## NB-60: Users & Items Tabs — reframed as analytics + the ban lever
+
+**Priority:** MEDIUM
+**Affected Features:** Ops, Users, Items
+**File(s):** `backend/api/routes/ops_finalize.py` (user/item analytics endpoints, new), `frontend/src/sections/OpsUsers.jsx` + `OpsItems.jsx` (new)
+**Behavior doc:** `docs/behaviors/ops-finalization.md` §§7–8
+
+**The Gap:**
+sqladmin cannot visualize anything — user footprints, review distributions, and item performance are raw-row archaeology.
+
+**User Acceptance Criteria:**
+- Users tab: lookup by telegram id/username → reviews (with rating distribution), alerts, subscriptions, boosts, recent interactions — visualized counts/mini-charts; actions: Ban/Unban, pause-all-alerts. No row editing.
+- Items tab: views-over-time per item, price distribution per category (histogram), per-channel performance (items/views/reports). No reclassification workbench (rejected — the owner loop replaces it).
+- Tests: analytics shapes correct from seeded data; ban/unban from the tab enforces the primitive; full regression green.
+
 ---
 
 # ARCHIVE — Implemented Tickets

@@ -105,3 +105,19 @@ Six phases, each with QA gate + atomic commit on `feat/ops-console`:
 **The gap:** (1) the `if (active) getStatus()` activation-refetch pattern is duplicated in AlertsPage and StoresPage — the always-mounted `display:none` tab pattern in MainLayout is a systemic staleness trap; a shared `useRefetchOnActivation(active, fn)` primitive prevents the next instance. (2) StoresPage (553L) and MonetizationHub (484L) exceed the 300-line guideline (pre-existing), and the "Add Channel" CTA fragment is duplicated — a refactor for size + dedup is due.
 
 **Acceptance criteria:** shared primitive hook with tests; both pages consume it; CTA fragment extracted; file sizes reduced or documented as intentional with extraction boundaries; full frontend suite green.
+
+---
+
+## TECH-40..TECH-45: Ops Finalization (NB-55..NB-60)
+
+**Status:** PENDING — behavior doc: `docs/behaviors/ops-finalization.md` (locked 2026-08-08)
+**Date:** 2026-08-08
+
+Six packages, each with QA gate + atomic commit on `feat/ops-finalization`:
+
+- **TECH-40 (NB-55):** Owner Quality Loop — Indexed/Updated DM carries item image+specs+description with Edit + Boost deep-link buttons (web-app doors, never Telegram editing); `update_item` re-triggers on category/subcategory changes; Quality Events stream (from ItemEdit history) with Revert actions.
+- **TECH-41 (NB-56):** Ban primitive — `User.banned` flag, `services/ban.py` single check, five enforcement seams (alert creation, review submission, sold-report submission, ingestion channel-level, item queries); reversible; evidence preserved.
+- **TECH-42 (NB-57):** Anomaly Radar — dead-chat buyers, judge-error spikes, report spikes, scam-pattern channels (low trust + price outliers + reports), price anomalies — each with one-click resolution verbs (action chaining mandatory).
+- **TECH-43 (NB-58):** Engine Diagnostics — per-item alert-engine decision traces with drill-down; honest reconstruction from the evaluation path.
+- **TECH-44 (NB-59):** Engine Actions — re-run matching, retry delivery, re-process post, trigger reconciliation/photo-refresh; confirm + audit + idempotency.
+- **TECH-45 (NB-60):** Users & Items tabs reframed — user footprint + review distribution + ban lever; item analytics (views-over-time, price histograms, per-channel performance). No reclassification workbench (rejected).

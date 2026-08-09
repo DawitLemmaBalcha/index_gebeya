@@ -157,9 +157,9 @@ The console is **platform-wide**, not monetization-only. Every operational contr
 
 ---
 
-## 10. Deferred sections (2–5) — boundary contract
+## 10. Finalized sections (2–5) — superseded 2026-08-08
 
-Built only when operational pain is real, and ONLY as action centers per Rule 2.1. No tickets are opened until the need exists. The nav stubs stay until then.
+The four stubs are finalized as action centers by `ops-finalization.md` (NB-55..NB-60): the Owner Quality Loop + Quality Events (Catalog), the Anomaly Radar + Ban primitive (Trust & Moderation / Users), Engine Diagnostics, Engine Actions, and Users/Items analytics. The boundary contract stands: action centers only, never row-editing — sqladmin owns rows, the console owns diagnosis and action. The nav stubs are replaced by the real surfaces; the shell shape never changes.
 
 ---
 
