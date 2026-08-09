@@ -270,6 +270,44 @@ class TestSubscriptionSettings:
         ).status_code == 404
 
 
+class TestOpsPriceLoop:
+    """User-verified regression: subscription prices saved in /ops never
+    reached the webapp — the status/order read sites used constants instead
+    of the admin_settings registry. Full loop: PUT a price via the ops API,
+    then the webapp-facing /subscriptions/status must reflect it
+    immediately."""
+
+    def _web_client(self, db_session):
+        from api.routes import subscriptions as subs_router
+        app = FastAPI()
+        app.include_router(subs_router.router, prefix="/subscriptions")
+        def _override_db():
+            yield db_session
+        app.dependency_overrides[get_db] = _override_db
+        return TestClient(app)
+
+    def test_ops_price_put_reaches_subscription_status_immediately(self, db_session):
+        from models import User
+        user = User(telegram_id=222, username="u222")
+        db_session.add(user)
+        db_session.commit()
+
+        ops = _monetization_client(db_session)
+        resp = ops.put(
+            "/ops/monetization/settings/alerts_only_price_stars", json={"value": "45"}
+        )
+        assert resp.status_code == 200, resp.text
+
+        web = self._web_client(db_session)
+        init_data = f'user={json.dumps({"id": 222, "username": "u222"})}'
+        status = web.get(
+            "/subscriptions/status",
+            params={"init_data": init_data},
+        )
+        assert status.status_code == 200, status.text
+        assert status.json()["alerts_only_price_stars"] == 45
+
+
 class TestRevenue:
     def test_revenue_counts_and_expiring(self, db_session, monkeypatch):
         user, channel, item = _seller(db_session)

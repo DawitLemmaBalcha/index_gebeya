@@ -667,3 +667,59 @@ class TestGetSubscriptionStatus:
             MAX_ALERTS_PER_USER + ALERTS_SUBSCRIPTION_EXTRA_ALERTS
         )
         assert status["credit_total"] == 0
+
+
+# ---------------------------------------------------------------------------
+# User-verified regression: subscription prices saved via the ops console
+# (admin_settings registry) never reached the webapp — the order invoice and
+# status payload read the CONSTANTS directly. These tests lock the registry
+# read sites: DB row wins, else env/constant default (get_setting fallback).
+# ---------------------------------------------------------------------------
+
+class TestRegistryDrivenPrices:
+    def test_status_prices_follow_registry_rows(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "alerts_only_price_stars", "45")
+        set_setting(db_session, "all_in_one_price_stars", "130")
+        user = _make_user(db_session)
+        status = get_subscription_status(db_session, user)
+        assert status["alerts_only_price_stars"] == 45
+        assert status["all_in_one_price_stars"] == 130
+
+    def test_status_prices_follow_registry_rows_with_active_subscription(self, db_session):
+        from services.settings_registry import set_setting
+        set_setting(db_session, "alerts_only_price_stars", "45")
+        set_setting(db_session, "all_in_one_price_stars", "130")
+        user = _make_user(db_session)
+        _make_subscription(db_session, user, product="all_in_one", charge_id="chg_reg_1")
+        status = get_subscription_status(db_session, user)
+        assert status["alerts_only_price_stars"] == 45
+        assert status["all_in_one_price_stars"] == 130
+
+    @pytest.mark.asyncio
+    async def test_order_invoice_prices_follow_registry(self, db_session, monkeypatch):
+        from tests.fake_telegram_payments import FakeStarPaymentsAdapter
+        from services.settings_registry import set_setting
+        set_setting(db_session, "alerts_only_price_stars", "45")
+        set_setting(db_session, "all_in_one_price_stars", "130")
+        fake = FakeStarPaymentsAdapter()
+        monkeypatch.setattr("services.subscriptions.star_payments", fake)
+        user = _make_user(db_session)
+
+        alerts = await create_subscription_order(db_session, user, "alerts_only")
+        assert alerts["price_stars"] == 45
+        assert fake.calls[0]["prices"] == [("Alerts Only", 45)]
+
+        all_in_one = await create_subscription_order(db_session, user, "all_in_one")
+        assert all_in_one["price_stars"] == 130
+        assert fake.calls[1]["prices"] == [("All-in-One", 130)]
+
+    @pytest.mark.asyncio
+    async def test_order_price_defaults_to_constant_without_registry_row(self, db_session, monkeypatch):
+        from tests.fake_telegram_payments import FakeStarPaymentsAdapter
+        fake = FakeStarPaymentsAdapter()
+        monkeypatch.setattr("services.subscriptions.star_payments", fake)
+        user = _make_user(db_session)
+        result = await create_subscription_order(db_session, user, "alerts_only")
+        assert result["price_stars"] == ALERTS_ONLY_PRICE_STARS
+        assert fake.calls[0]["prices"] == [("Alerts Only", ALERTS_ONLY_PRICE_STARS)]

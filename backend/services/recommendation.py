@@ -78,8 +78,12 @@ def get_trending_items(db: Session, limit: int = 10, exclude_ids: set = set()) -
     
     if len(sorted_items) < limit:
         needed = limit - len(sorted_items)
-        extras = get_recent_items(db, needed, exclude_ids)
+        # The recent backfill must exclude the already-queried ids: without
+        # them, the fetch skips already-included items and under-fills the
+        # page (user-verified: a 40-item catalog yielded a 15-item first
+        # page -> frontend hasMore=false and scrolling stopped).
         existing_ids = set(item_ids)
+        extras = get_recent_items(db, needed, exclude_ids | existing_ids)
         for ex in extras:
             if ex.id not in existing_ids:
                 sorted_items.append(ex)

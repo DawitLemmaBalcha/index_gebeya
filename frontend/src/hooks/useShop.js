@@ -58,7 +58,10 @@ export const useShop = () => {
     fetchItems(0);
   }, []);
 
-  // Initial Fetch (TECH-10: skip if cache exists)
+  // Initial Fetch — the cached page only serves the FIRST PAINT (TECH-10
+  // instant back-navigation). The feed is always re-derived from the server
+  // so hasMore tracks the CURRENT catalog: a stale hasMore=false cache
+  // previously froze Explore at a limited set forever (user-verified bug).
   useEffect(() => {
     // Always reset transient search states on mount
     setSearchResults(null);
@@ -68,7 +71,6 @@ export const useShop = () => {
     setMaxPrice("");
     setFilterCategory("All");
 
-    if (_feedCache) return; // Cache hit — skip fetch
     fetchItems(0);
   }, []);
 
@@ -91,14 +93,20 @@ export const useShop = () => {
   }, [searchQuery, minPrice, maxPrice, filterCategory, excludeUnpriced]);
 
   const fetchItems = useCallback(async (pageOffset = 0) => {
-    // Build URL with limit, offset, and exclude params
+    // Every page-0 fetch is a FRESH feed session: the accumulated seen-set
+    // only dedupes continuation pages. Cache hits (revisits) therefore
+    // re-derive the canonical first page + hasMore from the current catalog
+    // instead of freezing at a stale <LIMIT page (user-verified bug).
+    const freshSession = pageOffset === 0;
     let url = `${API_BASE_URL}/feed/foryou?limit=${LIMIT}&offset=${pageOffset}`;
-    if (seenItemIds.size > 0) {
+    if (!freshSession && seenItemIds.size > 0) {
       url += `&exclude=${[...seenItemIds].join(',')}`;
     }
 
     try {
-      if (pageOffset === 0) {
+      // Cache hits keep the instant paint (TECH-10); only the very first
+      // load in a JS session shows the skeleton.
+      if (freshSession && !_feedCache) {
         setLoading(true);
       }
       setError(null);
@@ -114,40 +122,38 @@ export const useShop = () => {
       if (!response.ok) throw new Error(`Server Error: ${response.status}`);
       const data = await response.json();
       
-      if (pageOffset === 0) {
+      if (freshSession) {
         setItems(data);
         setOffset(0);
+        // Fresh session: reset the seen-set to this page's ids.
+        setSeenItemIds(new Set(data.map(item => item.id)));
       } else {
         setItems(prev => [...prev, ...data]);
+        setSeenItemIds(prev => {
+          const next = new Set(prev);
+          data.forEach(item => next.add(item.id));
+          return next;
+        });
       }
       
-      if (data.length < LIMIT) {
-        setHasMore(false);
-      }
-      if (data.length === 0) {
-        setHasMore(false);
-      }
+      // Re-derive hasMore from the ACTUAL response — a full page restores
+      // scrolling, a short page ends it.
+      setHasMore(data.length >= LIMIT);
       
-      // Track seen IDs & populate cache on initial load (TECH-10)
-      setSeenItemIds(prev => {
-        const next = new Set(prev);
-        data.forEach(item => next.add(item.id));
-        
-        if (pageOffset === 0) {
-          // Populate module-level cache for instant back navigation
-          _feedCache = {
-            items: data,
-            offset: 0,
-            hasMore: data.length >= LIMIT,
-            seenItemIds: [...next],
-          };
-        }
-        
-        return next;
-      });
+      if (freshSession) {
+        // Populate module-level cache for instant back navigation (TECH-10)
+        _feedCache = {
+          items: data,
+          offset: 0,
+          hasMore: data.length >= LIMIT,
+          seenItemIds: data.map(item => item.id),
+        };
+      }
     } catch (error) {
       console.error("Error fetching items:", error);
-      setError(error.message);
+      // A failed background refresh of a cached feed keeps the cached items
+      // visible instead of masking them with the error screen (TECH-10).
+      if (pageOffset !== 0 || !_feedCache) setError(error.message);
     } finally {
       setLoading(false);
     }

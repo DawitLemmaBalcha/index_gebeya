@@ -22,8 +22,6 @@ from sqlalchemy.orm import Session
 
 from constants import (
     ALL_IN_ONE_MONTHLY_BOOST_CREDIT,
-    ALL_IN_ONE_PRICE_STARS,
-    ALERTS_ONLY_PRICE_STARS,
     ALERTS_SUBSCRIPTION_EXTRA_ALERTS,
     MAX_ALERTS_PER_USER,
     SUBSCRIPTION_PERIOD_SECONDS,
@@ -37,6 +35,11 @@ from constants import (
 )
 from models import Alert, Boost, Subscription, User
 from services.boost_pricing import get_boost_floor
+# NB-49 follow-up: the ORDER invoice and STATUS payload prices read the
+# admin_settings registry (ops console writes it). The constants stay the
+# seed defaults via get_setting's fallback chain. settings_registry imports
+# models/constants/sqlalchemy ONLY — cycle-free (blueprint D12).
+from services.settings_registry import get_setting
 from services.telegram_payments import star_payments
 
 logger = logging.getLogger("index_subscriptions")
@@ -146,7 +149,11 @@ async def create_subscription_order(db: Session, user: User, product: str) -> di
             detail="An active subscription already exists",
         )
 
-    price = ALERTS_ONLY_PRICE_STARS if product == "alerts_only" else ALL_IN_ONE_PRICE_STARS
+    price = (
+        get_setting(db, "alerts_only_price_stars")
+        if product == "alerts_only"
+        else get_setting(db, "all_in_one_price_stars")
+    )
     title = "Alerts Only" if product == "alerts_only" else "All-in-One"
     payload = f"s:{user.id}:{product}:{secrets.token_hex(4)}"
 
@@ -296,8 +303,8 @@ def get_subscription_status(db: Session, user: User) -> dict:
             "free_cap": MAX_ALERTS_PER_USER,
             "effective_cap": get_effective_alert_cap(db, user),
             "cap_banner_threshold": ALERT_CAP_BANNER_THRESHOLD,
-            "alerts_only_price_stars": ALERTS_ONLY_PRICE_STARS,
-            "all_in_one_price_stars": ALL_IN_ONE_PRICE_STARS,
+            "alerts_only_price_stars": get_setting(db, "alerts_only_price_stars"),
+            "all_in_one_price_stars": get_setting(db, "all_in_one_price_stars"),
             "boost_floor_price_stars": boost_floor,
             "boost_duration_days": BOOST_DURATION_DAYS,
         }
@@ -314,8 +321,8 @@ def get_subscription_status(db: Session, user: User) -> dict:
         "free_cap": MAX_ALERTS_PER_USER,
         "effective_cap": get_effective_alert_cap(db, user),
         "cap_banner_threshold": ALERT_CAP_BANNER_THRESHOLD,
-        "alerts_only_price_stars": ALERTS_ONLY_PRICE_STARS,
-        "all_in_one_price_stars": ALL_IN_ONE_PRICE_STARS,
+        "alerts_only_price_stars": get_setting(db, "alerts_only_price_stars"),
+        "all_in_one_price_stars": get_setting(db, "all_in_one_price_stars"),
         "boost_floor_price_stars": boost_floor,
         "boost_duration_days": BOOST_DURATION_DAYS,
     }
