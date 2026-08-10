@@ -1,6 +1,6 @@
 # Ops Finalization — Diagnose & Act (NB-55..NB-60)
 
-> **Status:** ⚠️ NOT YET IMPLEMENTED (locked design, 2026-08-08 — see pending-behaviors.md NB-55..NB-60)
+> **Status:** ✅ IMPLEMENTED (2026-08-09, commits eb965b0..d4590fe on feat/ops-finalization, QA APPROVED)
 
 ---
 

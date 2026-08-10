@@ -110,7 +110,7 @@ Six phases, each with QA gate + atomic commit on `feat/ops-console`:
 
 ## TECH-40..TECH-45: Ops Finalization (NB-55..NB-60)
 
-**Status:** PENDING — behavior doc: `docs/behaviors/ops-finalization.md` (locked 2026-08-08)
+**Status:** IMPLEMENTED ✅ — commits `eb965b0`..`d4590fe` on `feat/ops-finalization` (QA APPROVED)
 **Date:** 2026-08-08
 
 Six packages, each with QA gate + atomic commit on `feat/ops-finalization`:

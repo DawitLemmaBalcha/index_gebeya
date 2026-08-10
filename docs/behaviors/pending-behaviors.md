@@ -271,7 +271,7 @@ UAT and support workflows require sqladmin row-inserts (test boosts/subscription
 - All actions: explicit confirmation, audit rows, never touch real Telegram payments.
 - Tests: simulator drives the same fulfillment path as the real listener flow (idempotency included); grant/revoke guards. Full regression green.
 
-## NB-55: Owner Quality Loop — Edit DM Button + Category Re-trigger + Quality Events
+## NB-55: [IMPLEMENTED] Owner Quality Loop — Edit DM Button + Category Re-trigger + Quality Events
 
 **Priority:** HIGH
 **Affected Features:** Listener, Stores, Ops
@@ -291,7 +291,7 @@ Quality management is impractical for the admin (sqladmin reclassification is ra
 
 ---
 
-## NB-56: Ban Primitive — one flag, enforced at the seams
+## NB-56: [IMPLEMENTED] Ban Primitive — one flag, enforced at the seams
 
 **Priority:** HIGH
 **Affected Features:** Users, Alerts, Reviews, Ingestion, Search
@@ -311,7 +311,7 @@ No way to neutralize a bad actor short of destructive DB surgery. sqladmin delet
 
 ---
 
-## NB-57: Anomaly Radar — the platform finds its own problems
+## NB-57: [IMPLEMENTED] Anomaly Radar — the platform finds its own problems
 
 **Priority:** HIGH
 **Affected Features:** Ops, Notifications, Monetization
@@ -333,7 +333,7 @@ Problems are discovered by log-archaeology. Dead-chat buyers, judge-error floods
 
 ---
 
-## NB-58: Engine Diagnostics — per-item decision traces
+## NB-58: [IMPLEMENTED] Engine Diagnostics — per-item decision traces
 
 **Priority:** MEDIUM
 **Affected Features:** Ops, Alerts
@@ -351,7 +351,7 @@ When an alert doesn't fire, nobody can see why — the engine's decisions are co
 
 ---
 
-## NB-59: Engine Actions — make the system do things
+## NB-59: [IMPLEMENTED] Engine Actions — make the system do things
 
 **Priority:** MEDIUM
 **Affected Features:** Ops, Ingestion, Notifications, Payments
@@ -368,7 +368,7 @@ Behavior-triggering verbs (re-run matching, retry delivery, re-process a post, t
 
 ---
 
-## NB-60: Users & Items Tabs — reframed as analytics + the ban lever
+## NB-60: [IMPLEMENTED] Users & Items Tabs — reframed as analytics + the ban lever
 
 **Priority:** MEDIUM
 **Affected Features:** Ops, Users, Items
