@@ -1,7 +1,8 @@
 import asyncio
+import json
 import time
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from client import send_to_api, get_channel_info
+from client import send_to_api, get_channel_info, get_item_api
 from config import logger, HEARTBEAT_INTERVAL, MAX_RETRIES_LIMIT, WEB_APP_URL
 from stats import stats
 
@@ -106,20 +107,79 @@ async def background_worker(queue: asyncio.Queue, bot):
                     # NB-45 (Rule 5.1/5.2): every item-result DM carries the
                     # boost deep-link button — path params matching the
                     # App.jsx route /stores/:channelId/:itemId (§2.7/§2.8).
-                    # Generic button text; the price never appears in the DM.
+                    # NB-55 (Rule 1.1/1.2): the Edit door sits beside Boost —
+                    # both are WebAppInfo doors into the web app, never a
+                    # Telegram DM editing flow.
                     channel_id = channel_info.get('id') if channel_info else None
                     reply_markup = None
+                    reply_markup_boost = None
                     if channel_id and result.get('item_id'):
+                        stores_url = f"{WEB_APP_URL}/stores/{channel_id}/{result['item_id']}"
                         reply_markup = InlineKeyboardMarkup([[
                             InlineKeyboardButton(
+                                "✏️ Edit product",
+                                web_app=WebAppInfo(url=stores_url),
+                            ),
+                            InlineKeyboardButton(
                                 "🚀 Boost this product",
-                                web_app=WebAppInfo(
-                                    url=f"{WEB_APP_URL}/stores/{channel_id}/{result['item_id']}"
-                                ),
-                            )
+                                web_app=WebAppInfo(url=stores_url),
+                            ),
+                        ]])
+                        # NB-55: the fetch-failure fallback keeps the legacy
+                        # single boost button (the DM never breaks).
+                        reply_markup_boost = InlineKeyboardMarkup([[
+                            InlineKeyboardButton(
+                                "🚀 Boost this product",
+                                web_app=WebAppInfo(url=stores_url),
+                            ),
                         ]])
 
-                    await dm_message.edit_text(edit_text, reply_markup=reply_markup)
+                    # NB-55 (Rule 1.1): the rich Indexed/Updated DM — the
+                    # full picture (description + spec summary + photo), not
+                    # just the title line. Telegram cannot edit text into a
+                    # photo, so media goes out as a NEW photo message and the
+                    # processing DM is deleted best-effort. Any fetch or send
+                    # failure falls back to today's text DM + the boost button.
+                    item_details = None
+                    if result.get('item_id'):
+                        item_details = await get_item_api(result['item_id'])
+
+                    if item_details is not None:
+                        body = edit_text
+                        description = item_details.get('description')
+                        if description and description != 'No description':
+                            body += f"\n\n📝 {description}"
+                        specs_text = _build_spec_summary(item_details.get('specs'))
+                        if specs_text:
+                            body += f"\n\n_{specs_text}_"
+
+                        media_path = None
+                        images = item_details.get('images') or []
+                        if images:
+                            media_path = images[0]
+                        elif item_details.get('image_path'):
+                            media_path = item_details['image_path']
+
+                        if media_path:
+                            try:
+                                await bot.send_photo(
+                                    chat_id=registered_by,
+                                    photo=f"{WEB_APP_URL}/media/{media_path}",
+                                    caption=body,
+                                    reply_markup=reply_markup,
+                                )
+                                try:
+                                    await dm_message.delete()
+                                except Exception as e:
+                                    logger.warning(f"⚠️ Failed to delete processing DM for msg #{message_id}: {e}")
+                            except Exception as e:
+                                logger.warning(f"⚠️ Photo DM failed for msg #{message_id}, falling back to text: {e}")
+                                await dm_message.edit_text(edit_text, reply_markup=reply_markup_boost)
+                        else:
+                            await dm_message.edit_text(body, reply_markup=reply_markup)
+                    else:
+                        await dm_message.edit_text(edit_text, reply_markup=reply_markup_boost)
+
                     logger.info(f"📝 Edited DM with success for msg #{message_id} (replaced={is_replaced})")
                 else:
                     await dm_message.edit_text(
@@ -138,3 +198,23 @@ async def background_worker(queue: asyncio.Queue, bot):
         if success:
             logger.info(f"💤 Resting for {HEARTBEAT_INTERVAL}s...")
             await asyncio.sleep(HEARTBEAT_INTERVAL)
+
+
+def _build_spec_summary(specs) -> str:
+    """NB-55: the top 3-4 relevant spec values for the rich owner DM — the
+    exact skip-set pattern from listener/notifications.py (location,
+    condition, contact_phone, phone_number never surface in DMs)."""
+    if not specs:
+        return ""
+    if isinstance(specs, str):
+        try:
+            specs = json.loads(specs.replace("'", '"'))
+        except Exception:
+            return ""
+    if not isinstance(specs, dict):
+        return ""
+    skip_keys = {'location', 'condition', 'contact_phone', 'phone_number'}
+    relevant = {k: v for k, v in specs.items() if k.lower() not in skip_keys}
+    if not relevant:
+        return ""
+    return ' | '.join(str(v) for v in list(relevant.values())[:4])

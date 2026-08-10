@@ -92,7 +92,7 @@ async def test_report_sold_threshold_flips_status_and_notifies(db_session, monke
 
     dm_calls = []
 
-    async def fake_send_owner_dm(db, channel_id, message):
+    async def fake_send_owner_dm(db, channel_id, message, reply_markup=None):
         dm_calls.append((channel_id, message))
 
     monkeypatch.setattr(item_status, "send_owner_dm", fake_send_owner_dm)
@@ -105,8 +105,10 @@ async def test_report_sold_threshold_flips_status_and_notifies(db_session, monke
     assert result["report_count"] == CROWDSOURCE_SOLD_THRESHOLD
     assert db_session.get(Item, item.id).status == "reported_sold"
     assert _report_count(db_session, item.id) == CROWDSOURCE_SOLD_THRESHOLD
-    # Owner DM attempted with the item's channel (best-effort adapter is patched here).
-    assert [cid for cid, _ in dm_calls] == [channel.id]
+    # Owner DM attempted with the item's channel (best-effort adapter is
+    # patched here) — TWICE: the first-report early warning and the
+    # take-down notice at the threshold (the service's deliberate pair).
+    assert [cid for cid, _ in dm_calls] == [channel.id, channel.id]
 
 
 @pytest.mark.asyncio

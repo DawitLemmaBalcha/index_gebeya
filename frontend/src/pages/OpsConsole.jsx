@@ -13,6 +13,10 @@ import OpsSettings from '../sections/OpsSettings';
 import OpsAudit from '../sections/OpsAudit';
 import OpsPayments from '../sections/OpsPayments';
 import OpsTools from '../sections/OpsTools';
+import OpsQuality from '../sections/OpsQuality';
+import OpsRadar from '../sections/OpsRadar';
+import OpsUsers from '../sections/OpsUsers';
+import OpsAlertsEngine from '../sections/OpsAlertsEngine';
 
 const SECTIONS = [
   { id: 'overview', title: 'Overview' },
@@ -182,6 +186,14 @@ function renderSection(id, { setToast }) {
       return <OpsPayments setToast={setToast} />;
     case 'tools':
       return <OpsTools setToast={setToast} />;
+    case 'catalog':
+      return <OpsQuality setToast={setToast} />;
+    case 'trust':
+      return <OpsRadar setToast={setToast} />;
+    case 'users':
+      return <OpsUsers setToast={setToast} />;
+    case 'alerts':
+      return <OpsAlertsEngine setToast={setToast} />;
     default:
       return <ComingSoon title={title} />;
   }

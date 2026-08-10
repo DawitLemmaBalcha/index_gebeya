@@ -262,10 +262,16 @@ def update_item(db: Session, item_id: int, user: User, payload: "ItemUpdateReque
     if "category" in update_data and payload.category != item.category:
         _log_edit("category", item.category, payload.category)
         item.category = payload.category
+        # NB-55 (Rule 1.3): category corrections re-trigger the pipeline —
+        # browse reads live rows, so the item moves in the catalog
+        # immediately and matching must re-evaluate it.
+        needs_reprocess = True
 
     if "subcategory" in update_data and payload.subcategory != item.subcategory:
         _log_edit("subcategory", item.subcategory, payload.subcategory)
         item.subcategory = payload.subcategory
+        # NB-55 (Rule 1.3): subcategory corrections re-trigger the pipeline.
+        needs_reprocess = True
 
     if "specs" in update_data:
         old_specs = {}

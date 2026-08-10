@@ -13,7 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 # 👇 IMPORT ROUTERS 👇
 from api.routes import ingestion, search, items, reviews, alerts, notifications, analytics, feed, channels, payments, subscriptions
-from api.routes import ops_auth, ops_health, ops_monetization, ops_settings, ops_audit, ops_payments, ops_tools, internal as internal_routes
+from api.routes import ops_auth, ops_health, ops_monetization, ops_settings, ops_audit, ops_payments, ops_tools, ops_finalize, internal as internal_routes
 
 # Initialize Logging
 logging.basicConfig(level=logging.INFO)
@@ -322,6 +322,39 @@ def startup_event():
             logger.info("✅ user-deletion FK policy migration verified (8 user FKs)")
     except Exception as e:
         logger.warning(f"⚠️ user-deletion FK policy migration failed: {e}")
+
+    try:
+        with engine.begin() as conn:
+            # NB-56: users.banned — the ban primitive flag (Rule 3.1).
+            # Idempotent ALTER TABLE ADD COLUMN IF NOT EXISTS (established
+            # style); safe on fresh and existing DBs.
+            conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN DEFAULT FALSE"
+            ))
+            logger.info("✅ NB-56 schema migration verified (users.banned)")
+    except Exception as e:
+        logger.warning(f"⚠️ NB-56 schema migration failed: {e}")
+
+    try:
+        with engine.begin() as conn:
+            # NB-57: radar_dismissals — dismissal STATE table (unique per
+            # anomaly identity). Ops state, not audit: the audit row records
+            # the dismissal action; this table records the dismissal.
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS radar_dismissals (
+                    id SERIAL PRIMARY KEY,
+                    type VARCHAR NOT NULL,
+                    entity_id VARCHAR NOT NULL,
+                    dismissed_by VARCHAR,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    CONSTRAINT _radar_dismissal_uc UNIQUE(type, entity_id)
+                )
+                """
+            ))
+            logger.info("✅ NB-57 schema migration verified (radar_dismissals)")
+    except Exception as e:
+        logger.warning(f"⚠️ NB-57 schema migration failed: {e}")
 
     try:
         with engine.begin() as conn:
@@ -635,6 +668,10 @@ app.include_router(ops_settings.router, prefix="/ops/settings", tags=["Ops"])
 app.include_router(ops_audit.router, prefix="/ops/audit", tags=["Ops"])
 app.include_router(ops_payments.router, prefix="/ops/payments", tags=["Ops"])
 app.include_router(ops_tools.router, prefix="/ops/tools", tags=["Ops"])
+
+# NB-55..NB-60 (TECH-40..45): the ops-finalization router — quality events,
+# users/ban, radar, diagnostics, engine actions, analytics.
+app.include_router(ops_finalize.router, prefix="/ops", tags=["Ops"])
 
 # SQLAdmin — full CRUD dashboard at /admin
 setup_admin(app)

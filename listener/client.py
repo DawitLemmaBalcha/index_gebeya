@@ -153,6 +153,20 @@ async def ack_notification(notification_id: int) -> bool:
             return False
 
 
+async def mark_notification_failed(notification_id: int) -> bool:
+    """NB-57 (§3.4): marks a notification FAILED in the Backend — the
+    dead-chat terminal state after NOTIFICATION_FAILURE_LIMIT consecutive
+    delivery failures. Mirrors ack_notification (best-effort, never raises)."""
+    url = f"{API_BASE}/notifications/{notification_id}/fail"
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            response = await client.post(url)
+            return response.status_code == 200
+        except Exception as e:
+            logger.error(f"⚠️ Failed to mark notification {notification_id} FAILED: {e}")
+            return False
+
+
 async def upsert_channel_api(username: str, title: str, registered_by: int, telegram_id: int) -> bool:
     """Registers or updates a channel with the backend (owner onboarding)."""
     url = f"{API_BASE}/channels/"
@@ -196,6 +210,29 @@ async def get_channel_info(username: str):
                 return None
         except Exception as e:
             logger.warning(f"⚠️ get_channel_info exception for @{username}: {e}")
+            return None
+
+
+async def get_item_api(item_id: int):
+    """
+    NB-55: fetch the item's full details for the Indexed/Updated owner DM
+    (description, spec summary, gallery). Returns a dict or None on ANY
+    failure — never raises (mirrors get_channel_info).
+    """
+    url = f"{API_BASE}/internal/items/{item_id}"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(url, headers=INTERNAL_HEADERS)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 404:
+                logger.warning(f"⚠️ get_item_api: item {item_id} not found")
+                return None
+            else:
+                logger.warning(f"⚠️ get_item_api failed ({response.status_code}): {response.text[:200]}")
+                return None
+        except Exception as e:
+            logger.warning(f"⚠️ get_item_api exception for item {item_id}: {e}")
             return None
 
 

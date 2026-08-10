@@ -30,6 +30,22 @@ beforeEach(() => {
       meOk = false
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
     }
+    if (url === '/ops/quality/events') {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) })
+    }
+    if (url === '/ops/items/analytics') {
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: () => Promise.resolve({
+          views_over_time: { days: [], total: [], top_items: [] },
+          price_distribution: [],
+          per_channel: [],
+        }),
+      })
+    }
+    if (url === '/ops/radar') {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ generated_at: 'x', anomalies: [] }) })
+    }
     return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -68,7 +84,7 @@ describe('OpsConsole shell', () => {
     expect(await screen.findByText('Invalid credentials')).toBeInTheDocument()
   })
 
-  it('renders the coming-soon stub for a deferred section', async () => {
+  it('renders the real Quality Events component for the Catalog section', async () => {
     render(<OpsConsole />)
     await screen.findByTestId('ops-login-form')
     fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'admin' } })
@@ -77,6 +93,43 @@ describe('OpsConsole shell', () => {
     await waitFor(() => expect(screen.getByText(/signed in as admin/i)).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: 'Catalog' }))
-    expect(screen.getByText(/Catalog — coming soon/i)).toBeInTheDocument()
+    expect(screen.getByText(/Quality Events/i)).toBeInTheDocument()
+  })
+
+  it('renders the real Users component for the Users section', async () => {
+    render(<OpsConsole />)
+    await screen.findByTestId('ops-login-form')
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'admin' } })
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await waitFor(() => expect(screen.getByText(/signed in as admin/i)).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Users' }))
+    expect(screen.getByPlaceholderText(/telegram id/i)).toBeInTheDocument()
+  })
+
+  it('renders the real Anomaly Radar component for the Trust & Moderation section', async () => {
+    render(<OpsConsole />)
+    await screen.findByTestId('ops-login-form')
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'admin' } })
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await waitFor(() => expect(screen.getByText(/signed in as admin/i)).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trust & Moderation' }))
+    expect(await screen.findByText(/Anomaly Radar/i)).toBeInTheDocument()
+  })
+
+  it('renders the real Alerts engine component for the Alerts & Notifications section', async () => {
+    render(<OpsConsole />)
+    await screen.findByTestId('ops-login-form')
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'admin' } })
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    await waitFor(() => expect(screen.getByText(/signed in as admin/i)).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Alerts & Notifications' }))
+    expect(await screen.findByRole('button', { name: /trace item/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Actions' })).toBeInTheDocument()
   })
 })

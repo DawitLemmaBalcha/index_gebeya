@@ -174,21 +174,31 @@ def test_anonymous_user_offset_works():
 def test_empty_response_on_exhaustion():
     """T8: When all available items have been excluded via the exclude parameter,
     the endpoint should return an empty array, not an error."""
-    # Get all item IDs in the database via /items/recent
-    all_items_resp = httpx.get(f"{BASE_URL}/items/recent?limit=100", timeout=10.0)
-    if all_items_resp.status_code != 200:
-        pytest.skip("Cannot fetch all items for exhaustion test")
-    all_ids = [str(item["id"]) for item in all_items_resp.json()]
-    if not all_ids:
+    # Iterative closure over the feed's OWN reachable pool: exclude → fetch →
+    # union → repeat until the response is empty. A single /items/recent page
+    # can no longer cover the pool (the DB holds 300+ active items), and the
+    # feed's sub-queries don't page by offset — the closure is the honest way
+    # to enumerate everything the feed can return.
+    excluded: set = set()
+    response = None
+    for _ in range(10):
+        response = api_get(
+            "/feed/foryou",
+            headers={"x-session-id": SESSION_EXPLORER},
+            params={"limit": 100, "offset": 0, "exclude": ",".join(map(str, sorted(excluded)))},
+        )
+        if response.status_code != 200:
+            pytest.skip("Feed unreachable for exhaustion test")
+        page = response.json()
+        if not page:
+            break
+        excluded.update(item["id"] for item in page)
+    else:
+        pytest.skip("Feed pool did not exhaust after 10 closure iterations")
+    if not excluded:
         pytest.skip("No items in database to exhaust")
-    
-    # Exclude every item in the database
-    exclude_all = ",".join(all_ids)
-    response = api_get(
-        "/feed/foryou",
-        headers={"x-session-id": SESSION_EXPLORER},
-        params={"limit": 10, "offset": 0, "exclude": exclude_all}
-    )
+
+    assert response is not None
     assert response.status_code == 200
     data = response.json()
     assert data == [], f"Expected empty list when all items excluded, got {len(data)} items"
