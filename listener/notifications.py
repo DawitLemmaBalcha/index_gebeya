@@ -2,8 +2,15 @@ import asyncio
 import json
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.error import TelegramError
-from config import logger, WEB_APP_URL
-from client import get_pending_notifications, ack_notification
+from config import logger, WEB_APP_URL, NOTIFICATION_FAILURE_LIMIT
+from client import get_pending_notifications, ack_notification, mark_notification_failed
+
+# NB-57 (§3.4): process-local consecutive-failure counter per notification.
+# Increment on delivery failure, clear on success; at NOTIFICATION_FAILURE_LIMIT
+# the poller marks the notification FAILED (the dead-chat detection's honest
+# source — genuinely dead chats land as FAILED rows within ~15s). Transient
+# failures below the limit keep retrying from PENDING.
+_consecutive_failures: dict[int, int] = {}
 
 # ------------------------------------------------------------------
 # COURIER: OUTBOUND NOTIFICATIONS
@@ -62,9 +69,8 @@ async def notification_poller(bot: Bot):
                 logger.info(f"📬 Found {len(pending)} pending notifications")
 
             for notif in pending:
-                # 2. System DM Branch (TECH-20)
+                # 2. System DM Branch (TECH-20): deliver exact message, no item
                 if notif.get('message_text') is not None:
-                    # System DM: deliver exact message, no item
                     msg_text = notif['message_text']
                     notif_alert_id = notif.get('alert_id')
 
@@ -72,17 +78,11 @@ async def notification_poller(bot: Bot):
                         bot, notif['user_telegram_id'], msg_text,
                         alert_id=notif_alert_id, item_url=None
                     )
-
-                    if success:
-                        await ack_notification(notif['id'])
-                    else:
-                        logger.warning(f"⚠️ Could not deliver system DM {notif['id']}. Will retry.")
-                    continue
-
-                # 3. Normal Match Notification
-                # 2. Format Message
-                item = notif['item']
-                alert_id = notif.get('alert_id') # Ensure backend Notification schema has alert_id linked in response?
+                else:
+                    # 3. Normal Match Notification
+                    # 2. Format Message
+                    item = notif['item']
+                    notif_alert_id = notif.get('alert_id')
                 # Note: The NotificationResponse schema in backend/schemas.py didn't include alert_id. 
                 # Ideally, we should add it. But for now, we can try to rely on context or assume backend sends it.
                 # FIX: In backend/models.py Notification has alert_id. 
@@ -143,11 +143,20 @@ async def notification_poller(bot: Bot):
 
                 success = await send_alert_dm(bot, notif['user_telegram_id'], msg_text, alert_id=notif_alert_id, item_url=item_url, image_url=image_url)
 
-                # 4. Acknowledge (Mark as Sent)
+                # 4. NB-57 (§3.4): acknowledge on success; count consecutive
+                # failures and mark FAILED at NOTIFICATION_FAILURE_LIMIT.
                 if success:
+                    _consecutive_failures.pop(notif['id'], None)
                     await ack_notification(notif['id'])
                 else:
-                    logger.warning(f"⚠️ Could not deliver notification {notif['id']}. Will retry.")
+                    failures = _consecutive_failures.get(notif['id'], 0) + 1
+                    if failures >= NOTIFICATION_FAILURE_LIMIT:
+                        await mark_notification_failed(notif['id'])
+                        _consecutive_failures.pop(notif['id'], None)
+                        logger.warning(f"⚠️ Notification {notif['id']} marked FAILED after {failures} consecutive failures.")
+                    else:
+                        _consecutive_failures[notif['id']] = failures
+                        logger.warning(f"⚠️ Could not deliver notification {notif['id']} ({failures}/{NOTIFICATION_FAILURE_LIMIT}). Will retry.")
 
         except Exception as e:
             if "ConnectError" not in str(e):

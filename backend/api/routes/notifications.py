@@ -46,3 +46,25 @@ def acknowledge_notification(notification_id: int, db: Session = Depends(get_db)
     db.commit()
     
     return {"status": "acked"}
+
+
+@router.post("/{notification_id}/fail")
+def fail_notification(notification_id: int, db: Session = Depends(get_db)):
+    """
+    NB-57 (§3.4): the poller marks a notification FAILED after
+    NOTIFICATION_FAILURE_LIMIT consecutive delivery failures — the honest
+    dead-chat source the radar reads. PENDING → FAILED (200); any terminal
+    state (SENT/REPLACED/FAILED) → 409. Unauthenticated, mirroring /ack
+    (the poller is the machine caller).
+    """
+    notification = db.scalar(select(Notification).where(Notification.id == notification_id))
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if notification.status != "PENDING":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot fail a {notification.status} notification",
+        )
+    notification.status = "FAILED"
+    db.commit()
+    return {"status": "failed"}

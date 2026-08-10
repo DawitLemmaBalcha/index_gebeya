@@ -524,3 +524,13 @@ class SimulatePaymentRequest(BaseModel):
     subscription_expiration_date: Optional[datetime] = None
     is_recurring: bool = False
     is_first_recurring: bool = False
+
+
+# ----------------------------------------------------------------------
+# NB-57: Anomaly Radar schemas
+# ----------------------------------------------------------------------
+class RadarResolveRequest(BaseModel):
+    """Dismiss an anomaly identity — (type, entity_id) per the detection
+    records' fields (blueprint §3.5)."""
+    type: str
+    entity_id: str

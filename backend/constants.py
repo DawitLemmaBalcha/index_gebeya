@@ -105,6 +105,16 @@ SOFT_DELETED_RETENTION_DAYS: int = _get_config("SOFT_DELETED_RETENTION_DAYS", 30
 REPORTED_SOLD_RETENTION_DAYS: int = _get_config("REPORTED_SOLD_RETENTION_DAYS", 7, int)
 STALE_ITEM_DAYS: int = _get_config("STALE_ITEM_DAYS", 14, int)
 
+# --- Anomaly Radar (NB-57) — plain env-overridable constants in v1 ---
+# (documented: a settings-registry pass is a future package if the operator
+# wants live radar tuning — blueprint §6.)
+RADAR_SCAM_CHANNEL_MAX_TRUST: float = _get_config("RADAR_SCAM_CHANNEL_MAX_TRUST", 2.0, float)
+RADAR_SCAM_CHANNEL_PRICE_OUTLIER_X: float = _get_config("RADAR_SCAM_CHANNEL_PRICE_OUTLIER_X", 3.0, float)
+RADAR_SCAM_CHANNEL_MIN_REPORTS: int = _get_config("RADAR_SCAM_CHANNEL_MIN_REPORTS", 2, int)
+RADAR_PRICE_ANOMALY_MAX_X_MEDIAN: float = _get_config("RADAR_PRICE_ANOMALY_MAX_X_MEDIAN", 10.0, float)
+RADAR_DEAD_CHAT_SEVERITY_MEDIUM: int = _get_config("RADAR_DEAD_CHAT_SEVERITY_MEDIUM", 1, int)
+RADAR_DEAD_CHAT_SEVERITY_HIGH: int = _get_config("RADAR_DEAD_CHAT_SEVERITY_HIGH", 3, int)
+
 # --- Retention (TECH-25) ---
 ALERT_RETENTION_DAYS: int = _get_config("ALERT_RETENTION_DAYS", 30, int)
 NOTIFICATION_RETENTION_DAYS: int = _get_config("NOTIFICATION_RETENTION_DAYS", 90, int)

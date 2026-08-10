@@ -28,6 +28,11 @@ MEDIA_DIR = "/app/media"
 HEARTBEAT_INTERVAL = float(os.getenv("LISTENER_INTERVAL", "30.0"))
 MAX_RETRIES_LIMIT = int(os.getenv("LISTENER_MAX_RETRIES", "10"))
 
+# NB-57: consecutive-failure marking — the poller marks a notification
+# FAILED (dead-chat terminal state) after this many consecutive delivery
+# failures; transient failures below the limit keep retrying from PENDING.
+NOTIFICATION_FAILURE_LIMIT = int(os.getenv("NOTIFICATION_FAILURE_LIMIT", "3"))
+
 # ALBUM BUFFERING
 ALBUM_BUFFER_DELAY = 2.0 
 
