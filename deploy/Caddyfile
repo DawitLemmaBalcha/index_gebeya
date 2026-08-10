@@ -67,6 +67,24 @@ indexgebeya.cfd {
     handle /ops/internal* {
         reverse_proxy index_api:8000
     }
+    handle /ops/radar* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/quality* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/items* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/users* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/actions* {
+        reverse_proxy index_api:8000
+    }
+    handle /ops/diagnostics* {
+        reverse_proxy index_api:8000
+    }
 
     # Everything else → React SPA
     handle {
