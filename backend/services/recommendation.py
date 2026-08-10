@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from models import Item, UserInteraction
 from database import engine
+from services.ban import owner_banned_pred  # NB-56 Rule 3.3: feeds exclude banned sellers
 
 # --- LOGGER SETUP ---
 logger = logging.getLogger("index_api")
@@ -34,7 +35,7 @@ def get_recent_items(db: Session, limit: int = 10, exclude_ids: set = set()) -> 
     logger.info(f"🧠 [FALLBACK] Fetching {limit} recent items.")
     results = db.scalars(
         select(Item)
-        .where(Item.status == "active")
+        .where(Item.status == "active", ~owner_banned_pred())
         .order_by(Item.created_at.desc())
         .limit(limit + len(exclude_ids))
     ).all()
@@ -72,6 +73,7 @@ def get_trending_items(db: Session, limit: int = 10, exclude_ids: set = set()) -
         select(Item)
         .where(Item.id.in_(item_ids))
         .where(Item.status == "active")
+        .where(~owner_banned_pred())
     ).all()
     items_map = {i.id: i for i in items}
     sorted_items = [items_map[iid] for iid in item_ids if iid in items_map]
@@ -117,6 +119,7 @@ def get_session_feed(db: Session, interactions: List[UserInteraction], limit: in
         select(Item)
         .where(Item.id.not_in(item_ids))
         .where(Item.status == "active")
+        .where(~owner_banned_pred())
         .order_by(Item.image_vector.l2_distance(mean_vector))
         .limit(limit + len(exclude_ids))
     )
@@ -178,6 +181,7 @@ def get_discovery_feed(db: Session, interactions: List[UserInteraction], total_l
             select(Item)
             .where(Item.category == category)
             .where(Item.status == "active")
+            .where(~owner_banned_pred())
             .where(Item.id.not_in(query_exclude_ids))
             .order_by(Item.image_vector.l2_distance(mean_vector))
             .limit(limit_for_cat)
@@ -236,6 +240,7 @@ def get_wildcard_feed(db: Session, interactions: List[UserInteraction], limit: i
             select(Item)
             .where(Item.category == category)
             .where(Item.status == "active")
+            .where(~owner_banned_pred())
             .order_by(Item.created_at.desc())
             .limit(cat_limit + len(exclude_ids))
         ).all()

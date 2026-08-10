@@ -13,6 +13,7 @@ from services import search as search_service
 from services import catalog as catalog_service
 from services.analytics import AnalyticsService
 from services.auth import authenticate
+from services.ban import is_banned  # NB-56 Rule 3.2: the sold-report seam
 from services.boost import (
     get_boost_price,
     get_boost_status,
@@ -234,6 +235,9 @@ async def report_item_as_sold(
     the item status is set to 'reported_sold'.
     """
     user = authenticate(body.init_data, db)
+    # NB-56 (Rule 3.2): banned users cannot report items as sold.
+    if is_banned(db, user):
+        raise HTTPException(status_code=403, detail="Account banned")
     return await report_sold(db, item_id, user)
 
 

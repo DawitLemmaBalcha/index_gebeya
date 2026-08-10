@@ -14,6 +14,9 @@ class User(Base):
     telegram_id = Column(BigInteger, unique=True, index=True, nullable=False)
     username = Column(String, nullable=True)
     first_name = Column(String, nullable=True)
+    # NB-56 (Rule 3.1): the ban primitive — one reversible flag, zero derived
+    # state. Unban restores everything because every query seam re-reads it.
+    banned = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -401,3 +404,19 @@ class ListenerHeartbeat(Base):
     id = Column(Integer, primary_key=True)  # fixed 1
     last_seen_at = Column(DateTime(timezone=True), nullable=False)
     payload = Column(JSON, nullable=True)
+
+
+class RadarDismissal(Base):
+    """NB-57: radar dismissal STATE — one row per dismissed anomaly identity
+    (type, entity_id). Ops state, not audit: the audit log records the
+    dismissal ACTION; this table records that the radar must stop showing it."""
+    __tablename__ = "radar_dismissals"
+    __table_args__ = (
+        UniqueConstraint('type', 'entity_id', name='_radar_dismissal_uc'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String, nullable=False)
+    entity_id = Column(String, nullable=False)
+    dismissed_by = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

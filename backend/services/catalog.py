@@ -14,6 +14,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from models import Item
+from services.ban import owner_banned_pred  # NB-56 Rule 3.3: browse excludes banned sellers
 
 
 def browse_category(
@@ -29,6 +30,10 @@ def browse_category(
         Item.category == category,
         Item.status == "active",
         Item.is_active == True,  # noqa: E712 — house style (models/boost.py)
+        # NB-56 (Rule 3.3): banned sellers' items are excluded at query
+        # time — never deleted; the predicate is NULL-safe so ownerless
+        # channels stay visible (Rule 1.4).
+        ~owner_banned_pred(),
     )
     items = list(
         db.scalars(

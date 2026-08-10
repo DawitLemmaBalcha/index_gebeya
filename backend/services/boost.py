@@ -24,6 +24,7 @@ from constants import (
 )
 from models import Boost, Channel, Item, User
 from services import settings_registry
+from services.ban import owner_banned_pred  # NB-56 Rule 3.3: the pinned layer
 from services.boost_pricing import get_boost_price  # re-export (D12, D14)
 from services.subscriptions import get_credit_boosts_remaining
 from services.telegram_payments import star_payments
@@ -231,6 +232,10 @@ def get_pinned_boosted_items(
             Boost.ends_at > now,
             Item.status == "active",
             Item.is_active == True,
+            # NB-56 (Rule 3.3): the pinned layer queries items itself — a
+            # banned seller's boost must not surface above the organic
+            # results even though the organic lists are filtered.
+            ~owner_banned_pred(),
         )
     ).all()
 

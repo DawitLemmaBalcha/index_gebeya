@@ -81,6 +81,11 @@ def _execute_search_sql(db: Session, vec_literal: str, query_text: str, limit: i
             (i.image_vector IS NOT NULL OR (:q != '' AND similarity(coalesce(i.title, '') || ' ' || i.description, :q) > 0.01))
             {unpriced_clause}
             {exclude_clause}
+            -- NB-56 (Rule 3.3): banned sellers' items never surface in
+            -- search (join via c.registered_by = users.telegram_id; the
+            -- channels alias c already exists; NULL-safe for ownerless
+            -- channels — they match no row).
+            AND NOT EXISTS (SELECT 1 FROM users u WHERE u.telegram_id = c.registered_by AND u.banned = TRUE)
             -- TECH-22: Only return active items in search
             AND i.status = 'active'
     )

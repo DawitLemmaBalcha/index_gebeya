@@ -14,6 +14,7 @@ from ai_engine import extract_product_info
 from ai_engine.vector_client import vectorize_image, get_visual_hints
 from ai_engine.matcher import cosine_similarity
 from services.alerting import process_new_item # IMPORT ORCHESTRATOR
+from services.ban import is_channel_banned  # NB-56 Rule 3.3: the ingestion seam
 from services.boost import transfer_boost # NB-43 Rule 6.2: dedup replacement transfers boost
 
 router = APIRouter()
@@ -97,6 +98,12 @@ async def parse_telegram_post(
             channel = Channel(username=clean_username, title=clean_username, trust_score=2.5)
             db.add(channel)
             db.flush()
+
+        # NB-56 (Rule 3.3): a channel whose owner is banned pauses indexing —
+        # reject BEFORE the photo fetch and any item creation. Ownerless
+        # channels (registered_by NULL) are unaffected (Rule 1.4).
+        if channel.registered_by is not None and is_channel_banned(db, channel):
+            raise HTTPException(status_code=403, detail="Channel owner banned")
 
         # ---------------------------------------------------------
         # TECH-07: Fetch channel profile photo on first encounter
@@ -267,6 +274,11 @@ async def parse_telegram_post(
             replaced=was_replaced
         )
 
+    except HTTPException:
+        # NB-56: the ban 403 (and any other deliberate HTTP error) must
+        # propagate as its status code — never swallowed into a 200 error
+        # payload by the blanket exception handler below.
+        raise
     except Exception as e:
         logger.error(f"Error processing post: {str(e)}")
         db.rollback()

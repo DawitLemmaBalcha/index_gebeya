@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime, timedelta, timezone
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from typing import List, Dict, Optional
@@ -18,6 +19,7 @@ from constants import (
     ALERT_LIFESPAN_DAYS,
     RING_TOLERANCE,
 )
+from services.ban import is_banned  # NB-56 Rule 3.2: the alert-creation seam
 from services.subscriptions import get_effective_alert_cap  # NB-46 (D3): the single cap authority
 
 logger = logging.getLogger("index_alerts")
@@ -302,6 +304,11 @@ def _apply_auto_pause(db: Session, alert: Alert, item: Item, result) -> None:
         logger.info(f"⏸️ Auto-paused Alert {alert.id} after {MAX_MATCHES_BEFORE_PAUSE} total matches.")
 
 def create_alert(db: Session, user: User, query_text: str, max_price: Optional[float], preferences: Dict):
+    # NB-56 (Rule 3.2): banned buyers cannot create alerts — the seam at the
+    # service level covers the route and every caller.
+    if is_banned(db, user):
+        raise HTTPException(status_code=403, detail="Account banned")
+
     # --- Max Alerts Per User Check (NB-46 D3: effective cap = free + subscription extra) ---
     cap = get_effective_alert_cap(db, user)
     if cap > 0:
@@ -312,7 +319,6 @@ def create_alert(db: Session, user: User, query_text: str, max_price: Optional[f
             )
         )
         if active_count >= cap:
-            from fastapi import HTTPException
             raise HTTPException(
                 status_code=400,
                 detail=f"You've reached the maximum of {cap} active alerts. Pause or delete an existing alert to create a new one."

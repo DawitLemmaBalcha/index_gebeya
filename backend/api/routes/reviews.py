@@ -7,6 +7,7 @@ from database import get_db
 from models import Review, User, Channel
 from schemas import ReviewCreate, ReviewResponse
 from services.auth import verify_init_data
+from services.ban import is_banned  # NB-56 Rule 3.2: the review seam
 
 # 👇 THIS IS THE KEY: It defines a ROUTER, not an APP 👇
 router = APIRouter()
@@ -35,6 +36,11 @@ def create_review(payload: ReviewCreate, db: Session = Depends(get_db)):
         db.add(user)
         db.commit()
         db.refresh(user)
+
+    # NB-56 (Rule 3.2): banned users cannot submit reviews (their existing
+    # reviews stay visible — historical evidence).
+    if is_banned(db, user):
+        raise HTTPException(status_code=403, detail="Account banned")
 
     # 3. Check for Duplicate Review (One per channel per person)
     existing = db.query(Review).filter(
