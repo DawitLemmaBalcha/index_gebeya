@@ -63,3 +63,6 @@ desktop.ini
 /AGENTS.md
 # Graphify AST cache (regenerated locally)
 graphify-out/
+
+# Node
+node_modules/
